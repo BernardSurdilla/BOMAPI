@@ -1,6 +1,7 @@
 ﻿using API_TEST.Controllers;
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
+using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +11,7 @@ namespace BillOfMaterialsAPI.Controllers
 
     [ApiController]
     [Route("BOM/logs/")]
-    [Authorize]
+    [Authorize(Roles = UserRoles.Admin)]
     public class LoggingController : ControllerBase
     {
         private readonly LoggingDatabaseContext _logs;

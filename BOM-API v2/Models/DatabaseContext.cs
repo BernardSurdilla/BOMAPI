@@ -1,6 +1,8 @@
 ﻿using BillOfMaterialsAPI.Schemas;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 namespace BillOfMaterialsAPI.Models
 {
     public class DatabaseContext : DbContext
@@ -16,16 +18,20 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
     }
 
-    public class AccountDatabaseContext : IdentityDbContext<Users>
-    {
-        public AccountDatabaseContext(DbContextOptions<AccountDatabaseContext> options) :
-            base(options)
-        { }
-    }
     public class LoggingDatabaseContext : DbContext
     {
         public LoggingDatabaseContext(DbContextOptions<LoggingDatabaseContext> options): base(options) { }
         public DbSet<TransactionLogs> TransactionLogs {  get; set; }
 
     }
+
+    //Old Authentication
+    public class AccountDatabaseContext : IdentityDbContext<Users>
+    {
+        public AccountDatabaseContext(DbContextOptions<AccountDatabaseContext> options) :
+            base(options)
+        { }
+
+    }
+    
 }

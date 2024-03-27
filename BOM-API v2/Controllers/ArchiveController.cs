@@ -8,13 +8,15 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
+using JWTAuthentication.Authentication;
+
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
 namespace BillOfMaterialsAPI.Controllers
 {
     [Route("BOM/archive/")]
     [ApiController]
-    [Authorize]
+    [Authorize(Roles = UserRoles.Admin)]
     public class ArchiveController : ControllerBase
     {
         private readonly DatabaseContext _context;

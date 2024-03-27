@@ -5,6 +5,8 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using BillOfMaterialsAPI.Services;
+using JWTAuthentication.Authentication;
+using System.Security.Claims;
 
 namespace API_TEST.Controllers
 {
@@ -38,6 +40,7 @@ namespace API_TEST.Controllers
 
     [ApiController]
     [Route("BOM/")]
+    [Authorize(Roles = UserRoles.Admin)]
     public class BOMController : ControllerBase
     {
         private readonly DatabaseContext _context;
@@ -50,6 +53,11 @@ namespace API_TEST.Controllers
             _actionLogger = logger;
         }
 
+        [HttpGet]
+        public string yeeass()
+        {
+            return User.Claims.First(x => x.Type == ClaimTypes.Name).Value;
+        }
         //Json serialization and deserialization
         //string a = JsonSerializer.Serialize(ingredientAboutToBeDeleted);
         //JsonSerializer.Deserialize<List<SubPastryMaterials_materials_column>>(a);
@@ -58,7 +66,7 @@ namespace API_TEST.Controllers
 
     [ApiController]
     [Route("BOM/materials/")]
-    [Authorize]
+    [Authorize(Roles = UserRoles.Admin)]
     public class MaterialController : ControllerBase
     {
         private readonly DatabaseContext _context;
@@ -486,7 +494,7 @@ namespace API_TEST.Controllers
 
     [ApiController]
     [Route("BOM/ingredients/")]
-    [Authorize]
+    [Authorize(Roles = UserRoles.Admin)]
     public class IngredientController : ControllerBase
     {
         private readonly DatabaseContext _context;

@@ -5,6 +5,11 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using BillOfMaterialsAPI.Services;
 using BillOfMaterialsAPI.Schemas;
+using JWTAuthentication;
+using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,9 +62,11 @@ builder.Services.AddDbContext<DatabaseContext>(optionsAction: options => options
 
 //builder.Services.AddIdentity<Users, >(options => options.SignIn.RequireConfirmedAccount = true).AddEntityFrameworkStores<AccountDatabaseContext>();
 builder.Services.AddDbContext<LoggingDatabaseContext>(optionsAction: options => options.UseSqlServer(builder.Configuration.GetConnectionString("SQLServerMigrationTesting")));
+
+/*
+ * OLD AUTHENTICATION METHOD
+ * 
 builder.Services.AddDbContext<AccountDatabaseContext>(optionsAction: options => options.UseSqlServer(builder.Configuration.GetConnectionString("SQLServerMigrationTesting")));
-
-
 //Security
 builder.Services.AddAuthorization();
 builder.Services.AddIdentityApiEndpoints<Users>(opt => {
@@ -86,6 +93,37 @@ builder.Services.ConfigureApplicationCookie(options => {
 
     options.SlidingExpiration = true;
 });
+*/
+
+//NEW AUTHENTICATION METHOD
+var serverVersion = new MariaDbServerVersion(new Version(10, 4, 28));
+builder.Services.AddDbContext<AuthDB>(options => options.UseMySql(builder.Configuration.GetConnectionString("AUTHTESTING"), serverVersion));
+builder.Services.AddAuthorization();
+
+//options.UseMySql(builder.Configuration.GetConnectionString("MySql"), serverVersion)
+//options.UseMySql(builder.Configuration.GetConnectionString("AUTHTESTING"), serverVersion)
+
+builder.Services.AddIdentity<APIUsers, IdentityRole>()
+    .AddEntityFrameworkStores<AuthDB>()
+    .AddDefaultTokenProviders();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.SaveToken = true;
+    options.RequireHttpsMetadata = false;
+    options.TokenValidationParameters = new TokenValidationParameters()
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidAudience = builder.Configuration.GetSection("JWT").GetValue<string>("ValidAudience"),
+        ValidIssuer = builder.Configuration.GetSection("JWT").GetValue<string>("ValidIssuer"),
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("JWT").GetValue<string>("Secret")))
+    };
+});
 
 
 //Custom Services
@@ -98,16 +136,17 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-
-    app.UseCors("DebugPolicy");
+    app.UseSwagger()
+    .UseSwaggerUI()
+    .UseCors("DebugPolicy");
 }
 
-app.MapIdentityApi<Users>();
+//app.MapIdentityApi<BillOfMaterialsAPI.Schemas.Users>();
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 
 app.Run();
