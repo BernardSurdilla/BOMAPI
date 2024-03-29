@@ -17,21 +17,4 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
     }
-
-    public class LoggingDatabaseContext : DbContext
-    {
-        public LoggingDatabaseContext(DbContextOptions<LoggingDatabaseContext> options): base(options) { }
-        public DbSet<TransactionLogs> TransactionLogs {  get; set; }
-
-    }
-
-    //Old Authentication
-    public class AccountDatabaseContext : IdentityDbContext<Users>
-    {
-        public AccountDatabaseContext(DbContextOptions<AccountDatabaseContext> options) :
-            base(options)
-        { }
-
-    }
-    
 }

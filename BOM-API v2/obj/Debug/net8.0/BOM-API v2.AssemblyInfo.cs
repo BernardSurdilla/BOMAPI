@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BOM-API v2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+991bbe62db89e0727dc0894f7f20b624e082b1b4")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ba9c9fc69870587e397943fac3d258d1442156c0")]
 [assembly: System.Reflection.AssemblyProductAttribute("BOM-API v2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BOM-API v2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

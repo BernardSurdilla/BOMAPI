@@ -63,7 +63,195 @@ namespace API_TEST.Controllers
         //JsonSerializer.Deserialize<List<SubPastryMaterials_materials_column>>(a);
     }
 
+    [ApiController]
+    [Route("BOM/ingredients/")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public class IngredientController : ControllerBase
+    {
+        private readonly DatabaseContext _context;
+        private readonly IActionLogger _actionLogger;
 
+        public IngredientController(DatabaseContext context, IActionLogger logs) { _context = context; _actionLogger = logs; }
+
+        // GET
+        [HttpGet]
+        public async Task<List<GetIngredients>> GetAllIngredients(int? page, int? record_per_page)
+        {
+            List<GetIngredients> response = new List<GetIngredients>();
+
+            List<Ingredients> dbIngredients;
+
+            //Paging algorithm
+            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).ToListAsync(); }
+            else { 
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync(); 
+            }
+
+            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+
+            foreach (Ingredients i in dbIngredients)
+            {
+                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
+                response.Add(newRow);
+            }
+
+            await _actionLogger.LogAction(User, "GET, All ingredients");
+
+            return response;
+        }
+        [HttpGet("{ingredient_id}")]
+        public async Task<GetIngredients> GetIngredient(string ingredient_id)
+        {
+            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
+
+            if (currentIngredient == null) { return GetIngredients.DefaultResponse(); }
+            if (currentIngredient.isActive == false) { return GetIngredients.DefaultResponse(); }
+
+            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id);
+            return new GetIngredients(
+                currentIngredient.ingredient_id,
+                currentIngredient.item_id,
+                currentIngredient.amount,
+                currentIngredient.amount_measurement,
+                currentIngredient.dateAdded,
+                currentIngredient.lastModifiedDate
+                );
+        }
+        [HttpGet("{ingredient_id}/{column_name}")]
+        public async Task<object> GetIngredientColumn(string ingredient_id, string column_name)
+        {
+            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
+            Object? response = null;
+
+            if (currentIngredient == null) { return NotFound(new { message = "Specified material with the material_id is not found." }); }
+            if (currentIngredient.isActive == false) { return NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
+
+            switch (column_name)
+            {
+                case "ingredient_id": response = currentIngredient.ingredient_id; break;
+                case "item_id": response = currentIngredient.item_id; break;
+                case "amount": response = currentIngredient.amount; break;
+                case "amount_measurement": response = currentIngredient.amount_measurement; break;
+                case "dateAdded": response = currentIngredient.dateAdded; break;
+                case "lastModifiedDate": response = currentIngredient.lastModifiedDate; break;
+                default: response = BadRequest(new { message = "Specified column does not exist." }); break;
+            }
+
+            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " + column_name);
+            return response;
+        }
+
+        // POST
+        [HttpPost]
+        public async Task<IActionResult> AddIngredient(PostIngredients data)
+        {
+            try
+            {
+                if (data == null) { return BadRequest(new { message = "Data to be inserted is empty." }); }
+
+                //Check if item id exists on the 'Materials' table
+                //or in the inventory
+                var materialIdList = await _context.Materials.Select(id => id.material_id).ToListAsync();
+                //Add additional code here for inventory id checking
+                if (materialIdList.Find(id => id == data.item_id).IsNullOrEmpty() == true && false) { return NotFound(new { message = "Id specified in the request does not exist in the database." }); }
+
+                string lastIngredientId = "";
+
+                try { List<Ingredients> x = await _context.Ingredients.ToListAsync(); lastIngredientId = x.Last().ingredient_id; }
+                catch (Exception ex)
+                {
+                    string newIngredientId = IdFormat.ingredientIdFormat;
+                    for (int i = 1; i <= IdFormat.idNumLength; i++) { newIngredientId += "0"; }
+                    lastIngredientId = newIngredientId;
+                }
+
+                Ingredients newIngredientsEntry = new Ingredients();
+                DateTime currentTime = DateTime.Now;
+
+                newIngredientsEntry.ingredient_id = IdFormat.IncrementId(IdFormat.ingredientIdFormat, IdFormat.idNumLength, lastIngredientId);
+
+                newIngredientsEntry.item_id = data.item_id;
+
+                newIngredientsEntry.amount = data.amount;
+                newIngredientsEntry.amount_measurement = data.amount_measurement;
+                newIngredientsEntry.isActive = true;
+                newIngredientsEntry.dateAdded = currentTime;
+                newIngredientsEntry.lastModifiedDate = currentTime;
+
+                await _context.Ingredients.AddAsync(newIngredientsEntry);
+                await _context.SaveChangesAsync();
+
+                await _actionLogger.LogAction(User, "POST, Add Ingredient " + newIngredientsEntry.ingredient_id);
+                return Ok(new { message = "Data inserted to the database." });
+            }
+            catch (Exception e)
+            {
+                return StatusCode(500, "Error on creating new ingredient.");
+            }
+
+
+        }
+
+        // PATCH
+        [HttpPatch("{ingredient_id}")]
+        public async Task<IActionResult> UpdateIngredients(string ingredient_id, PatchIngredients entry)
+        {
+            Ingredients? ingredientAboutToBeUpdated = await _context.Ingredients.FindAsync(ingredient_id);
+            if (ingredientAboutToBeUpdated == null) { return NotFound(new { message = "Specified ingredient entry with the selected ingredient_id not found." }); }
+            if (ingredientAboutToBeUpdated.isActive == false) { return NotFound(new { message = "Specified ingredient entry with the selected ingredient_id not found or deleted." }); }
+
+            //Code for checking if the id in the request exists in the material or inventory tables
+            var materialIdList = await _context.Materials.Select(id => id.material_id).ToListAsync();
+            //Add additional code here to check the inventory
+            if (materialIdList.Find(id => id == entry.item_id).IsNullOrEmpty() == true && false) { return NotFound(new { message = "Id specified in the request does not exist in the database." }); }
+
+            DateTime currentTime = DateTime.Now;
+
+            _context.Ingredients.Update(ingredientAboutToBeUpdated);
+            ingredientAboutToBeUpdated.item_id = entry.item_id;
+            ingredientAboutToBeUpdated.amount = entry.amount;
+            ingredientAboutToBeUpdated.amount_measurement = entry.amount_measurement;
+            ingredientAboutToBeUpdated.lastModifiedDate = currentTime;
+
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "PATCH, Update Ingredient " + ingredient_id);
+            return Ok(new { message = "Ingredient updated" });
+        }
+
+        // DELETE
+        [HttpDelete("{ingredient_id}")]
+        public async Task<IActionResult> DeleteIngredient(string ingredient_id)
+        {
+            Ingredients? ingredientAboutToBeDeleted = await _context.Ingredients.FindAsync(ingredient_id);
+            if (ingredientAboutToBeDeleted == null) { return NotFound(new { message = "Specified ingredient with the selected ingredient_id not found." }); }
+            if (ingredientAboutToBeDeleted.isActive == false) { return NotFound(new { message = "Specified ingredient with the selected ingredient_id already deleted." }); }
+
+            DateTime currentTime = DateTime.Now;
+            _context.Ingredients.Update(ingredientAboutToBeDeleted);
+            ingredientAboutToBeDeleted.lastModifiedDate = currentTime;
+            ingredientAboutToBeDeleted.isActive = false;
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "DELETE, Delete Ingredient " + ingredient_id);
+            return Ok(new { message = "Ingredient deleted." });
+
+        }
+    }
+
+    /*
+     * 
+     * 
+     *fix 
+     *below
+     *
+     *
+     */
     [ApiController]
     [Route("BOM/materials/")]
     [Authorize(Roles = UserRoles.Admin)]
@@ -79,7 +267,7 @@ namespace API_TEST.Controllers
 
         //GET
         [HttpGet]
-        public async Task<List<GetMaterials>> GetAllMaterials()
+        public async Task<List<GetMaterials>> GetAllMaterials(int? page, int? record_per_page)
         {
             
             //Default GET request without parameters
@@ -90,11 +278,22 @@ namespace API_TEST.Controllers
 
             //Get all entries in the 'Materials' and 'MaterialIngredients' table in the connected database
             //And convert it to a list object
-            List<Materials> dbMaterials = await _context.Materials.ToListAsync();
-            List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.ToListAsync();
-            //Get only the rows with the 'isActive' column true
-            dbMaterials = dbMaterials.FindAll(x => x.isActive == true);
-            dbMaterialIngredients = dbMaterialIngredients.FindAll(x => x.isActive == true);
+            List<Materials> dbMaterials;
+            List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.Where(row => row.isActive == true).ToListAsync();
+
+            //Paging algorithm
+            if (page == null) { dbMaterials = await _context.Materials.Where(row => row.isActive == true).ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbMaterials = await _context.Materials.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            if (dbMaterials.IsNullOrEmpty()) { response.Add(GetMaterials.DefaultResponse()); return response; }
 
             foreach (Materials material in dbMaterials)
             {
@@ -183,7 +382,7 @@ namespace API_TEST.Controllers
             */
         }
         [HttpGet("{material_id}/{column_name}")]
-        public async Task<object> GetMaterialColumn(string material_id, string column_name)
+        public async Task<Object> GetMaterialColumn(string material_id, string column_name)
         {
             Materials? currentMaterial = await _context.Materials.FindAsync(material_id);
 
@@ -492,175 +691,5 @@ namespace API_TEST.Controllers
         }
     }
 
-    [ApiController]
-    [Route("BOM/ingredients/")]
-    [Authorize(Roles = UserRoles.Admin)]
-    public class IngredientController : ControllerBase
-    {
-        private readonly DatabaseContext _context;
-        private readonly IActionLogger _actionLogger;
-
-        public IngredientController(DatabaseContext context, IActionLogger logs) { _context = context; _actionLogger = logs; }
-
-        // GET
-        [HttpGet]
-        public async Task<List<GetIngredients>> GetAllIngredients()
-        {
-            List<GetIngredients> response = new List<GetIngredients>();
-
-            List<Ingredients> dbIngredients = await _context.Ingredients.ToListAsync();
-            dbIngredients = dbIngredients.FindAll(x => x.isActive == true);
-
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
-
-            foreach (Ingredients i in dbIngredients)
-            {
-                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
-                response.Add(newRow);
-            }
-
-            await _actionLogger.LogAction(User, "GET, All ingredients");
-
-            return response;
-        }
-        [HttpGet("{ingredient_id}")]
-        public async Task<GetIngredients> GetIngredient(string ingredient_id)
-        {
-            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
-
-            if (currentIngredient == null) { return GetIngredients.DefaultResponse(); }
-            if (currentIngredient.isActive == false) { return GetIngredients.DefaultResponse(); }
-
-            await _actionLogger.LogAction(User, "GET, Ingredient " +  ingredient_id);
-            return new GetIngredients(
-                currentIngredient.ingredient_id,
-                currentIngredient.item_id,
-                currentIngredient.amount,
-                currentIngredient.amount_measurement,
-                currentIngredient.dateAdded,
-                currentIngredient.lastModifiedDate
-                );
-        }
-        [HttpGet("{ingredient_id}/{column_name}")]
-        public async Task<object> GetIngredientColumn(string ingredient_id, string column_name)
-        {
-            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
-            Object? response = null;
-
-            if (currentIngredient == null) { return NotFound(new { message = "Specified material with the material_id is not found." }); }
-            if (currentIngredient.isActive == false) { return NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
-
-            switch (column_name)
-            {
-                case "ingredient_id": response = currentIngredient.ingredient_id; break;
-                case "item_id": response = currentIngredient.item_id; break;
-                case "amount": response = currentIngredient.amount; break;
-                case "amount_measurement": response = currentIngredient.amount_measurement; break;
-                case "dateAdded": response = currentIngredient.dateAdded; break;
-                case "lastModifiedDate": response = currentIngredient.lastModifiedDate; break;
-                default: response = BadRequest(new { message = "Specified column does not exist." }); break;
-            }
-
-            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " +  column_name);
-            return response;
-        }
-
-        // POST
-        [HttpPost]
-        public async Task<IActionResult> AddIngredient(PostIngredients data)
-        {
-            try
-            {
-                if (data == null) { return BadRequest(new { message = "Data to be inserted is empty." }); }
-
-                //Check if item id exists on the 'Materials' table
-                //or in the inventory
-                var materialIdList = await _context.Materials.Select(id => id.material_id).ToListAsync();
-                //Add additional code here for inventory id checking
-                if (materialIdList.Find(id => id == data.item_id).IsNullOrEmpty() == true && false) { return NotFound(new { message = "Id specified in the request does not exist in the database." }); }
-
-                string lastIngredientId = "";
-
-                try { List<Ingredients> x = await _context.Ingredients.ToListAsync(); lastIngredientId = x.Last().ingredient_id; }
-                catch (Exception ex)
-                {
-                    string newIngredientId = IdFormat.ingredientIdFormat;
-                    for (int i = 1; i <= IdFormat.idNumLength; i++) { newIngredientId += "0"; }
-                    lastIngredientId = newIngredientId;
-                }
-
-                Ingredients newIngredientsEntry = new Ingredients();
-                DateTime currentTime = DateTime.Now;
-
-                newIngredientsEntry.ingredient_id = IdFormat.IncrementId(IdFormat.ingredientIdFormat, IdFormat.idNumLength, lastIngredientId);
-
-
-                newIngredientsEntry.item_id = data.item_id;
-
-                newIngredientsEntry.amount = data.amount;
-                newIngredientsEntry.amount_measurement = data.amount_measurement;
-                newIngredientsEntry.isActive = true;
-                newIngredientsEntry.dateAdded = currentTime;
-                newIngredientsEntry.lastModifiedDate = currentTime;
-
-                await _context.Ingredients.AddAsync(newIngredientsEntry);
-                await _context.SaveChangesAsync();
-
-                await _actionLogger.LogAction(User, "POST, Add Ingredient " + newIngredientsEntry.ingredient_id);
-                return Ok(new { message = "Data inserted to the database." });
-            }
-            catch (Exception e)
-            {
-                return StatusCode(500, "Error on creating new ingredient.");
-            }
-
-
-        }
-
-        // PATCH
-        [HttpPatch("{ingredient_id}")]
-        public async Task<IActionResult> UpdateIngredients(string ingredient_id, PatchIngredients entry)
-        {
-            Ingredients? ingredientAboutToBeUpdated = await _context.Ingredients.FindAsync(ingredient_id);
-            if (ingredientAboutToBeUpdated == null) { return NotFound(new { message = "Specified ingredient entry with the selected ingredient_id not found." }); }
-            if (ingredientAboutToBeUpdated.isActive == false) { return NotFound(new { message = "Specified ingredient entry with the selected ingredient_id not found or deleted." }); }
-
-            //Code for checking if the id in the request exists in the material or inventory tables
-            var materialIdList = await _context.Materials.Select(id => id.material_id).ToListAsync();
-            //Add additional code here to check the inventory
-            if (materialIdList.Find(id => id == entry.item_id).IsNullOrEmpty() == true && false) { return NotFound(new { message = "Id specified in the request does not exist in the database." }); }
-
-            DateTime currentTime = DateTime.Now;
-
-            _context.Ingredients.Update(ingredientAboutToBeUpdated);
-            ingredientAboutToBeUpdated.item_id = entry.item_id;
-            ingredientAboutToBeUpdated.amount = entry.amount;
-            ingredientAboutToBeUpdated.amount_measurement = entry.amount_measurement;
-            ingredientAboutToBeUpdated.lastModifiedDate = currentTime;
-
-            await _context.SaveChangesAsync();
-
-            await _actionLogger.LogAction(User, "PATCH, Update Ingredient " + ingredient_id);
-            return Ok(new { message = "Ingredient updated" });
-        }
-
-        // DELETE
-        [HttpDelete("{ingredient_id}")]
-        public async Task<IActionResult> DeleteIngredient(string ingredient_id)
-        {
-            Ingredients? ingredientAboutToBeDeleted = await _context.Ingredients.FindAsync(ingredient_id);
-            if (ingredientAboutToBeDeleted == null) { return NotFound(new { message = "Specified ingredient with the selected ingredient_id not found." }); }
-            if (ingredientAboutToBeDeleted.isActive == false) { return NotFound(new { message = "Specified ingredient with the selected ingredient_id already deleted." }); }
-
-            DateTime currentTime = DateTime.Now;
-            _context.Ingredients.Update(ingredientAboutToBeDeleted);
-            ingredientAboutToBeDeleted.lastModifiedDate = currentTime;
-            ingredientAboutToBeDeleted.isActive = false;
-            await _context.SaveChangesAsync();
-
-            await _actionLogger.LogAction(User, "DELETE, Delete Ingredient " + ingredient_id);
-            return Ok(new { message = "Ingredient deleted." });
-
-        }
-    }
+    
 }

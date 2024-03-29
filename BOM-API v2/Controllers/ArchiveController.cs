@@ -27,14 +27,25 @@ namespace BillOfMaterialsAPI.Controllers
 
         //Getting deleted data
         [HttpGet("ingredients/")]
-        public async Task<List<GetIngredients>> GetDeletedIngredients() 
+        public async Task<List<GetIngredients>> GetDeletedIngredients(int? page, int? record_per_page) 
         {
             List<GetIngredients> response = new List<GetIngredients>();
 
-            List<Ingredients> dbIngredients = await _context.Ingredients.ToListAsync();
-            dbIngredients = dbIngredients.FindAll(x => x.isActive == false);
+            List<Ingredients> dbIngredients;
 
-            if (dbIngredients.IsNullOrEmpty() == true) { return response; }
+            //Paging algorithm
+            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
 
             foreach (Ingredients i in dbIngredients)
             {
@@ -46,7 +57,7 @@ namespace BillOfMaterialsAPI.Controllers
             return response;
         }
         [HttpGet("materials/")]
-        public async Task<List<GetMaterials>> GetDeletedMaterials()
+        public async Task<List<GetMaterials>> GetDeletedMaterials(int? page, int? record_per_page)
         {
             //Default GET request without parameters
             //This should return all records in the BOM database
@@ -56,10 +67,22 @@ namespace BillOfMaterialsAPI.Controllers
 
             //Get all entries in the 'Materials' and 'MaterialIngredients' table in the connected database
             //And convert it to a list object
-            List<Materials> dbMaterials = await _context.Materials.ToListAsync();
-            List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.ToListAsync();
-            dbMaterials = dbMaterials.FindAll(x => x.isActive == false);
-            dbMaterialIngredients = dbMaterialIngredients.FindAll(x => x.isActive == false);
+            List<Materials> dbMaterials;
+            List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.Where(row => row.isActive == false).ToListAsync();
+
+            //Paging algorithm
+            if (page == null) { dbMaterials = await _context.Materials.Where(row => row.isActive == false).ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbMaterials = await _context.Materials.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            if (dbMaterials.IsNullOrEmpty()) { response.Add(GetMaterials.DefaultResponse()); return response; }
 
             foreach (Materials material in dbMaterials)
             {
@@ -93,8 +116,7 @@ namespace BillOfMaterialsAPI.Controllers
             //Return empty array if material not found
             if (currentMaterial == null) { return new List<SubGetMaterialIngredients>([new SubGetMaterialIngredients(new MaterialIngredients())]); }
 
-            List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.ToListAsync();
-            dbMaterialIngredients = dbMaterialIngredients.FindAll(x => x.isActive == false && x.material_id == material_id);
+            List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.Where(row => row.material_id == currentMaterial.material_id && row.isActive == false).ToListAsync();
 
             List<SubGetMaterialIngredients> materialIngredients = new List<SubGetMaterialIngredients>();
             //Return empty array if no non active entries are found

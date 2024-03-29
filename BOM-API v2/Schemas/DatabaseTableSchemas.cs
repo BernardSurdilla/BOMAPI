@@ -72,11 +72,12 @@ namespace BillOfMaterialsAPI.Schemas
     }
 
     //ACCOUNT
-
+    /*
     public class Users : IdentityUser
     {
         [Required][MaxLength(50)] public string DisplayName { get; set; }
         [Required] public DateTime JoinDate { get; set; }
 
     }
+    */
 }

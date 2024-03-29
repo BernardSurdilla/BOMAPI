@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using Microsoft.Extensions.Options;
+using BillOfMaterialsAPI.Services;
 
 
 
@@ -81,12 +82,14 @@ namespace JWTAuthentication.Controllers
         private readonly UserManager<APIUsers> userManager;
         private readonly RoleManager<IdentityRole> roleManager;
         private readonly IConfiguration _configuration;
+        private readonly IActionLogger _actionLogger;
 
-        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration)
+        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger)
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
-            _configuration = configuration;
+            this._configuration = configuration;
+            this._actionLogger = actionLogger;
         }
 
         [HttpPost]
@@ -121,6 +124,7 @@ namespace JWTAuthentication.Controllers
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                     );
 
+                await _actionLogger.LogUserLogin(user);
                 return Ok(new
                 {
                     token = new JwtSecurityTokenHandler().WriteToken(token),
@@ -128,29 +132,6 @@ namespace JWTAuthentication.Controllers
                 });
             }
             return Unauthorized();
-        }
-
-        [HttpPost]
-        [Route("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterModel model)
-        {
-            var userExists = await userManager.FindByNameAsync(model.Username);
-            var userEmailExist = await userManager.FindByEmailAsync(model.Email);
-            if (userExists != null || userEmailExist != null)
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User already exists!" });
-
-            APIUsers user = new APIUsers()
-            {
-                Email = model.Email,
-                SecurityStamp = Guid.NewGuid().ToString(),
-                UserName = model.Username,
-                JoinDate = DateTime.Now
-            };
-            var result = await userManager.CreateAsync(user, model.Password);
-            if (!result.Succeeded)
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User creation failed! Please check user details and try again." });
-
-            return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
 
         [HttpPost]
