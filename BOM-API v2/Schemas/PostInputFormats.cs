@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -7,6 +6,8 @@ namespace BillOfMaterialsAPI.Schemas
     {
         //Which item in the inventory this ingredient pertains to
         [Required][MaxLength(25)] public string item_id { get; set; }
+        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
@@ -17,6 +18,16 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
+    //MaterialIngredientsEntryFormatWOMaterialId
+    public class SubPostMaterialIngredients
+    {
+        //Which item in the inventory this ingredient pertains to
+        [Required][MaxLength(25)] public string item_id { get; set; }
+        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+
+        [Required] public int amount { get; set; }
+        [Required][MaxLength(15)] public string amount_measurement { get; set; }
+    }
     //MaterialIngredientEntryFormat
     public class PostMaterialIngredient
     {
@@ -24,6 +35,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(25)] public string material_id { get; set; }
         //Which item in the inventory this ingredient pertains to
         [Required][MaxLength(25)] public string item_id { get; set; }
+        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
@@ -36,12 +49,10 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public List<SubPostMaterialIngredients> ingredients { get; set; }
     }
-    //MaterialIngredientsEntryFormatWOMaterialId
-    public class SubPostMaterialIngredients
+
+    public class PostPastryMaterial
     {
-        //Which item in the inventory this ingredient pertains to
-        [Required][MaxLength(25)] public string item_id { get; set; }
-        [Required] public int amount { get; set; }
-        [Required][MaxLength(15)] public string amount_measurement { get; set; }
+
     }
+    
 }

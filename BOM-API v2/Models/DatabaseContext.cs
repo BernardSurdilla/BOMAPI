@@ -1,8 +1,5 @@
 ﻿using BillOfMaterialsAPI.Schemas;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations;
 namespace BillOfMaterialsAPI.Models
 {
     public class DatabaseContext : DbContext
@@ -16,5 +13,5 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
-    }
+    }   
 }

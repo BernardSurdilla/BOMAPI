@@ -1,14 +1,12 @@
 using BillOfMaterialsAPI.Models;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.OpenApi.Models;
-using Swashbuckle.AspNetCore.Filters;
 using BillOfMaterialsAPI.Services;
-using BillOfMaterialsAPI.Schemas;
-using JWTAuthentication;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
+using Swashbuckle.AspNetCore.Filters;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,9 +15,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy(name: "DebugPolicy", policy => { 
-        policy.AllowAnyOrigin(); 
-        policy.AllowAnyHeader(); });
+    options.AddPolicy(name: "DebugPolicy", policy =>
+    {
+        policy.AllowAnyOrigin();
+        policy.AllowAnyHeader();
+    });
 });
 
 builder.Services.AddControllers();
@@ -27,7 +27,8 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(opt =>
 {
-    opt.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme {
+    opt.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
+    {
         In = ParameterLocation.Header,
         Name = "Authorization",
         Type = SecuritySchemeType.ApiKey

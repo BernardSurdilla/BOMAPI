@@ -65,7 +65,7 @@
   },
   {
     "ContainingType": "API_TEST.Controllers.BOMController",
-    "Method": "yeeass",
+    "Method": "test",
     "RelativePath": "BOM",
     "HttpMethod": "GET",
     "IsController": true,
@@ -257,69 +257,6 @@
   },
   {
     "ContainingType": "API_TEST.Controllers.IngredientController",
-    "Method": "AddIngredient",
-    "RelativePath": "BOM/ingredients",
-    "HttpMethod": "POST",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "data",
-        "Type": "BillOfMaterialsAPI.Schemas.PostIngredients",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_TEST.Controllers.IngredientController",
-    "Method": "GetIngredient",
-    "RelativePath": "BOM/ingredients/{ingredient_id}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "ingredient_id",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "BillOfMaterialsAPI.Schemas.GetIngredients",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "API_TEST.Controllers.IngredientController",
-    "Method": "UpdateIngredients",
-    "RelativePath": "BOM/ingredients/{ingredient_id}",
-    "HttpMethod": "PATCH",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "ingredient_id",
-        "Type": "System.String",
-        "IsRequired": true
-      },
-      {
-        "Name": "entry",
-        "Type": "BillOfMaterialsAPI.Schemas.PatchIngredients",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
-  },
-  {
-    "ContainingType": "API_TEST.Controllers.IngredientController",
     "Method": "DeleteIngredient",
     "RelativePath": "BOM/ingredients/{ingredient_id}",
     "HttpMethod": "DELETE",
@@ -354,6 +291,26 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.BOMController",
+    "Method": "GetMostCommonlyUsedItem",
+    "RelativePath": "BOM/item_used/occurence",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetUsedItems, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   },
   {
     "ContainingType": "BillOfMaterialsAPI.Controllers.LoggingController",
@@ -584,5 +541,135 @@
       }
     ],
     "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.PastryIngredientController",
+    "Method": "GetAllPastryMaterial",
+    "RelativePath": "BOM/pastry_materials",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetPastryMaterial, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.PastryIngredientController",
+    "Method": "AddNewPastryMaterial",
+    "RelativePath": "BOM/pastry_materials",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "designId",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "entries",
+        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.PostIngredients, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.PastryIngredientController",
+    "Method": "GetSpecificPastryMaterial",
+    "RelativePath": "BOM/pastry_materials/{pastry_material_id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "pastry_material_id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "BillOfMaterialsAPI.Schemas.GetPastryMaterial",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.PastryIngredientController",
+    "Method": "AddNewIngredient",
+    "RelativePath": "BOM/pastry_materials/{pastry_material_id}",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "pastry_material_id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "entry",
+        "Type": "BillOfMaterialsAPI.Schemas.PostIngredients",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.PastryIngredientController",
+    "Method": "DeletePastryMaterial",
+    "RelativePath": "BOM/pastry_materials/{pastry_material_id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "pastry_material_id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.PastryIngredientController",
+    "Method": "GetAllPastryIngredient",
+    "RelativePath": "BOM/pastry_materials/{pastry_material_id}/ingredients",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "pastry_material_id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetPastryMaterialIngredients, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
   }
 ]

@@ -1,14 +1,11 @@
-﻿using API_TEST.Controllers;
-using BillOfMaterialsAPI.Models;
+﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
 using BillOfMaterialsAPI.Services;
+using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-
-using JWTAuthentication.Authentication;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -27,7 +24,7 @@ namespace BillOfMaterialsAPI.Controllers
 
         //Getting deleted data
         [HttpGet("ingredients/")]
-        public async Task<List<GetIngredients>> GetDeletedIngredients(int? page, int? record_per_page) 
+        public async Task<List<GetIngredients>> GetDeletedIngredients(int? page, int? record_per_page)
         {
             List<GetIngredients> response = new List<GetIngredients>();
 
@@ -49,7 +46,7 @@ namespace BillOfMaterialsAPI.Controllers
 
             foreach (Ingredients i in dbIngredients)
             {
-                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
+                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
                 response.Add(newRow);
             }
 
@@ -120,8 +117,8 @@ namespace BillOfMaterialsAPI.Controllers
 
             List<SubGetMaterialIngredients> materialIngredients = new List<SubGetMaterialIngredients>();
             //Return empty array if no non active entries are found
-            if (dbMaterialIngredients.IsNullOrEmpty() == true) { return new List<SubGetMaterialIngredients>([new SubGetMaterialIngredients(new MaterialIngredients())]); } 
-            foreach (MaterialIngredients i in  dbMaterialIngredients) { materialIngredients.Add(new SubGetMaterialIngredients(i)); }
+            if (dbMaterialIngredients.IsNullOrEmpty() == true) { return new List<SubGetMaterialIngredients>([new SubGetMaterialIngredients(new MaterialIngredients())]); }
+            foreach (MaterialIngredients i in dbMaterialIngredients) { materialIngredients.Add(new SubGetMaterialIngredients(i)); }
 
             await _actionLogger.LogAction(User, "GET, All Deleted Material Ingredients");
             return materialIngredients;
@@ -139,7 +136,7 @@ namespace BillOfMaterialsAPI.Controllers
 
             _context.Ingredients.Update(selectedIngredientEntry);
             DateTime currentTime = DateTime.Now;
-            selectedIngredientEntry.lastModifiedDate = currentTime; 
+            selectedIngredientEntry.lastModifiedDate = currentTime;
             selectedIngredientEntry.isActive = true;
             await _context.SaveChangesAsync();
 

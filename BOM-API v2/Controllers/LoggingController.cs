@@ -1,7 +1,4 @@
-﻿using API_TEST.Controllers;
-using BillOfMaterialsAPI.Models;
-using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Services;
+﻿using BillOfMaterialsAPI.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
