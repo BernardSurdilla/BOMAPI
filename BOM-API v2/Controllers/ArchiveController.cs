@@ -99,36 +99,6 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "GET, All Deleted Pastry Material Ingredients");
             return response;
         }
-        [HttpGet("pastry_materials/ingredients/all")]
-        public async Task<List<GetIngredients>> GetAllDeletedIngredients(int? page, int? record_per_page)
-        {
-            List<GetIngredients> response = new List<GetIngredients>();
-
-            List<Ingredients> dbIngredients;
-
-            //Paging algorithm
-            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).ToListAsync(); }
-            else
-            {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
-
-                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
-
-                dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
-            }
-
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
-
-            foreach (Ingredients i in dbIngredients)
-            {
-                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
-                response.Add(newRow);
-            }
-
-            await _actionLogger.LogAction(User, "GET, All Deleted Ingredients");
-            return response;
-        }
 
         [HttpGet("materials/")]
         public async Task<List<GetMaterials>> GetDeletedMaterials(int? page, int? record_per_page)
@@ -204,6 +174,10 @@ namespace BillOfMaterialsAPI.Controllers
         //
         //Restoring data
         //
+
+        //Note: Restoring Pastry Materials will also restore All ingredient entry tied to it
+        //If the item or material pointed by the ingredient is not active...
+        //It will not restore it
         [HttpPatch("pastry_materials/{pastry_material_id}")]
         public async Task<IActionResult> RestorePastryMaterial(string pastry_material_id)
         {
@@ -216,20 +190,47 @@ namespace BillOfMaterialsAPI.Controllers
             selectedPastryMaterialsEntry.lastModifiedDate = currentTime;
             selectedPastryMaterialsEntry.isActive = true;
 
+            List<string> failedToRestoreEntries = new List<string>();
+
             List<Ingredients> ingredientsOfSelectedEntry = await _context.Ingredients.Where(x => x.pastry_material_id == selectedPastryMaterialsEntry.pastry_material_id && x.isActive == false).ToListAsync();
             if (ingredientsOfSelectedEntry.IsNullOrEmpty() == false)
             {
                 foreach (Ingredients i in ingredientsOfSelectedEntry)
                 {
-                    _context.Ingredients.Update(i);
-                    i.lastModifiedDate = currentTime;
-                    i.isActive = true;
+                    switch (i.ingredient_type)
+                    {
+                        case IngredientType.InventoryItem:
+                            //Add code here to check if the inventory item associated still exist
+
+                            _context.Ingredients.Update(i);
+                            i.lastModifiedDate = currentTime;
+                            i.isActive = true;
+                            break;
+                        case IngredientType.Material:
+                            Materials? referencedMaterial = await _context.Materials.Where(x => x.material_id == i.item_id).FirstAsync();
+
+                            if (referencedMaterial != null)
+                            {
+                                if (referencedMaterial.isActive == true)
+                                {
+                                    _context.Ingredients.Update(i);
+                                    i.lastModifiedDate = currentTime;
+                                    i.isActive = true;
+                                }
+                                else { failedToRestoreEntries.Add("Material: " + referencedMaterial.material_id + " - Ingredient: " + i.ingredient_id); }
+                            }
+
+                            break;
+                    }
+                    
                 }
             }
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH, Recover Pastry Materials " + pastry_material_id);
-            return Ok(new { message = "Pastry Materials restored" });
+
+            if (failedToRestoreEntries.IsNullOrEmpty()) { return Ok(new { message = "Pastry Materials restored. All associated ingredients recovered" }); }
+            else { return Ok(new { message = "Pastry Materials restored. Some associated Ingredients failed to be restored however. Check results for more details", results = failedToRestoreEntries }); }
         }
         [HttpPatch("pastry_materials/{pastry_material_id}/{ingredient_id}")]
         public async Task<IActionResult> RestorePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
@@ -252,11 +253,14 @@ namespace BillOfMaterialsAPI.Controllers
         }
 
         //NOTE: When restore all is true
-        //It will restore any record that has their associated parent still active
+        //It will restore any record that references this material if their associated parent is active
+        //
         //For example:
         //Restoring a material that is associated with a pastry material ingredient record will...
-        //Restore it if the pastry material connected with that record is active
-        //Ignore it if the pastry material connected with that record is not active (deleted)
+        //Restore the pastry material ingredient connected associated with the material IF the pastry material for that ingredient is active
+        //Ignore the pastry material ingredient connected associated with the material IF the pastry material for that ingredient is not active (deleted)
+        //
+        //Same goes for the material ingredients
         [HttpPatch("materials/{material_id}")]
         public async Task<IActionResult> RestoreMaterial(string material_id, bool restore_all_pastry_ingredients_connected = false, bool restore_all_material_ingredient_connected = false)
         {
@@ -282,7 +286,9 @@ namespace BillOfMaterialsAPI.Controllers
                 }
             }
 
-            //Deleting connected pastry ingredients
+            List<string> failedToRestoreEntries = new List<string>();
+
+            //Restoring connected pastry ingredients
             if (restore_all_pastry_ingredients_connected == true)
             {
                 List<Ingredients> ingredientsToBeRestored = await _context.Ingredients.Where(x => x.item_id == materialAboutToBeRestored.material_id && x.isActive == false).ToListAsync();
@@ -311,13 +317,13 @@ namespace BillOfMaterialsAPI.Controllers
                                     i.lastModifiedDate = currentTime;
                                     i.isActive = true;
                                 }
+                                else { failedToRestoreEntries.Add("Pastry Material: " + associatedPastryMaterial.pastry_material_id + " - Ingredient: " + i.ingredient_id ); }
                             }
                             break;
                     }
                 }
             }
-
-            //Deleting connected material ingredients of other materials
+            //Restoring connected material ingredients of other materials
             if (restore_all_material_ingredient_connected == true)
             {
                 List<MaterialIngredients> relatedMaterialIngredientsAboutToBeRestored = await _context.MaterialIngredients.Where(x => x.item_id == materialAboutToBeRestored.material_id && x.isActive == false).ToListAsync();
@@ -336,7 +342,7 @@ namespace BillOfMaterialsAPI.Controllers
                         case IngredientType.Material:
                             //Check if the material associated is active
                             //If it is restore the record
-                            Materials? associatedMaterial = await _context.Materials.Where(x => x.material_id == i.item_id).FirstAsync();
+                            Materials? associatedMaterial = await _context.Materials.Where(x => x.material_id == i.material_id).FirstAsync();
 
                             if (associatedMaterial != null)
                             {
@@ -346,6 +352,7 @@ namespace BillOfMaterialsAPI.Controllers
                                     i.lastModifiedDate = currentTime;
                                     i.isActive = true;
                                 }
+                                else { failedToRestoreEntries.Add("Material: " + associatedMaterial.material_id + " - Material Ingredient: " + i.material_ingredient_id); }
                             }
                             break;
                     }
@@ -355,7 +362,10 @@ namespace BillOfMaterialsAPI.Controllers
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH, Recover Material " + "Also Associated Material&Pastry Ingredient " + restore_all_material_ingredient_connected.ToString() + "/" + restore_all_pastry_ingredients_connected.ToString());
-            return Ok(new { message = "Material restored." });
+
+            if (failedToRestoreEntries.IsNullOrEmpty() ) { return Ok(new { message = "Material restored. All associated Material Ingredient and Pastry Material Ingredient restored" }); }
+            else { return Ok(new { message = "Material restored. Some associated Material Ingredient and/or Pastry Material Ingredient failed to be restored however. Check results for more details", results = failedToRestoreEntries }); }
+            
         }
         [HttpPatch("materials/{material_id}/ingredients/{material_ingredient_id}")]
         public async Task<IActionResult> DeleteMaterialIngredient(string material_id, string material_ingredient_id)

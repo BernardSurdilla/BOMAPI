@@ -122,17 +122,91 @@ namespace API_TEST.Controllers
             return response;
         }
 
-        [HttpGet]
-        public async Task<string> test()
+
+        [HttpGet("obsolete/archive/ingredients/all")]
+        public async Task<List<GetIngredients>> GetAllDeletedIngredients(int? page, int? record_per_page)
         {
-            string lastPastryMaterialId = "ass";
-            try { PastryMaterials x = await _context.PastryMaterials.OrderByDescending(x => x.pastry_material_id).FirstAsync(); lastPastryMaterialId = x.pastry_material_id; }
-            catch
+            List<GetIngredients> response = new List<GetIngredients>();
+
+            List<Ingredients> dbIngredients;
+
+            //Paging algorithm
+            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).ToListAsync(); }
+            else
             {
-                lastPastryMaterialId = "hehehaha";
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
-            return lastPastryMaterialId;
+
+            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+
+            foreach (Ingredients i in dbIngredients)
+            {
+                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
+                response.Add(newRow);
+            }
+
+            await _actionLogger.LogAction(User, "GET, All Deleted Ingredients");
+            return response;
         }
+        [HttpGet("obsolete/ingredients")]
+        public async Task<List<GetIngredients>> GetAllIngredients(int? page, int? record_per_page)
+        {
+            List<GetIngredients> response = new List<GetIngredients>();
+
+            List<Ingredients> dbIngredients;
+
+            //Paging algorithm
+            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+            foreach (Ingredients i in dbIngredients)
+            {
+                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
+                response.Add(newRow);
+            }
+            await _actionLogger.LogAction(User, "GET, All ingredients");
+            return response;
+        }
+        [HttpGet("obsolete/ingredients/{ingredient_id}/{column_name}")]
+        public async Task<object> GetIngredientColumn(string ingredient_id, string column_name)
+        {
+            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
+            object? response = null;
+
+            if (currentIngredient == null) { return NotFound(new { message = "Specified material with the material_id is not found." }); }
+            if (currentIngredient.isActive == false) { return NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
+
+            switch (column_name)
+            {
+                case "ingredient_id": response = currentIngredient.ingredient_id; break;
+                case "pastry_material_id": response = currentIngredient.pastry_material_id; break;
+                case "item_id": response = currentIngredient.item_id; break;
+                case "ingredient_type": response = currentIngredient.pastry_material_id; break;
+                case "amount": response = currentIngredient.amount; break;
+                case "amount_measurement": response = currentIngredient.amount_measurement; break;
+                case "dateAdded": response = currentIngredient.dateAdded; break;
+                case "lastModifiedDate": response = currentIngredient.lastModifiedDate; break;
+                default: response = BadRequest(new { message = "Specified column does not exist." }); break;
+            }
+
+            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " + column_name);
+            return response;
+        }
+
+
         //Json serialization and deserialization
         //string a = JsonSerializer.Serialize(ingredientAboutToBeDeleted);
         //JsonSerializer.Deserialize<List<SubPastryMaterials_materials_column>>(a);
@@ -188,7 +262,7 @@ namespace API_TEST.Controllers
 
         }
         [HttpGet("{pastry_material_id}/ingredients")]
-        public async Task<List<GetPastryMaterialIngredients>> GetAllPastryIngredient(string pastry_material_id)
+        public async Task<List<GetPastryMaterialIngredients>> GetAllPastryMaterialIngredient(string pastry_material_id)
         {
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
 
@@ -199,6 +273,21 @@ namespace API_TEST.Controllers
 
             foreach (Ingredients i in currentIngredient)
             {
+                //Check if the referenced item is active
+                switch (i.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        //
+                        //Add code here to find the item in the inventory
+                        //
+                        break;
+                    case IngredientType.Material:
+                        Materials? associatedMaterial = await _context.Materials.Where(x => x.material_id == i.item_id).FirstAsync();
+                        if (associatedMaterial == null) { continue; }
+                        if (associatedMaterial.isActive == false) { continue; }
+                        break;
+                }
+
                 GetPastryMaterialIngredients newEntry = new GetPastryMaterialIngredients();
 
                 newEntry.ingredient_id = i.ingredient_id;
@@ -212,11 +301,6 @@ namespace API_TEST.Controllers
 
                 switch (i.ingredient_type)
                 {
-                    case IngredientType.InventoryItem:
-                        //
-                        //Add code here to find the item in the inventory
-                        //
-                        break;
                     case IngredientType.Material:
                         List<MaterialIngredients> allMatIng = await _context.MaterialIngredients.Where(x => x.material_id == i.item_id && x.isActive == true).ToListAsync();
 
@@ -329,7 +413,7 @@ namespace API_TEST.Controllers
 
         }
         [HttpPost("{pastry_material_id}/ingredients")]
-        public async Task<IActionResult> AddNewIngredient(string pastry_material_id, PostIngredients entry)
+        public async Task<IActionResult> AddNewPastryMaterialIngredient(string pastry_material_id, PostIngredients entry)
         {
             PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.Where(x 
                 => x.isActive == true).FirstAsync(x => x.pastry_material_id == pastry_material_id);
@@ -745,7 +829,7 @@ namespace API_TEST.Controllers
                     lastMaterialId = newMaterialId;
                 }
 
-                try { MaterialIngredients x = await _context.MaterialIngredients.OrderByDescending(x => x.material_id).FirstAsync(); lastMaterialIngredientId = x.material_ingredient_id; }
+                try { MaterialIngredients x = await _context.MaterialIngredients.OrderByDescending(x => x.material_ingredient_id).FirstAsync(); lastMaterialIngredientId = x.material_ingredient_id; }
                 catch (Exception ex)
                 {
                     string newIngredientId = IdFormat.materialIngredientIdFormat;
@@ -1044,7 +1128,7 @@ namespace API_TEST.Controllers
             return Ok(new { message = "Material ingredient deleted." });
         }
     }
-
+    /*
     [ApiController]
     [Route("BOM/ingredients/")]
     [Authorize(Roles = UserRoles.Admin)]
@@ -1056,58 +1140,7 @@ namespace API_TEST.Controllers
         public IngredientController(DatabaseContext context, IActionLogger logs) { _context = context; _actionLogger = logs; }
 
         // GET
-        [HttpGet]
-        public async Task<List<GetIngredients>> GetAllIngredients(int? page, int? record_per_page)
-        {
-            List<GetIngredients> response = new List<GetIngredients>();
-
-            List<Ingredients> dbIngredients;
-
-            //Paging algorithm
-            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).ToListAsync(); }
-            else
-            {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
-
-                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
-
-                dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
-            }
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
-            foreach (Ingredients i in dbIngredients)
-            {
-                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
-                response.Add(newRow);
-            }
-            await _actionLogger.LogAction(User, "GET, All ingredients");
-            return response;
-        }
-
-        [HttpGet("{ingredient_id}/{column_name}")]
-        public async Task<object> GetIngredientColumn(string ingredient_id, string column_name)
-        {
-            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
-            object? response = null;
-
-            if (currentIngredient == null) { return NotFound(new { message = "Specified material with the material_id is not found." }); }
-            if (currentIngredient.isActive == false) { return NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
-
-            switch (column_name)
-            {
-                case "ingredient_id": response = currentIngredient.ingredient_id; break;
-                case "pastry_material_id": response = currentIngredient.pastry_material_id; break;
-                case "item_id": response = currentIngredient.item_id; break;
-                case "ingredient_type": response = currentIngredient.pastry_material_id; break;
-                case "amount": response = currentIngredient.amount; break;
-                case "amount_measurement": response = currentIngredient.amount_measurement; break;
-                case "dateAdded": response = currentIngredient.dateAdded; break;
-                case "lastModifiedDate": response = currentIngredient.lastModifiedDate; break;
-                default: response = BadRequest(new { message = "Specified column does not exist." }); break;
-            }
-
-            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " + column_name);
-            return response;
-        }
+        
     }
+    */
 }

@@ -64,26 +64,6 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "API_TEST.Controllers.BOMController",
-    "Method": "test",
-    "RelativePath": "BOM",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [],
-    "ReturnTypes": [
-      {
-        "Type": "System.String",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
     "ContainingType": "BillOfMaterialsAPI.Controllers.ArchiveController",
     "Method": "GetDeletedMaterials",
     "RelativePath": "BOM/archive/materials",
@@ -126,6 +106,16 @@
         "Name": "material_id",
         "Type": "System.String",
         "IsRequired": true
+      },
+      {
+        "Name": "restore_all_pastry_ingredients_connected",
+        "Type": "System.Boolean",
+        "IsRequired": false
+      },
+      {
+        "Name": "restore_all_material_ingredient_connected",
+        "Type": "System.Boolean",
+        "IsRequired": false
       }
     ],
     "ReturnTypes": []
@@ -270,89 +260,6 @@
         "StatusCode": 200
       }
     ]
-  },
-  {
-    "ContainingType": "BillOfMaterialsAPI.Controllers.ArchiveController",
-    "Method": "GetAllDeletedIngredients",
-    "RelativePath": "BOM/archive/pastry_materials/ingredients/all",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "page",
-        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
-        "IsRequired": false
-      },
-      {
-        "Name": "record_per_page",
-        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetIngredients, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "API_TEST.Controllers.IngredientController",
-    "Method": "GetAllIngredients",
-    "RelativePath": "BOM/ingredients",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "page",
-        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
-        "IsRequired": false
-      },
-      {
-        "Name": "record_per_page",
-        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
-        "IsRequired": false
-      }
-    ],
-    "ReturnTypes": [
-      {
-        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetIngredients, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
-        "MediaTypes": [
-          "text/plain",
-          "application/json",
-          "text/json"
-        ],
-        "StatusCode": 200
-      }
-    ]
-  },
-  {
-    "ContainingType": "API_TEST.Controllers.IngredientController",
-    "Method": "GetIngredientColumn",
-    "RelativePath": "BOM/ingredients/{ingredient_id}/{column_name}",
-    "HttpMethod": "GET",
-    "IsController": true,
-    "Order": 0,
-    "Parameters": [
-      {
-        "Name": "ingredient_id",
-        "Type": "System.String",
-        "IsRequired": true
-      },
-      {
-        "Name": "column_name",
-        "Type": "System.String",
-        "IsRequired": true
-      }
-    ],
-    "ReturnTypes": []
   },
   {
     "ContainingType": "API_TEST.Controllers.BOMController",
@@ -511,6 +418,16 @@
         "Name": "material_id",
         "Type": "System.String",
         "IsRequired": true
+      },
+      {
+        "Name": "delete_all_pastry_ingredients_connected",
+        "Type": "System.Boolean",
+        "IsRequired": false
+      },
+      {
+        "Name": "delete_all_material_ingredient_connected",
+        "Type": "System.Boolean",
+        "IsRequired": false
       }
     ],
     "ReturnTypes": []
@@ -598,6 +515,89 @@
       },
       {
         "Name": "material_ingredient_id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.BOMController",
+    "Method": "GetAllDeletedIngredients",
+    "RelativePath": "BOM/obsolete/archive/ingredients/all",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "page",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "record_per_page",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetIngredients, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.BOMController",
+    "Method": "GetAllIngredients",
+    "RelativePath": "BOM/obsolete/ingredients",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "page",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      },
+      {
+        "Name": "record_per_page",
+        "Type": "System.Nullable\u00601[[System.Int32, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[BillOfMaterialsAPI.Schemas.GetIngredients, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "API_TEST.Controllers.BOMController",
+    "Method": "GetIngredientColumn",
+    "RelativePath": "BOM/obsolete/ingredients/{ingredient_id}/{column_name}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "ingredient_id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "column_name",
         "Type": "System.String",
         "IsRequired": true
       }
@@ -768,7 +768,7 @@
   },
   {
     "ContainingType": "API_TEST.Controllers.PastryIngredientController",
-    "Method": "GetAllPastryIngredient",
+    "Method": "GetAllPastryMaterialIngredient",
     "RelativePath": "BOM/pastry_materials/{pastry_material_id}/ingredients",
     "HttpMethod": "GET",
     "IsController": true,
@@ -794,7 +794,7 @@
   },
   {
     "ContainingType": "API_TEST.Controllers.PastryIngredientController",
-    "Method": "AddNewIngredient",
+    "Method": "AddNewPastryMaterialIngredient",
     "RelativePath": "BOM/pastry_materials/{pastry_material_id}/ingredients",
     "HttpMethod": "POST",
     "IsController": true,
