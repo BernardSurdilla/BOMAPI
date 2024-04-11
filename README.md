@@ -50,7 +50,7 @@ So....
 - When deleting a 'PastryMaterials' record, all 'Ingredients' record(s) for it will be deleted
 - When deleting a 'Materials' record, all 'MaterialIngredients' record(s) for it will be deleted, and all 'MaterialIngredients' and 'Ingredients' record(s) that refer to it will be deleted
 
-![SCENARIO1-4](https://github.com/BernardSurdilla/BOMAPI/assets/149220736/e8943862-a3b8-4a3d-a162-68a10a24a68a)
+![SCENARIO1-4](https://github.com/BernardSurdilla/BOMAPI/assets/149220736/8afc6a40-02fd-4695-bed9-eb334e0555b4)
 
 - When restoring a 'PastryMaterials' record, all 'Ingredients' records associated with it will be recovered as well unless...
   - It refers to a 'Materials' record that is deleted
