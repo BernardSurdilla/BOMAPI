@@ -1,6 +1,46 @@
 [
   {
     "ContainingType": "JWTAuthentication.Controllers.AuthenticateController",
+    "Method": "GetAllUser",
+    "RelativePath": "auth/all_users",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "System.Collections.Generic.List\u00601[[JWTAuthentication.Authentication.GetUser, BOM-API v2, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "JWTAuthentication.Controllers.AuthenticateController",
+    "Method": "CurrentUser",
+    "RelativePath": "auth/current_user",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": [
+      {
+        "Type": "JWTAuthentication.Authentication.GetUser",
+        "MediaTypes": [
+          "text/plain",
+          "application/json",
+          "text/json"
+        ],
+        "StatusCode": 200
+      }
+    ]
+  },
+  {
+    "ContainingType": "JWTAuthentication.Controllers.AuthenticateController",
     "Method": "Login",
     "RelativePath": "auth/login",
     "HttpMethod": "POST",
@@ -18,7 +58,7 @@
   {
     "ContainingType": "JWTAuthentication.Controllers.AuthenticateController",
     "Method": "RegisterAdmin",
-    "RelativePath": "auth/register-admin",
+    "RelativePath": "auth/register_admin",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -34,7 +74,7 @@
   {
     "ContainingType": "JWTAuthentication.Controllers.AuthenticateController",
     "Method": "RegisterArtist",
-    "RelativePath": "auth/register-artist",
+    "RelativePath": "auth/register_artist",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -50,7 +90,7 @@
   {
     "ContainingType": "JWTAuthentication.Controllers.AuthenticateController",
     "Method": "RegisterCustomer",
-    "RelativePath": "auth/register-customer",
+    "RelativePath": "auth/register_customer",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
@@ -148,7 +188,7 @@
   },
   {
     "ContainingType": "BillOfMaterialsAPI.Controllers.ArchiveController",
-    "Method": "DeleteMaterialIngredient",
+    "Method": "RestoreMaterialIngredient",
     "RelativePath": "BOM/archive/materials/{material_id}/ingredients/{material_ingredient_id}",
     "HttpMethod": "PATCH",
     "IsController": true,
@@ -522,7 +562,7 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "API_TEST.Controllers.BOMController",
+    "ContainingType": "API_TEST.Controllers.ObsoleteEndpointsController",
     "Method": "GetAllDeletedIngredients",
     "RelativePath": "BOM/obsolete/archive/ingredients/all",
     "HttpMethod": "GET",
@@ -553,7 +593,7 @@
     ]
   },
   {
-    "ContainingType": "API_TEST.Controllers.BOMController",
+    "ContainingType": "API_TEST.Controllers.ObsoleteEndpointsController",
     "Method": "GetAllIngredients",
     "RelativePath": "BOM/obsolete/ingredients",
     "HttpMethod": "GET",
@@ -584,7 +624,7 @@
     ]
   },
   {
-    "ContainingType": "API_TEST.Controllers.BOMController",
+    "ContainingType": "API_TEST.Controllers.ObsoleteEndpointsController",
     "Method": "GetIngredientColumn",
     "RelativePath": "BOM/obsolete/ingredients/{ingredient_id}/{column_name}",
     "HttpMethod": "GET",

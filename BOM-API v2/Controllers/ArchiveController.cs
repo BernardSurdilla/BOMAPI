@@ -43,7 +43,51 @@ namespace BillOfMaterialsAPI.Controllers
                 pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            foreach (PastryMaterials i in pastryMaterials) { response.Add(new GetPastryMaterial(i)); }
+            foreach (PastryMaterials i in pastryMaterials) 
+            {
+                List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x =>  x.isActive == false && x.pastry_material_id == i.pastry_material_id).ToListAsync();
+
+                List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
+                foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
+                {
+                    GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
+                    newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
+                    newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
+                    newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
+                    newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
+                    newSubIngredientListEntry.amount = ifcm.amount;
+                    newSubIngredientListEntry.item_id = ifcm.item_id;
+
+                    switch (ifcm.ingredient_type)
+                    {
+                        case IngredientType.InventoryItem:
+                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                            break;
+                        case IngredientType.Material:
+                            List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
+
+                            if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                            {
+                                List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                                foreach(MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                {
+                                    SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
+                                    newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                                }
+                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                            }
+                            else
+                            {
+                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                            }
+                            break;
+                    }
+                    subIngredientList.Add(newSubIngredientListEntry);
+                }
+
+                response.Add(new GetPastryMaterial(i, subIngredientList));
+            }
 
             await _actionLogger.LogAction(User, "GET, All Deleted Pastry Material ");
             return response;
@@ -69,8 +113,8 @@ namespace BillOfMaterialsAPI.Controllers
                 newEntry.item_id = i.item_id;
                 newEntry.amount = i.amount;
                 newEntry.amount_measurement = i.amount_measurement;
-                newEntry.dateAdded = i.dateAdded;
-                newEntry.lastModifiedDate = i.lastModifiedDate;
+                newEntry.date_added = i.date_added;
+                newEntry.last_modified_date = i.last_modified_date;
 
                 switch (i.ingredient_type)
                 {
@@ -187,7 +231,7 @@ namespace BillOfMaterialsAPI.Controllers
 
             _context.PastryMaterials.Update(selectedPastryMaterialsEntry);
             DateTime currentTime = DateTime.Now;
-            selectedPastryMaterialsEntry.lastModifiedDate = currentTime;
+            selectedPastryMaterialsEntry.last_modified_date = currentTime;
             selectedPastryMaterialsEntry.isActive = true;
 
             List<string> failedToRestoreEntries = new List<string>();
@@ -203,7 +247,7 @@ namespace BillOfMaterialsAPI.Controllers
                             //Add code here to check if the inventory item associated still exist
 
                             _context.Ingredients.Update(i);
-                            i.lastModifiedDate = currentTime;
+                            i.last_modified_date = currentTime;
                             i.isActive = true;
                             break;
                         case IngredientType.Material:
@@ -214,7 +258,7 @@ namespace BillOfMaterialsAPI.Controllers
                                 if (referencedMaterial.isActive == true)
                                 {
                                     _context.Ingredients.Update(i);
-                                    i.lastModifiedDate = currentTime;
+                                    i.last_modified_date = currentTime;
                                     i.isActive = true;
                                 }
                                 else { failedToRestoreEntries.Add("Material: " + referencedMaterial.material_id + " - Ingredient: " + i.ingredient_id); }
@@ -235,17 +279,44 @@ namespace BillOfMaterialsAPI.Controllers
         [HttpPatch("pastry_materials/{pastry_material_id}/{ingredient_id}")]
         public async Task<IActionResult> RestorePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
         {
+            PastryMaterials? pastryMaterialEntry = await _context.PastryMaterials.FindAsync(pastry_material_id);
+            if (pastryMaterialEntry == null) { return NotFound(new { message = "Specified pastry material with the selected pastry_material_id not found." }); }
+            if (pastryMaterialEntry.isActive == false) { return NotFound(new { message = "Specified pastry material with the selected pastry_material_id not found or deleted." }); }
             Ingredients? selectedIngredientEntry = await _context.Ingredients.FindAsync(ingredient_id);
             if (selectedIngredientEntry == null) { return NotFound(new { message = "Specified ingredient with the selected ingredient_id not found." }); }
-            if (selectedIngredientEntry.isActive == true) { return NotFound(new { message = "Specified ingredient with the selected ingredient_id still exists." }); }
+            if (selectedIngredientEntry.isActive == true) { return BadRequest(new { message = "Specified ingredient with the selected ingredient_id still exists." }); }
 
             if (selectedIngredientEntry.pastry_material_id != pastry_material_id) { NotFound(new { message = "Specified ingredient with the selected ingredient_id does not exist in" + pastry_material_id + "." }); }
 
-            _context.Ingredients.Update(selectedIngredientEntry);
             DateTime currentTime = DateTime.Now;
-            selectedIngredientEntry.lastModifiedDate = currentTime;
-            selectedIngredientEntry.isActive = true;
 
+            switch (selectedIngredientEntry.ingredient_type)
+            {
+                case IngredientType.InventoryItem:
+                    //Add code here to check if the inventory item associated still exist
+
+                    _context.Ingredients.Update(selectedIngredientEntry);
+                    selectedIngredientEntry.last_modified_date = currentTime;
+                    selectedIngredientEntry.isActive = true;
+                    break;
+                case IngredientType.Material:
+                    Materials? referencedMaterial = await _context.Materials.Where(x => x.material_id == selectedIngredientEntry.item_id).FirstAsync();
+
+                    if (referencedMaterial != null)
+                    {
+                        if (referencedMaterial.isActive == true)
+                        {
+                            _context.Ingredients.Update(selectedIngredientEntry);
+                            selectedIngredientEntry.last_modified_date = currentTime;
+                            selectedIngredientEntry.isActive = true;
+                        }
+                        else
+                        {
+                            return BadRequest(new { message = "Specified pastry material ingredient found, but cannot be restored as the material it refers to is deleted. Material " + referencedMaterial.material_id });
+                        }
+                    }
+                    break;
+            }
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH, Recover Ingredient " + ingredient_id);
@@ -272,21 +343,46 @@ namespace BillOfMaterialsAPI.Controllers
 
             DateTime currentTime = DateTime.Now;
             _context.Materials.Update(materialAboutToBeRestored);
-            materialAboutToBeRestored.lastModifiedDate = currentTime;
+            materialAboutToBeRestored.last_modified_date = currentTime;
             materialAboutToBeRestored.isActive = true;
+
+            List<string> failedToRestoreEntries = new List<string>();
 
             List<MaterialIngredients> materialIngredientsAboutToBeRestored = await _context.MaterialIngredients.Where(x => x.isActive == false && x.material_id == material_id).ToListAsync();
             if (materialIngredientsAboutToBeRestored.IsNullOrEmpty() == false)
             {
                 foreach (MaterialIngredients i in materialIngredientsAboutToBeRestored)
                 {
-                    _context.MaterialIngredients.Update(i);
-                    i.lastModifiedDate = currentTime;
-                    i.isActive = true;
+                    switch (i.ingredient_type)
+                    {
+                        case IngredientType.InventoryItem:
+                            //Add code here to check if the inventory item associated still exist
+
+                            _context.MaterialIngredients.Update(i);
+                            i.last_modified_date = currentTime;
+                            i.isActive = true;
+                            break;
+                        case IngredientType.Material:
+                            //Check if the material associated is active
+                            //If it is restore the record
+                            Materials? associatedMaterial = await _context.Materials.Where(x => x.material_id == i.item_id).FirstAsync();
+
+                            if (associatedMaterial != null)
+                            {
+                                if (associatedMaterial.isActive == true)
+                                {
+                                    _context.MaterialIngredients.Update(i);
+                                    i.last_modified_date = currentTime;
+                                    i.isActive = true;
+                                }
+                                else { failedToRestoreEntries.Add("Material Ingredient: " + i.material_ingredient_id + " - Material: " + associatedMaterial.material_id); }
+                            }
+                            break;
+                    }
                 }
             }
 
-            List<string> failedToRestoreEntries = new List<string>();
+            
 
             //Restoring connected pastry ingredients
             if (restore_all_pastry_ingredients_connected == true)
@@ -301,7 +397,7 @@ namespace BillOfMaterialsAPI.Controllers
                             //Add code here to check if the inventory item associated still exist
 
                             _context.Ingredients.Update(i);
-                            i.lastModifiedDate = currentTime;
+                            i.last_modified_date = currentTime;
                             i.isActive = true;
                             break;
                         case IngredientType.Material:
@@ -314,7 +410,7 @@ namespace BillOfMaterialsAPI.Controllers
                                 if (associatedPastryMaterial.isActive == true)
                                 {
                                     _context.Ingredients.Update(i);
-                                    i.lastModifiedDate = currentTime;
+                                    i.last_modified_date = currentTime;
                                     i.isActive = true;
                                 }
                                 else { failedToRestoreEntries.Add("Pastry Material: " + associatedPastryMaterial.pastry_material_id + " - Ingredient: " + i.ingredient_id ); }
@@ -336,7 +432,7 @@ namespace BillOfMaterialsAPI.Controllers
                             //Add code here to check if the inventory item associated still exist
 
                             _context.MaterialIngredients.Update(i);
-                            i.lastModifiedDate = currentTime;
+                            i.last_modified_date = currentTime;
                             i.isActive = true;
                             break;
                         case IngredientType.Material:
@@ -349,7 +445,7 @@ namespace BillOfMaterialsAPI.Controllers
                                 if (associatedMaterial.isActive == true)
                                 {
                                     _context.MaterialIngredients.Update(i);
-                                    i.lastModifiedDate = currentTime;
+                                    i.last_modified_date = currentTime;
                                     i.isActive = true;
                                 }
                                 else { failedToRestoreEntries.Add("Material: " + associatedMaterial.material_id + " - Material Ingredient: " + i.material_ingredient_id); }
@@ -361,26 +457,53 @@ namespace BillOfMaterialsAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Recover Material " + "Also Associated Material&Pastry Ingredient " + restore_all_material_ingredient_connected.ToString() + "/" + restore_all_pastry_ingredients_connected.ToString());
+            await _actionLogger.LogAction(User, "PATCH, Recover Material " + "Also Associated Material/Pastry Ingredient? " + restore_all_material_ingredient_connected.ToString() + "/" + restore_all_pastry_ingredients_connected.ToString());
 
             if (failedToRestoreEntries.IsNullOrEmpty() ) { return Ok(new { message = "Material restored. All associated Material Ingredient and Pastry Material Ingredient restored" }); }
             else { return Ok(new { message = "Material restored. Some associated Material Ingredient and/or Pastry Material Ingredient failed to be restored however. Check results for more details", results = failedToRestoreEntries }); }
             
         }
         [HttpPatch("materials/{material_id}/ingredients/{material_ingredient_id}")]
-        public async Task<IActionResult> DeleteMaterialIngredient(string material_id, string material_ingredient_id)
+        public async Task<IActionResult> RestoreMaterialIngredient(string material_id, string material_ingredient_id)
         {
             Materials? materialEntry = await _context.Materials.FindAsync(material_id);
             if (materialEntry == null) { return NotFound(new { message = "Specified material with the selected material_id not found." }); }
-            if (materialEntry.isActive == false) { return NotFound(new { message = "Specified material with the selected material_id not found." }); }
-            MaterialIngredients? materialIngredientAboutToBeDeleted = await _context.MaterialIngredients.FindAsync(material_ingredient_id);
-            if (materialIngredientAboutToBeDeleted == null) { return NotFound(new { message = "Specified material ingredient with the selected material_ingredient_id not found." }); }
-            if (materialIngredientAboutToBeDeleted.isActive == true) { return NotFound(new { message = "Specified material ingredient with the selected material_ingredient_id still exists." }); }
+            if (materialEntry.isActive == false) { return NotFound(new { message = "Specified material with the selected material_id not found or deleted." }); }
+            MaterialIngredients? materialIngredientAboutToBeRestored = await _context.MaterialIngredients.FindAsync(material_ingredient_id);
+            if (materialIngredientAboutToBeRestored == null) { return NotFound(new { message = "Specified material ingredient with the selected material_ingredient_id not found." }); }
+            if (materialIngredientAboutToBeRestored.isActive == true) { return BadRequest(new { message = "Specified material ingredient with the selected material_ingredient_id still exists." }); }
 
             DateTime currentTime = DateTime.Now;
-            _context.MaterialIngredients.Update(materialIngredientAboutToBeDeleted);
-            materialIngredientAboutToBeDeleted.lastModifiedDate = currentTime;
-            materialIngredientAboutToBeDeleted.isActive = true;
+
+            switch (materialIngredientAboutToBeRestored.ingredient_type)
+            {
+                case IngredientType.InventoryItem:
+                    //Add code here to check if the inventory item associated still exist
+
+                    _context.MaterialIngredients.Update(materialIngredientAboutToBeRestored);
+                    materialIngredientAboutToBeRestored.last_modified_date = currentTime;
+                    materialIngredientAboutToBeRestored.isActive = true;
+
+                    break;
+                case IngredientType.Material:
+                    Materials? referencedMaterial = await _context.Materials.Where(x => x.material_id == materialIngredientAboutToBeRestored.item_id).FirstAsync();
+
+                    if (referencedMaterial != null)
+                    {
+                        if (referencedMaterial.isActive == true)
+                        {
+                            _context.MaterialIngredients.Update(materialIngredientAboutToBeRestored);
+                            materialIngredientAboutToBeRestored.last_modified_date = currentTime;
+                            materialIngredientAboutToBeRestored.isActive = true;
+                        }
+                        else
+                        {
+                            return BadRequest(new { message = "Specified material ingredient found, but cannot be restored as the material it refers to is deleted. Material " + referencedMaterial.material_id });
+                        }
+                    }
+                    break;
+            }
+
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH, Recover Material " + material_id + " - Material Ingredient " + material_ingredient_id);

@@ -1,6 +1,7 @@
 ﻿using BillOfMaterialsAPI.Services;
 //Controller imports
 using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
@@ -62,6 +63,14 @@ namespace JWTAuthentication.Authentication
         public string Message { get; set; }
     }
 
+    public class GetUser
+    {
+        public string user_id { get; set; }
+        [EmailAddress] public string email { get; set; }
+        public string username { get; set; }
+        public string phone_number { get; set; }
+        public DateTime join_date { get; set; }
+    }
 }
 
 
@@ -80,8 +89,8 @@ namespace JWTAuthentication.Controllers
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
-            this._configuration = configuration;
-            this._actionLogger = actionLogger;
+            _configuration = configuration;
+            _actionLogger = actionLogger;
         }
 
         [HttpPost]
@@ -94,10 +103,11 @@ namespace JWTAuthentication.Controllers
                 var userRoles = await userManager.GetRolesAsync(user);
 
                 var authClaims = new List<Claim>
-                {
-                    new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                    new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                };
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+
+            };
 
                 foreach (var userRole in userRoles)
                 {
@@ -124,8 +134,7 @@ namespace JWTAuthentication.Controllers
             return Unauthorized();
         }
 
-        [HttpPost]
-        [Route("register-customer")]
+        [HttpPost("register_customer/")]
         public async Task<IActionResult> RegisterCustomer([FromBody] RegisterModel model)
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
@@ -137,7 +146,8 @@ namespace JWTAuthentication.Controllers
             {
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
-                UserName = model.Username
+                UserName = model.Username,
+                JoinDate = DateTime.Now
             };
 
             var result = await userManager.CreateAsync(user, model.Password);
@@ -153,8 +163,7 @@ namespace JWTAuthentication.Controllers
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
-        [HttpPost]
-        [Route("register-artist")]
+        [HttpPost("register_artist/")]
         public async Task<IActionResult> RegisterArtist([FromBody] RegisterModel model)
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
@@ -183,8 +192,7 @@ namespace JWTAuthentication.Controllers
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
-        [HttpPost]
-        [Route("register-admin")]
+        [HttpPost("register_admin/")]
         public async Task<IActionResult> RegisterAdmin([FromBody] RegisterModel model)
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
@@ -214,6 +222,44 @@ namespace JWTAuthentication.Controllers
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
 
+        [Authorize][HttpGet("current_user/")]
+        public async Task<GetUser> CurrentUser()
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return new GetUser(); }
 
+            GetUser response = new GetUser();
+            response.user_id = currentUser.Id;
+            response.email = currentUser.Email;
+            response.username = currentUser.UserName;
+            response.join_date = currentUser.JoinDate;
+
+            await _actionLogger.LogAction(User, "GET, User Information " + currentUser.Id);
+            return response;
+        }
+        [Authorize(Roles = UserRoles.Admin)][HttpGet("all_users/")]
+        public async Task<List<GetUser>> GetAllUser()
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return new List<GetUser>(); }
+
+            List<GetUser> response = new List<GetUser>();
+
+            List<APIUsers> registeredUsers = await userManager.Users.ToListAsync();
+            foreach (APIUsers user in registeredUsers)
+            {
+                GetUser newResponseEntry = new GetUser();
+                newResponseEntry.user_id = user.Id;
+                newResponseEntry.username = user.UserName;
+                newResponseEntry.email = user.Email;
+                newResponseEntry.phone_number = user.PhoneNumber;
+                newResponseEntry.join_date = user.JoinDate;
+
+                response.Add(newResponseEntry);
+            }
+            await _actionLogger.LogAction(User, "GET, All User Information " + currentUser.Id);
+            return response;
+        }
     }
+    
 }

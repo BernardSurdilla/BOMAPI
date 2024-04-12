@@ -7,13 +7,13 @@ namespace BillOfMaterialsAPI.Schemas
     public class GetMaterials
     {
         [Required] public SubGetMaterials Material { get; set; }
-        [Required] public List<SubGetMaterialIngredients> MaterialIngredients { get; set; }
+        [Required] public List<SubGetMaterialIngredients> material_ingredients { get; set; }
         public int costEstimate { get; set; }
 
         public GetMaterials(SubGetMaterials materials, List<SubGetMaterialIngredients> materialIngredients, int costEst)
         {
             Material = materials;
-            MaterialIngredients = materialIngredients;
+            material_ingredients = materialIngredients;
             costEstimate = costEst;
         }
         public static GetMaterials DefaultResponse()
@@ -30,8 +30,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(50)] public string material_name { get; set; }
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
 
         public SubGetMaterials(Materials dbRow)
         {
@@ -39,8 +39,8 @@ namespace BillOfMaterialsAPI.Schemas
             this.material_name = dbRow.material_name;
             this.amount = dbRow.amount;
             this.amount_measurement = dbRow.amount_measurement;
-            this.dateAdded = dbRow.dateAdded;
-            this.lastModifiedDate = dbRow.lastModifiedDate;
+            this.date_added = dbRow.date_added;
+            this.last_modified_date = dbRow.last_modified_date;
         }
     }
     public class SubGetMaterialIngredients
@@ -55,8 +55,8 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
 
         public SubGetMaterialIngredients(MaterialIngredients dbRow)
         {
@@ -66,8 +66,8 @@ namespace BillOfMaterialsAPI.Schemas
             this.ingredient_type = dbRow.ingredient_type;
             this.amount = dbRow.amount;
             this.amount_measurement = dbRow.amount_measurement;
-            this.dateAdded = dbRow.dateAdded;
-            this.lastModifiedDate = dbRow.lastModifiedDate;
+            this.date_added = dbRow.date_added;
+            this.last_modified_date = dbRow.last_modified_date;
         }
     }
 
@@ -83,11 +83,11 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
 
-
-        public GetIngredients(string ingredient_id, string item_id, string pastry_material_id, string ingredient_type, int amount, string amount_measurement, DateTime dateAdded, DateTime lastModifiedDate)
+        public GetIngredients() { }
+        public GetIngredients(string ingredient_id, string item_id, string pastry_material_id, string ingredient_type, int amount, string amount_measurement, DateTime date_added, DateTime last_modified_date)
         {
             this.ingredient_id = ingredient_id;
             this.item_id = item_id;
@@ -95,12 +95,12 @@ namespace BillOfMaterialsAPI.Schemas
             this.ingredient_type = ingredient_type;
             this.amount = amount;
             this.amount_measurement = amount_measurement;
-            this.dateAdded = dateAdded;
-            this.lastModifiedDate = lastModifiedDate;
+            this.date_added = date_added;
+            this.last_modified_date = last_modified_date;
         }
         public static GetIngredients DefaultResponse()
         {
-            return new GetIngredients("", "", "", "", 0, "", DateTime.MinValue, DateTime.MinValue);
+            return new GetIngredients();
         }
     }
     public class GetPastryMaterial
@@ -108,17 +108,20 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(16)] public string DesignId;
         [Required][MaxLength(26)] public string pastry_material_id { get; set; }
 
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+
+        public List<GetPastryMaterialIngredients> ingredients { get; set; }
 
         public static GetPastryMaterial DefaultResponse() { return new GetPastryMaterial(); }
         public GetPastryMaterial() { }
-        public GetPastryMaterial(PastryMaterials pastryMaterials)
+        public GetPastryMaterial(PastryMaterials pastryMaterials, List<GetPastryMaterialIngredients> ingredients)
         {
             this.DesignId = pastryMaterials.DesignId;
             this.pastry_material_id = pastryMaterials.pastry_material_id;
-            this.dateAdded = pastryMaterials.dateAdded;
-            this.lastModifiedDate = pastryMaterials.lastModifiedDate;
+            this.date_added = pastryMaterials.date_added;
+            this.last_modified_date = pastryMaterials.last_modified_date;
+            this.ingredients = ingredients;
         }
     }
 
@@ -134,8 +137,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public int amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
 
         [Required] public List<SubGetMaterialIngredients> material_ingredients { get; set; }
 

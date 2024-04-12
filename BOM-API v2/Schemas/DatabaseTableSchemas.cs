@@ -23,8 +23,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public bool isActive { get; set; }
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
 
         public PastryMaterials PastryMaterials { get; set; }
 
@@ -43,8 +43,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public bool isActive { get; set; }
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
     }
     public class SubPastryMaterials_materials_column
     {
@@ -64,8 +64,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
         
         [Required] public bool isActive { get; set; }
-        [Required] public DateTime dateAdded { get; set; }
-        public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
     }
     //Table for the items of a 'Materials' table row
     [PrimaryKey("material_ingredient_id")]
@@ -86,8 +86,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public bool isActive { get; set; }
-        [Required] public DateTime dateAdded { get; set; }
-        [Required] public DateTime lastModifiedDate { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        [Required] public DateTime last_modified_date { get; set; }
 
         public Materials Materials { get; set; }
     }

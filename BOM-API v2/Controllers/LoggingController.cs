@@ -21,7 +21,7 @@ namespace BillOfMaterialsAPI.Controllers
             List<TransactionLogs> transactionLogs;
 
             //Paging algorithm
-            if (page == null) { transactionLogs = await _logs.TransactionLogs.ToListAsync(); }
+            if (page == null) { transactionLogs = await _logs.TransactionLogs.OrderByDescending(x => x.date).ToListAsync(); }
             else
             {
                 int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
@@ -29,7 +29,7 @@ namespace BillOfMaterialsAPI.Controllers
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
-                transactionLogs = await _logs.TransactionLogs.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                transactionLogs = await _logs.TransactionLogs.OrderByDescending(x => x.date).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
             return transactionLogs;

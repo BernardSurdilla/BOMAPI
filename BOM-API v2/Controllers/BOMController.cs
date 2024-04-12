@@ -121,92 +121,7 @@ namespace API_TEST.Controllers
             await _actionLogger.LogAction(User, "GET, Most Commonly Used Items ");
             return response;
         }
-
-
-        [HttpGet("obsolete/archive/ingredients/all")]
-        public async Task<List<GetIngredients>> GetAllDeletedIngredients(int? page, int? record_per_page)
-        {
-            List<GetIngredients> response = new List<GetIngredients>();
-
-            List<Ingredients> dbIngredients;
-
-            //Paging algorithm
-            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).ToListAsync(); }
-            else
-            {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
-
-                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
-
-                dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
-            }
-
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
-
-            foreach (Ingredients i in dbIngredients)
-            {
-                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
-                response.Add(newRow);
-            }
-
-            await _actionLogger.LogAction(User, "GET, All Deleted Ingredients");
-            return response;
-        }
-        [HttpGet("obsolete/ingredients")]
-        public async Task<List<GetIngredients>> GetAllIngredients(int? page, int? record_per_page)
-        {
-            List<GetIngredients> response = new List<GetIngredients>();
-
-            List<Ingredients> dbIngredients;
-
-            //Paging algorithm
-            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).ToListAsync(); }
-            else
-            {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
-
-                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
-
-                dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
-            }
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
-            foreach (Ingredients i in dbIngredients)
-            {
-                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.dateAdded, i.lastModifiedDate);
-                response.Add(newRow);
-            }
-            await _actionLogger.LogAction(User, "GET, All ingredients");
-            return response;
-        }
-        [HttpGet("obsolete/ingredients/{ingredient_id}/{column_name}")]
-        public async Task<object> GetIngredientColumn(string ingredient_id, string column_name)
-        {
-            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
-            object? response = null;
-
-            if (currentIngredient == null) { return NotFound(new { message = "Specified material with the material_id is not found." }); }
-            if (currentIngredient.isActive == false) { return NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
-
-            switch (column_name)
-            {
-                case "ingredient_id": response = currentIngredient.ingredient_id; break;
-                case "pastry_material_id": response = currentIngredient.pastry_material_id; break;
-                case "item_id": response = currentIngredient.item_id; break;
-                case "ingredient_type": response = currentIngredient.pastry_material_id; break;
-                case "amount": response = currentIngredient.amount; break;
-                case "amount_measurement": response = currentIngredient.amount_measurement; break;
-                case "dateAdded": response = currentIngredient.dateAdded; break;
-                case "lastModifiedDate": response = currentIngredient.lastModifiedDate; break;
-                default: response = BadRequest(new { message = "Specified column does not exist." }); break;
-            }
-
-            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " + column_name);
-            return response;
-        }
-
-
+        
         //Json serialization and deserialization
         //string a = JsonSerializer.Serialize(ingredientAboutToBeDeleted);
         //JsonSerializer.Deserialize<List<SubPastryMaterials_materials_column>>(a);
@@ -240,10 +155,57 @@ namespace API_TEST.Controllers
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
-                pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            foreach (PastryMaterials i in  pastryMaterials) { response.Add(new GetPastryMaterial(i)); }
+            foreach (PastryMaterials i in pastryMaterials)
+            {
+                List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == i.pastry_material_id).ToListAsync();
+
+                List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
+                foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
+                {
+                    GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
+                    newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
+                    newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
+                    newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
+                    newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
+                    newSubIngredientListEntry.amount = ifcm.amount;
+                    newSubIngredientListEntry.item_id = ifcm.item_id;
+
+                    switch (ifcm.ingredient_type)
+                    {
+                        case IngredientType.InventoryItem:
+                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                            break;
+                        case IngredientType.Material:
+                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
+                            if (currentReferencedMaterial == null) { break; }
+
+                            List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
+
+                            if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                            {
+                                List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                                foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                {
+                                    SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
+                                    newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                                }
+                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                            }
+                            else
+                            {
+                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                            }
+                            break;
+                    }
+                    subIngredientList.Add(newSubIngredientListEntry);
+                }
+
+                response.Add(new GetPastryMaterial(i, subIngredientList));
+            }
 
             await _actionLogger.LogAction(User, "GET, All Pastry Material ");
             return response;
@@ -255,7 +217,51 @@ namespace API_TEST.Controllers
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
             if (currentPastryMat == null) { return GetPastryMaterial.DefaultResponse(); }
 
-            GetPastryMaterial response = new GetPastryMaterial(currentPastryMat);
+            List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMat.pastry_material_id).ToListAsync();
+
+            List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
+            foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
+            {
+                GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
+                newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
+                newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
+                newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
+                newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
+                newSubIngredientListEntry.amount = ifcm.amount;
+                newSubIngredientListEntry.item_id = ifcm.item_id;
+
+                switch (ifcm.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                        break;
+                    case IngredientType.Material:
+                        Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
+                        if (currentPastryMat == null) { break; }
+
+                        List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
+
+                        if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                        {
+                            List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                            foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                            {
+                                SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
+                                newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                            }
+                            newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                        }
+                        else
+                        {
+                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                        }
+                        break;
+                }
+                subIngredientList.Add(newSubIngredientListEntry);
+            }
+
+            GetPastryMaterial response = new GetPastryMaterial(currentPastryMat, subIngredientList);
 
             await _actionLogger.LogAction(User, "GET, Pastry Material " + currentPastryMat.pastry_material_id);
             return response;
@@ -296,8 +302,8 @@ namespace API_TEST.Controllers
                 newEntry.item_id = i.item_id;
                 newEntry.amount = i.amount;
                 newEntry.amount_measurement = i.amount_measurement;
-                newEntry.dateAdded = i.dateAdded;
-                newEntry.lastModifiedDate = i.lastModifiedDate;
+                newEntry.date_added = i.date_added;
+                newEntry.last_modified_date = i.last_modified_date;
 
                 switch (i.ingredient_type)
                 {
@@ -369,8 +375,8 @@ namespace API_TEST.Controllers
 
             newPastryMaterialEntry.pastry_material_id = newPastryId;
             newPastryMaterialEntry.DesignId = designId;
-            newPastryMaterialEntry.dateAdded = currentTime;
-            newPastryMaterialEntry.lastModifiedDate = currentTime;
+            newPastryMaterialEntry.date_added = currentTime;
+            newPastryMaterialEntry.last_modified_date = currentTime;
             newPastryMaterialEntry.isActive = true;
 
             await _context.PastryMaterials.AddAsync(newPastryMaterialEntry);
@@ -400,8 +406,8 @@ namespace API_TEST.Controllers
                 newIngredientsEntry.amount = entry.amount;
                 newIngredientsEntry.amount_measurement = entry.amount_measurement;
                 newIngredientsEntry.isActive = true;
-                newIngredientsEntry.dateAdded = currentTime;
-                newIngredientsEntry.lastModifiedDate = currentTime;
+                newIngredientsEntry.date_added = currentTime;
+                newIngredientsEntry.last_modified_date = currentTime;
 
                 await _context.Ingredients.AddAsync(newIngredientsEntry);
             }
@@ -458,8 +464,8 @@ namespace API_TEST.Controllers
             newIngredientsEntry.amount = entry.amount;
             newIngredientsEntry.amount_measurement = entry.amount_measurement;
             newIngredientsEntry.isActive = true;
-            newIngredientsEntry.dateAdded = currentTime;
-            newIngredientsEntry.lastModifiedDate = currentTime;
+            newIngredientsEntry.date_added = currentTime;
+            newIngredientsEntry.last_modified_date = currentTime;
 
             await _context.Ingredients.AddAsync(newIngredientsEntry);
             await _context.SaveChangesAsync();
@@ -484,7 +490,7 @@ namespace API_TEST.Controllers
 
             _context.PastryMaterials.Update(currentPastryMaterial);
             currentPastryMaterial.DesignId = entry.DesignId;
-            currentPastryMaterial.lastModifiedDate = currentTime;
+            currentPastryMaterial.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
 
@@ -526,7 +532,7 @@ namespace API_TEST.Controllers
             currentIngredient.item_id = entry.item_id;
             currentIngredient.amount = entry.amount;
             currentIngredient.amount_measurement = entry.amount_measurement;
-            currentIngredient.lastModifiedDate = currentTime;
+            currentIngredient.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
 
@@ -549,12 +555,12 @@ namespace API_TEST.Controllers
             foreach (Ingredients i in ingredients) 
             {
                 _context.Ingredients.Update(i);
-                i.lastModifiedDate = currentTime;
+                i.last_modified_date = currentTime;
                 i.isActive = false;
             }
             _context.PastryMaterials.Update(currentPastryMaterial);
             currentPastryMaterial.isActive = false;
-            currentPastryMaterial.lastModifiedDate = currentTime;
+            currentPastryMaterial.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
             await _actionLogger.LogAction(User, "DELETE, Delete Pastry Material " + pastry_material_id);
@@ -572,7 +578,7 @@ namespace API_TEST.Controllers
 
             DateTime currentTime = DateTime.Now;
             _context.Ingredients.Update(ingredientAboutToBeDeleted);
-            ingredientAboutToBeDeleted.lastModifiedDate = currentTime;
+            ingredientAboutToBeDeleted.last_modified_date = currentTime;
             ingredientAboutToBeDeleted.isActive = false;
             await _context.SaveChangesAsync();
 
@@ -726,13 +732,13 @@ namespace API_TEST.Controllers
                 case "material_name": response = currentMaterial.material_name; break;
                 case "amount": response = currentMaterial.amount; break;
                 case "amount_measurement": response = currentMaterial.amount_measurement; break;
-                case "dateAdded": response = currentMaterial.dateAdded; break;
-                case "lastModifiedDate": response = currentMaterial.lastModifiedDate; break;
+                case "date_added": response = currentMaterial.date_added; break;
+                case "last_modified_date": response = currentMaterial.last_modified_date; break;
                 case "cost_estimate":
                     //Replace this with code that calculates the price estimation
                     response = 0;
                     break;
-                case "material_ingredients":
+                case "ingredients":
                     List<MaterialIngredients> y = _context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentMaterial.material_id).ToList();
 
                     List<SubGetMaterialIngredients> currentMaterialIngredients = new List<SubGetMaterialIngredients>();
@@ -756,8 +762,8 @@ namespace API_TEST.Controllers
                         case "material_name": response = currentMaterial.material_name; break;
                         case "amount": response = currentMaterial.amount; break;
                         case "amount_measurement": response = currentMaterial.amount_measurement; break;
-                        case "dateAdded": response = currentMaterial.dateAdded; break;
-                        case "lastModifiedDate": response = currentMaterial.lastModifiedDate; break;
+                        case "date_added": response = currentMaterial.date_added; break;
+                        case "last_modified_date": response = currentMaterial.last_modified_date; break;
                         case "cost_estimate":
                             //Replace this with code that calculates the price estimation
                             response = 0;
@@ -843,8 +849,8 @@ namespace API_TEST.Controllers
                 newMaterialsEntry.amount_measurement = data.amount_measurement;
 
                 newMaterialsEntry.isActive = true;
-                newMaterialsEntry.dateAdded = currentTime;
-                newMaterialsEntry.lastModifiedDate = currentTime;
+                newMaterialsEntry.date_added = currentTime;
+                newMaterialsEntry.last_modified_date = currentTime;
 
                 foreach (SubPostMaterialIngredients i in data.ingredients)
                 {
@@ -859,8 +865,8 @@ namespace API_TEST.Controllers
                     currentMatIng.amount_measurement = i.amount_measurement;
 
                     currentMatIng.isActive = true;
-                    currentMatIng.dateAdded = currentTime;
-                    currentMatIng.lastModifiedDate = currentTime;
+                    currentMatIng.date_added = currentTime;
+                    currentMatIng.last_modified_date = currentTime;
 
                     lastMaterialIngredientId = newMaterialIngredientId;
 
@@ -968,8 +974,8 @@ namespace API_TEST.Controllers
                 currentMatIng.amount = i.amount;
                 currentMatIng.amount_measurement = i.amount_measurement;
                 currentMatIng.isActive = true;
-                currentMatIng.dateAdded = currentTime;
-                currentMatIng.lastModifiedDate = currentTime;
+                currentMatIng.date_added = currentTime;
+                currentMatIng.last_modified_date = currentTime;
 
                 lastMaterialIngredientId = newMaterialIngredientId;
 
@@ -1001,7 +1007,7 @@ namespace API_TEST.Controllers
             materialAboutToBeUpdated.material_name = entry.material_name;
             materialAboutToBeUpdated.amount = entry.amount;
             materialAboutToBeUpdated.amount_measurement = entry.amount_measurement;
-            materialAboutToBeUpdated.lastModifiedDate = currentTime;
+            materialAboutToBeUpdated.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
 
@@ -1043,7 +1049,7 @@ namespace API_TEST.Controllers
             materialIngredientAboutToBeUpdated.item_id = entry.item_id;
             materialIngredientAboutToBeUpdated.amount = entry.amount;
             materialIngredientAboutToBeUpdated.amount_measurement = entry.amount_measurement;
-            materialIngredientAboutToBeUpdated.lastModifiedDate = currentTime;
+            materialIngredientAboutToBeUpdated.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
 
@@ -1055,6 +1061,10 @@ namespace API_TEST.Controllers
         [HttpDelete("{material_id}")]
         public async Task<IActionResult> DeleteMaterial(string material_id, bool delete_all_pastry_ingredients_connected = false, bool delete_all_material_ingredient_connected = false)
         {
+            //Code for deleting materials
+            //When deleting materials, all associated MaterialIngredient records will be deleted as well
+
+
             //Deleting materials will also delete all of the associated material ingredient
             Materials? materialAboutToBeDeleted = await _context.Materials.FindAsync(material_id);
             if (materialAboutToBeDeleted == null) { return NotFound(new { message = "Specified material with the selected material_id not found." }); }
@@ -1062,7 +1072,7 @@ namespace API_TEST.Controllers
 
             DateTime currentTime = DateTime.Now;
             _context.Materials.Update(materialAboutToBeDeleted);
-            materialAboutToBeDeleted.lastModifiedDate = currentTime;
+            materialAboutToBeDeleted.last_modified_date = currentTime;
             materialAboutToBeDeleted.isActive = false;
 
             List<MaterialIngredients> materialIngredientsAboutToBeDeleted = await _context.MaterialIngredients.ToListAsync();
@@ -1072,7 +1082,7 @@ namespace API_TEST.Controllers
                 foreach (MaterialIngredients i in materialIngredientsAboutToBeDeleted)
                 {
                     _context.MaterialIngredients.Update(i);
-                    i.lastModifiedDate = currentTime;
+                    i.last_modified_date = currentTime;
                     i.isActive = false;
                 }
             }
@@ -1085,7 +1095,7 @@ namespace API_TEST.Controllers
                 foreach (Ingredients i in ingredientsToBeDeleted)
                 {
                     _context.Ingredients.Update(i);
-                    i.lastModifiedDate = currentTime;
+                    i.last_modified_date = currentTime;
                     i.isActive = false;
                 }
             }
@@ -1098,7 +1108,7 @@ namespace API_TEST.Controllers
                 foreach (MaterialIngredients i in relatedMaterialIngredientsAboutToBeDeleted)
                 {
                     _context.MaterialIngredients.Update(i);
-                    i.lastModifiedDate = currentTime;
+                    i.last_modified_date = currentTime;
                     i.isActive = false;
                 }
             }
@@ -1120,7 +1130,7 @@ namespace API_TEST.Controllers
 
             DateTime currentTime = DateTime.Now;
             _context.MaterialIngredients.Update(materialIngredientAboutToBeDeleted);
-            materialIngredientAboutToBeDeleted.lastModifiedDate = currentTime;
+            materialIngredientAboutToBeDeleted.last_modified_date = currentTime;
             materialIngredientAboutToBeDeleted.isActive = false;
             await _context.SaveChangesAsync();
 
@@ -1128,19 +1138,98 @@ namespace API_TEST.Controllers
             return Ok(new { message = "Material ingredient deleted." });
         }
     }
-    /*
+    
     [ApiController]
-    [Route("BOM/ingredients/")]
+    [Route("BOM/obsolete/")]
     [Authorize(Roles = UserRoles.Admin)]
-    public class IngredientController : ControllerBase
+    public class ObsoleteEndpointsController : ControllerBase
     {
         private readonly DatabaseContext _context;
         private readonly IActionLogger _actionLogger;
-
-        public IngredientController(DatabaseContext context, IActionLogger logs) { _context = context; _actionLogger = logs; }
-
-        // GET
         
+        public ObsoleteEndpointsController(DatabaseContext context, IActionLogger logs) { _context = context; _actionLogger = logs; }
+
+        [HttpGet("archive/ingredients/all")]
+        public async Task<List<GetIngredients>> GetAllDeletedIngredients(int? page, int? record_per_page)
+        {
+            List<GetIngredients> response = new List<GetIngredients>();
+
+            List<Ingredients> dbIngredients;
+
+            //Paging algorithm
+            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+
+            foreach (Ingredients i in dbIngredients)
+            {
+                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.date_added, i.last_modified_date);
+                response.Add(newRow);
+            }
+
+            await _actionLogger.LogAction(User, "GET, All Deleted Ingredients");
+            return response;
+        }
+        [HttpGet("ingredients")]
+        public async Task<List<GetIngredients>> GetAllIngredients(int? page, int? record_per_page)
+        {
+            List<GetIngredients> response = new List<GetIngredients>();
+
+            List<Ingredients> dbIngredients;
+
+            //Paging algorithm
+            if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
+                int current_page = page.Value < 1 ? 1 : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+            foreach (Ingredients i in dbIngredients)
+            {
+                GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.date_added, i.last_modified_date);
+                response.Add(newRow);
+            }
+            await _actionLogger.LogAction(User, "GET, All ingredients");
+            return response;
+        }
+        [HttpGet("ingredients/{ingredient_id}/{column_name}")]
+        public async Task<object> GetIngredientColumn(string ingredient_id, string column_name)
+        {
+            Ingredients? currentIngredient = await _context.Ingredients.FindAsync(ingredient_id);
+            object? response = null;
+
+            if (currentIngredient == null) { return NotFound(new { message = "Specified material with the material_id is not found." }); }
+            if (currentIngredient.isActive == false) { return NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
+
+            switch (column_name)
+            {
+                case "ingredient_id": response = currentIngredient.ingredient_id; break;
+                case "pastry_material_id": response = currentIngredient.pastry_material_id; break;
+                case "item_id": response = currentIngredient.item_id; break;
+                case "ingredient_type": response = currentIngredient.pastry_material_id; break;
+                case "amount": response = currentIngredient.amount; break;
+                case "amount_measurement": response = currentIngredient.amount_measurement; break;
+                case "date_added": response = currentIngredient.date_added; break;
+                case "last_modified_date": response = currentIngredient.last_modified_date; break;
+                default: response = BadRequest(new { message = "Specified column does not exist." }); break;
+            }
+
+            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " + column_name);
+            return response;
+        }
     }
-    */
 }

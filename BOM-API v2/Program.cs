@@ -17,8 +17,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: "DebugPolicy", policy =>
     {
-        policy.AllowAnyOrigin();
-        policy.AllowAnyHeader();
+        policy.SetIsOriginAllowedToAllowWildcardSubdomains()
+        .AllowAnyOrigin()
+        .AllowAnyHeader()
+        .AllowAnyMethod();
     });
 });
 
