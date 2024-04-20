@@ -1,5 +1,6 @@
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Services;
+using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -77,6 +78,7 @@ builder.Services.AddAuthentication(options =>
 //E.G: Using a DBContext in the constructor to get a database context
 
 builder.Services.AddTransient<IActionLogger, AccountManager>(); //Logging service
+builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Service
 
 
 var app = builder.Build();

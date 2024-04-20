@@ -1,5 +1,8 @@
-﻿using BillOfMaterialsAPI.Services;
-//Controller imports
+﻿using BillOfMaterialsAPI.Schemas;
+using BillOfMaterialsAPI.Helpers;
+using BillOfMaterialsAPI.Services;
+
+
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -11,6 +14,7 @@ using System.ComponentModel.DataAnnotations;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Nodes;
 
 
 
@@ -51,6 +55,7 @@ namespace JWTAuthentication.Authentication
     }
     public class LoginModel
     {
+        [EmailAddress]
         [Required(ErrorMessage = "User Name is required")]
         public string Email { get; set; }
 
@@ -68,7 +73,9 @@ namespace JWTAuthentication.Authentication
         public string user_id { get; set; }
         [EmailAddress] public string email { get; set; }
         public string username { get; set; }
+        public List<string> roles { get; set; }
         public string phone_number { get; set; }
+        public bool is_email_confirmed { get; set; }
         public DateTime join_date { get; set; }
     }
 }
@@ -84,13 +91,15 @@ namespace JWTAuthentication.Controllers
         private readonly RoleManager<IdentityRole> roleManager;
         private readonly IConfiguration _configuration;
         private readonly IActionLogger _actionLogger;
+        private readonly IEmailService _emailService;
 
-        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger)
+        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger, IEmailService emailService)
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
             _configuration = configuration;
             _actionLogger = actionLogger;
+            _emailService = emailService;
         }
 
         [HttpPost]
@@ -222,6 +231,28 @@ namespace JWTAuthentication.Controllers
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
 
+        [Authorize][HttpPost("send_confirmation_email")]
+        public async Task<IActionResult> SendEmailConfirmationEmail()
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return NotFound(new { message = "User not found." }); }
+
+            string? userName = currentUser.UserName;
+            string? email = currentUser.Email;
+
+            int result = await _emailService.SendEmailConfirmationEmail(userName, email, "https://www.google.com");
+            if (result == 0)
+            {
+                return Ok(new { message = "Email sent to " + email });
+            }
+            else
+            {
+                return StatusCode(500, new { message = "Email failed to send to " + email });
+            }
+
+            
+        }
+
         [Authorize][HttpGet("current_user/")]
         public async Task<GetUser> CurrentUser()
         {
@@ -232,20 +263,35 @@ namespace JWTAuthentication.Controllers
             response.user_id = currentUser.Id;
             response.email = currentUser.Email;
             response.username = currentUser.UserName;
+            response.is_email_confirmed = currentUser.EmailConfirmed;
             response.join_date = currentUser.JoinDate;
+
+            response.roles = (List<string>)await userManager.GetRolesAsync(currentUser);
 
             await _actionLogger.LogAction(User, "GET, User Information " + currentUser.Id);
             return response;
         }
         [Authorize(Roles = UserRoles.Admin)][HttpGet("all_users/")]
-        public async Task<List<GetUser>> GetAllUser()
+        public async Task<List<GetUser>> GetAllUser(int? page, int? record_per_page)
         {
             var currentUser = await userManager.GetUserAsync(User);
             if (currentUser == null) { return new List<GetUser>(); }
 
             List<GetUser> response = new List<GetUser>();
 
-            List<APIUsers> registeredUsers = await userManager.Users.ToListAsync();
+            List<APIUsers> registeredUsers;
+
+            if (page == null) { registeredUsers = await userManager.Users.ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                registeredUsers = await userManager.Users.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
             foreach (APIUsers user in registeredUsers)
             {
                 GetUser newResponseEntry = new GetUser();
@@ -253,13 +299,18 @@ namespace JWTAuthentication.Controllers
                 newResponseEntry.username = user.UserName;
                 newResponseEntry.email = user.Email;
                 newResponseEntry.phone_number = user.PhoneNumber;
+                newResponseEntry.is_email_confirmed = currentUser.EmailConfirmed;
                 newResponseEntry.join_date = user.JoinDate;
+
+                newResponseEntry.roles = (List<string>)await userManager.GetRolesAsync(user);
 
                 response.Add(newResponseEntry);
             }
             await _actionLogger.LogAction(User, "GET, All User Information " + currentUser.Id);
             return response;
         }
+
+        
     }
     
 }

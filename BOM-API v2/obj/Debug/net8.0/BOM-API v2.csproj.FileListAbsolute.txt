@@ -150,3 +150,6 @@ C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\bin\Debug\net8.0\zh-Hans\Mic
 C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\bin\Debug\net8.0\zh-Hant\Microsoft.CodeAnalysis.Workspaces.resources.dll
 C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\obj\Debug\net8.0\BOM-API v2.sourcelink.json
+C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\bin\Debug\net8.0\BouncyCastle.Cryptography.dll
+C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\bin\Debug\net8.0\MailKit.dll
+C:\Users\Bernard\source\repos\BOM-API v2\BOM-API v2\bin\Debug\net8.0\MimeKit.dll

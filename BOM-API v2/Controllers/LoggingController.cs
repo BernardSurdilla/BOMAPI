@@ -1,4 +1,5 @@
 ﻿using BillOfMaterialsAPI.Services;
+using BillOfMaterialsAPI.Helpers;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,8 +25,8 @@ namespace BillOfMaterialsAPI.Controllers
             if (page == null) { transactionLogs = await _logs.TransactionLogs.OrderByDescending(x => x.date).ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 

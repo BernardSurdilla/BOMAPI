@@ -1,6 +1,8 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
 using BillOfMaterialsAPI.Services;
+using BillOfMaterialsAPI.Helpers;
+
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,34 +18,7 @@ using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace API_TEST.Controllers
 {
-    [ApiExplorerSettings(IgnoreApi = true)]
-    public static class IdFormat
-    {
-        public static string materialIdFormat = "MID";
-        public static string materialIngredientIdFormat = "MIID";
-        public static string ingredientIdFormat = "IID";
-        public static string pastryMaterialIdFormat = "PMID";
-        public static string logsIdFormat = "LOG";
-        public static int idNumLength = 12;
-
-        public static string IncrementId(string idStringBuffer, int idNumberLength, string idString)
-        {
-            int index = idString.IndexOf(idStringBuffer);
-            string idNumeralsPart = (index < 0) ? idString : idString.Remove(index, idStringBuffer.Length);
-            int idInt = Convert.ToInt32(idNumeralsPart);
-
-            int newIdInt = idInt + 1;
-            int numberOfNumerals = Convert.ToInt32(newIdInt.ToString()).ToString().Length;
-
-            string newId = newIdInt.ToString();
-            for (int i = 0; i < idNumberLength - numberOfNumerals; i++)
-            {
-                newId = "0" + newId;
-            }
-            newId = idStringBuffer + newId;
-            return newId;
-        }
-    }
+    
 
     [ApiController]
     [Route("BOM/")]
@@ -60,13 +35,18 @@ namespace API_TEST.Controllers
         }
 
         [HttpGet("item_used/occurence/")]
-        public async Task<List<GetUsedItems>> GetMostCommonlyUsedItem()
+        public async Task<List<GetUsedItems>> GetMostCommonlyUsedItems()
         {
-            List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, pastry_material_id = row.pastry_material_id }).ToList();
+            List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
 
-            List<MaterialIngredients> materialIngredientsItems = _context.MaterialIngredients.Where(row => row.isActive == true).Select(row => new MaterialIngredients() { item_id = row.item_id, Materials = row.Materials }).ToList();
+            List<MaterialIngredients> materialIngredientsItems = _context.MaterialIngredients.Where(row => row.isActive == true).Select(row => new MaterialIngredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, Materials = row.Materials }).ToList();
 
             List<GetUsedItems> response = new List<GetUsedItems>();
+
+            //Lists for checking if records referenced by ingredients and material_ingredients are active are active
+
+            List<Materials> activeMaterials = await _context.Materials.Where(x => x.isActive == true).Select(x => new Materials() { material_id = x.material_id, material_name = x.material_name }).ToListAsync();
+            List<string> activeInventoryItems = new List<string>(); //Replace with function to get all deleted inventory items 
 
             //Dictionary<string, string> numberOfUses = new Dictionary<string, string>();
 
@@ -75,23 +55,43 @@ namespace API_TEST.Controllers
             { 
                 while (ingItemEnum.MoveNext())
                 {
+
+                    string currentItemName = "N/A";
+                    switch (ingItemEnum.Current.ingredient_type)
+                    {
+                        //Insert code to check if inventory item is activw here
+                        case IngredientType.InventoryItem: 
+                            currentItemName = "<insert_inventory_item_name_here>"; 
+                            break;
+                        case IngredientType.Material:
+                            Materials? searchResult = activeMaterials.Find(x => x.material_id == ingItemEnum.Current.item_id);
+                            if (searchResult == null) continue;
+
+                            currentItemName = searchResult.material_name; break;
+                    }
+
                     GetUsedItems? currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
+
                     if (currentRecord == null)
                     {
                         GetUsedItems newEntry = new GetUsedItems()
                         {
                             item_id = ingItemEnum.Current.item_id,
+                            item_name = currentItemName,
+                            item_type = ingItemEnum.Current.ingredient_type,
                             as_material_ingredient = new List<string>(),
                             as_cake_ingredient = new List<string>(),
                             num_of_uses_cake_ingredient = 0,
                             num_of_uses_material_ingredient = 0
                         };
+                        
+
                         response.Add(newEntry);
                         currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
                     }
 
                     currentRecord.num_of_uses_cake_ingredient += 1;
-                    currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.pastry_material_id);
+                    currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " <design_name_goes_here>");
                 }
             }
             //Count the material ingredients
@@ -99,23 +99,40 @@ namespace API_TEST.Controllers
             {
                 while (matIngItemEnum.MoveNext())
                 {
+                    string currentItemName = "N/A";
+                    switch (matIngItemEnum.Current.ingredient_type)
+                    {
+                        //Insert code to check if inventory item is activw here
+                        case IngredientType.InventoryItem:
+                            currentItemName = "<insert_inventory_name_here>";
+                            break;
+                        case IngredientType.Material:
+                            Materials? searchResult = activeMaterials.Find(x => x.material_id == matIngItemEnum.Current.item_id);
+                            if (searchResult == null) continue;
+
+                            currentItemName = searchResult.material_name; break;
+                    }
+
                     GetUsedItems? currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
                     if (currentRecord == null)
                     {
                         GetUsedItems newEntry = new GetUsedItems()
                         {
                             item_id = matIngItemEnum.Current.item_id,
+                            item_name = currentItemName,
+                            item_type = matIngItemEnum.Current.ingredient_type,
                             as_material_ingredient = new List<string>(),
                             as_cake_ingredient = new List<string>(),
                             num_of_uses_cake_ingredient = 0,
                             num_of_uses_material_ingredient = 0
                         };
+                        
                         response.Add(newEntry);
                         currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
                     }
 
                     currentRecord.num_of_uses_material_ingredient += 1;
-                    currentRecord.as_material_ingredient.Add(matIngItemEnum.Current.Materials.material_id);
+                    currentRecord.as_material_ingredient.Add(matIngItemEnum.Current.Materials.material_id + ": " + matIngItemEnum.Current.Materials.material_name);
                 }
             }
             await _actionLogger.LogAction(User, "GET, Most Commonly Used Items ");
@@ -150,8 +167,8 @@ namespace API_TEST.Controllers
             if (page == null) { pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == true).ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
@@ -620,8 +637,8 @@ namespace API_TEST.Controllers
             if (page == null) { dbMaterials = await _context.Materials.Where(row => row.isActive == true).ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
@@ -1160,8 +1177,8 @@ namespace API_TEST.Controllers
             if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
@@ -1190,8 +1207,8 @@ namespace API_TEST.Controllers
             if (page == null) { dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 

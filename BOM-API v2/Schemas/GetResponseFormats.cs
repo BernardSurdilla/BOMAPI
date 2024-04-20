@@ -147,6 +147,9 @@ namespace BillOfMaterialsAPI.Schemas
     public class GetUsedItems
     {
         [Required] public string item_id { get; set; }
+        [Required] public string item_type { get; set; }
+        [Required] public string item_name { get; set; }
+
         [Required] public List<string> as_material_ingredient { get; set; }
         [Required] public List<string> as_cake_ingredient { get; set; }
 
