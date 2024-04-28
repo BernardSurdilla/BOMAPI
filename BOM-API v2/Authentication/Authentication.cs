@@ -15,6 +15,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.ComponentModel.DataAnnotations.Schema;
+using System.Security.Cryptography;
 
 
 
@@ -28,13 +30,20 @@ namespace JWTAuthentication.Authentication
         {
 
         }
-
+        public DbSet<EmailConfirmationKeys> EmailConfirmationKeys { get; set; } //Table for storing user confirmation keys
     }
-
     public class APIUsers : IdentityUser
     {
         [Required] public DateTime JoinDate { get; set; }
     }
+    public class EmailConfirmationKeys
+    {
+        [Required][ForeignKey("APIUsers")] public string Id { get; set; }
+        [Required] public string ConfirmationKey { get; set; }
+        [Required] public DateTime ValidUntil { get; set; } 
+
+    }
+
     public static class UserRoles
     {
         public const string Admin = "Admin";
@@ -89,17 +98,22 @@ namespace JWTAuthentication.Controllers
     {
         private readonly UserManager<APIUsers> userManager;
         private readonly RoleManager<IdentityRole> roleManager;
+
+        private readonly AuthDB _auth;
+
         private readonly IConfiguration _configuration;
         private readonly IActionLogger _actionLogger;
         private readonly IEmailService _emailService;
 
-        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger, IEmailService emailService)
+
+        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger, IEmailService emailService, AuthDB auth)
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
             _configuration = configuration;
             _actionLogger = actionLogger;
             _emailService = emailService;
+            _auth = auth;
         }
 
         [HttpPost]
@@ -231,46 +245,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
 
-        [Authorize][HttpPost("send_confirmation_email")]
-        public async Task<IActionResult> SendEmailConfirmationEmail()
-        {
-            var currentUser = await userManager.GetUserAsync(User);
-            if (currentUser == null) { return NotFound(new { message = "User not found." }); }
-
-            string? userName = currentUser.UserName;
-            string? email = currentUser.Email;
-
-            int result = await _emailService.SendEmailConfirmationEmail(userName, email, "https://www.google.com");
-            if (result == 0)
-            {
-                return Ok(new { message = "Email sent to " + email });
-            }
-            else
-            {
-                return StatusCode(500, new { message = "Email failed to send to " + email });
-            }
-
-            
-        }
-
-        [Authorize][HttpGet("current_user/")]
-        public async Task<GetUser> CurrentUser()
-        {
-            var currentUser = await userManager.GetUserAsync(User);
-            if (currentUser == null) { return new GetUser(); }
-
-            GetUser response = new GetUser();
-            response.user_id = currentUser.Id;
-            response.email = currentUser.Email;
-            response.username = currentUser.UserName;
-            response.is_email_confirmed = currentUser.EmailConfirmed;
-            response.join_date = currentUser.JoinDate;
-
-            response.roles = (List<string>)await userManager.GetRolesAsync(currentUser);
-
-            await _actionLogger.LogAction(User, "GET, User Information " + currentUser.Id);
-            return response;
-        }
+        
         [Authorize(Roles = UserRoles.Admin)][HttpGet("all_users/")]
         public async Task<List<GetUser>> GetAllUser(int? page, int? record_per_page)
         {
@@ -310,7 +285,104 @@ namespace JWTAuthentication.Controllers
             return response;
         }
 
-        
+        [Authorize][HttpGet("user/")]
+        public async Task<GetUser> CurrentUser()
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return new GetUser(); }
+
+            GetUser response = new GetUser();
+            response.user_id = currentUser.Id;
+            response.email = currentUser.Email;
+            response.username = currentUser.UserName;
+            response.is_email_confirmed = currentUser.EmailConfirmed;
+            response.join_date = currentUser.JoinDate;
+
+            response.roles = (List<string>)await userManager.GetRolesAsync(currentUser);
+
+            await _actionLogger.LogAction(User, "GET, User Information " + currentUser.Id);
+            return response;
+        }
+        [Authorize][HttpPost("user/send_confirmation_email/")]
+        public async Task<IActionResult> SendEmailConfirmationEmail()
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return NotFound(new { message = "User not found." }); }
+            if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
+
+            string currentEmailConfirmationKey = Convert.ToBase64String(new HMACSHA256().Key);
+
+            DateTime currentTime = DateTime.Now;
+            EmailConfirmationKeys? currentUserKey = null;
+
+            try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            catch {  }
+
+            if (currentUserKey != null)
+            {
+                _auth.EmailConfirmationKeys.Update(currentUserKey);
+                currentUserKey.ConfirmationKey = currentEmailConfirmationKey;
+                currentUserKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:Validation:EmailValidationKeyValidityDays"));
+            }
+            else
+            {
+                EmailConfirmationKeys newEmailConfirmationKey = new EmailConfirmationKeys();
+                newEmailConfirmationKey.Id = currentUser.Id;
+                newEmailConfirmationKey.ConfirmationKey = currentEmailConfirmationKey;
+                newEmailConfirmationKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:Validation:EmailValidationKeyValidityDays"));
+
+                _auth.EmailConfirmationKeys.Add(newEmailConfirmationKey);
+            }
+
+            await _auth.SaveChangesAsync();
+
+            string? userName = currentUser.UserName;
+            string? email = currentUser.Email;
+            string? redirectAddress = _configuration.GetValue<string>("Email:Validation:RedirectAddress") + currentEmailConfirmationKey; //Link here to verify the current user, insert key here
+
+
+            int result = await _emailService.SendEmailConfirmationEmail(userName, email, redirectAddress);
+            if (result == 0)
+            {
+                return Ok(new { message = "Email sent to " + email });
+            }
+            else
+            {
+                return StatusCode(500, new { message = "Email failed to send to " + email });
+            }
+        }
+        [Authorize][HttpPost("user/confirm_email/")]
+        public async Task<IActionResult> ConfirmUserEmail(string confirmationCode)
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return NotFound(new { message = "User not found." }); }
+            if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
+
+            DateTime currentTime = DateTime.Now;
+            EmailConfirmationKeys? currentUserKey = null;
+
+            try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            catch { }
+
+            if (currentUserKey == null) { return BadRequest(new { message = "Please send a confirmation code to the user's email first" }); }
+            if (currentUserKey.ValidUntil <= currentTime) { return BadRequest(new { message = "Confirmation key already expired, please send a new confirmation key to the user's email" }); }
+
+            string validationKey = currentUserKey.ConfirmationKey;
+
+            if (confirmationCode != validationKey) { return BadRequest(new { message = "Validation code is incorrect." }); }
+            
+            if (confirmationCode == validationKey) 
+            {
+                currentUser.EmailConfirmed = true;
+            }
+            await userManager.UpdateAsync(currentUser);
+
+            _auth.EmailConfirmationKeys.Remove(currentUserKey);
+            await _auth.SaveChangesAsync();
+
+            return Ok(new { message = "Email confirmed successfully" });
+        }
+
     }
     
 }

@@ -175,11 +175,17 @@ namespace API_TEST.Controllers
                 pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
+            //Loop through all retrieved rows for the ingredients of the cake
             foreach (PastryMaterials i in pastryMaterials)
             {
+                //Get all associated ingredients of the current cake
                 List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == i.pastry_material_id).ToListAsync();
 
+                //The object that will be attached to the new response entry
+                //Contains the ingredients of the current cake
                 List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
+
+                //Loop through all of the retireved ingredients of the current cake
                 foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
                 {
                     GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
@@ -190,17 +196,26 @@ namespace API_TEST.Controllers
                     newSubIngredientListEntry.amount = ifcm.amount;
                     newSubIngredientListEntry.item_id = ifcm.item_id;
 
+                    //Check what kind of ingredient is the current ingredient
+                    //Either from the inventory or the materials list
                     switch (ifcm.ingredient_type)
                     {
+
                         case IngredientType.InventoryItem:
                             newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
                             break;
-                        case IngredientType.Material:
-                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
-                            if (currentReferencedMaterial == null) { break; }
 
+                        case IngredientType.Material:
+                            //Find if the material that the current ingredient is referring to
+                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
+                            if (currentReferencedMaterial == null) { break; } //Skip the current entry if the material is not found or deletedd
+
+                            //Find all active ingredients of the current material
                             List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
 
+                            //Check if there are material ingredients retrieved
+                            //Add the retireved materials to the current response entry if yes
+                            //Add an empty array to the current response entry if no
                             if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
                             {
                                 List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();

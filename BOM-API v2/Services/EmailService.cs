@@ -9,6 +9,11 @@ using BillOfMaterialsAPI.Services;
 
 namespace BOM_API_v2.Services
 {
+    public class IEmailServiceOptions
+    {
+
+    }
+
     public class EmailService : IEmailService
     {
         private readonly IConfiguration _configuration;
@@ -38,12 +43,12 @@ namespace BOM_API_v2.Services
 
                 using (var client = new SmtpClient())
                 {
-                    client.Connect(smtpHost, port.Value, false);
+                    await client.ConnectAsync(smtpHost, port.Value, false);
 
                     // Note: only needed if the SMTP server requires authentication
-                    client.Authenticate(userName, password);
+                    await client.AuthenticateAsync(userName, password);
 
-                    client.Send(message);
+                    await client.SendAsync(message);
                     client.Disconnect(true);
                 }
                 return 0;
