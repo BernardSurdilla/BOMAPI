@@ -19,7 +19,7 @@ namespace BillOfMaterialsAPI.Schemas
         //Dictates where the API should look up the id in the item_id column
         [Required][MaxLength(3)][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public bool isActive { get; set; }
@@ -60,7 +60,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Key][Required][MaxLength(25)] public string material_id { get; set; }
         [Required][MaxLength(50)] public string material_name { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
         
         [Required] public bool isActive { get; set; }
@@ -82,7 +82,7 @@ namespace BillOfMaterialsAPI.Schemas
         //Dictates where the API should look up the id in the item_id column
         [Required][MaxLength(3)][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public bool isActive { get; set; }

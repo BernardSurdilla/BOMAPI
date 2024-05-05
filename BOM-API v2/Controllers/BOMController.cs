@@ -15,6 +15,7 @@ using System.Net.NetworkInformation;
 using System.Security.Claims;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Globalization;
 
 namespace API_TEST.Controllers
 {
@@ -35,7 +36,7 @@ namespace API_TEST.Controllers
         }
 
         [HttpGet("item_used/occurence/")]
-        public async Task<List<GetUsedItems>> GetMostCommonlyUsedItems()
+        public async Task<List<GetUsedItems>> GetMostCommonlyUsedItems(string? sortBy, string? sortOrder)
         {
             List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
 
@@ -44,11 +45,8 @@ namespace API_TEST.Controllers
             List<GetUsedItems> response = new List<GetUsedItems>();
 
             //Lists for checking if records referenced by ingredients and material_ingredients are active are active
-
             List<Materials> activeMaterials = await _context.Materials.Where(x => x.isActive == true).Select(x => new Materials() { material_id = x.material_id, material_name = x.material_name }).ToListAsync();
-            List<string> activeInventoryItems = new List<string>(); //Replace with function to get all deleted inventory items 
-
-            //Dictionary<string, string> numberOfUses = new Dictionary<string, string>();
+            List<string> activeInventoryItems = new List<string>(); //Replace with function to get all active inventory items 
 
             //Count the ingredients
             using (var ingItemEnum = ingredientsItems.GetEnumerator())
@@ -94,6 +92,7 @@ namespace API_TEST.Controllers
                     currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " <design_name_goes_here>");
                 }
             }
+
             //Count the material ingredients
             using (var matIngItemEnum = materialIngredientsItems.GetEnumerator())
             {
@@ -135,10 +134,80 @@ namespace API_TEST.Controllers
                     currentRecord.as_material_ingredient.Add(matIngItemEnum.Current.Materials.material_id + ": " + matIngItemEnum.Current.Materials.material_name);
                 }
             }
-            await _actionLogger.LogAction(User, "GET, Most Commonly Used Items ");
+
+            //Sorting Algorithm
+            if (sortBy != null)
+            {
+
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC": sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "item_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.item_id.CompareTo(x.item_id));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.item_id.CompareTo(y.item_id));
+                                break;
+                        }
+                        break;
+                    case "item_name":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.item_name.CompareTo(x.item_name));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.item_name.CompareTo(y.item_name));
+                                break;
+                        }
+                        break;
+                    case "item_type":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.item_type.CompareTo(x.item_type));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.item_type.CompareTo(y.item_type));
+                                break;
+                        }
+                        break;
+                    case "num_of_uses_cake_ingredient":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.num_of_uses_cake_ingredient.CompareTo(x.num_of_uses_cake_ingredient));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.num_of_uses_cake_ingredient.CompareTo(y.num_of_uses_cake_ingredient));
+                                break;
+                        }
+                        break;
+                    case "num_of_uses_material_ingredient":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.num_of_uses_material_ingredient.CompareTo(x.num_of_uses_material_ingredient));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.num_of_uses_material_ingredient.CompareTo(y.num_of_uses_material_ingredient));
+                                break;
+                        }
+                        break;
+                }
+            }
+
+
+            await _actionLogger.LogAction(User, "GET", "Most Commonly Used Items ");
             return response;
         }
         
+
+
         //Json serialization and deserialization
         //string a = JsonSerializer.Serialize(ingredientAboutToBeDeleted);
         //JsonSerializer.Deserialize<List<SubPastryMaterials_materials_column>>(a);
@@ -157,14 +226,80 @@ namespace API_TEST.Controllers
 
         //GET
         [HttpGet]
-        public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page)
+        public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             List<PastryMaterials> pastryMaterials;
 
             List<GetPastryMaterial> response = new List<GetPastryMaterial>();
 
+            //Base query for the materials database to retrieve rows
+            IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.isActive == true);
+            //Row sorting algorithm
+            if (sortBy != null)
+            {
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "DesignId":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.DesignId);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.DesignId);
+                                break;
+                        }
+                        break;
+                    case "pastry_material_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.pastry_material_id);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.pastry_material_id);
+                                break;
+                        }
+                        break;
+                    case "date_added":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                    case "last_modified_date":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.last_modified_date);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.last_modified_date);
+                                break;
+                        }
+                        break;
+                    default:
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                }
+            }
             //Paging algorithm
-            if (page == null) { pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == true).ToListAsync(); }
+            if (page == null) { pastryMaterials = await pastryMaterialQuery.ToListAsync(); }
             else
             {
                 int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
@@ -172,7 +307,7 @@ namespace API_TEST.Controllers
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
-                pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                pastryMaterials = await pastryMaterialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
             //Loop through all retrieved rows for the ingredients of the cake
@@ -180,6 +315,13 @@ namespace API_TEST.Controllers
             {
                 //Get all associated ingredients of the current cake
                 List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == i.pastry_material_id).ToListAsync();
+
+                GetPastryMaterial newResponseRow = new GetPastryMaterial(){
+                    DesignId = i.DesignId,
+                    pastry_material_id = i.pastry_material_id,
+                    date_added = i.date_added,
+                    last_modified_date = i.last_modified_date,
+                };
 
                 //The object that will be attached to the new response entry
                 //Contains the ingredients of the current cake
@@ -195,6 +337,8 @@ namespace API_TEST.Controllers
                     newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
                     newSubIngredientListEntry.amount = ifcm.amount;
                     newSubIngredientListEntry.item_id = ifcm.item_id;
+                    newSubIngredientListEntry.date_added = ifcm.date_added;
+                    newSubIngredientListEntry.last_modified_date = ifcm.last_modified_date;
 
                     //Check what kind of ingredient is the current ingredient
                     //Either from the inventory or the materials list
@@ -235,11 +379,13 @@ namespace API_TEST.Controllers
                     }
                     subIngredientList.Add(newSubIngredientListEntry);
                 }
+                
+                newResponseRow.ingredients = subIngredientList;
 
-                response.Add(new GetPastryMaterial(i, subIngredientList));
+                response.Add(newResponseRow);
             }
 
-            await _actionLogger.LogAction(User, "GET, All Pastry Material ");
+            await _actionLogger.LogAction(User, "GET", "All Pastry Material ");
             return response;
 
         }
@@ -247,7 +393,7 @@ namespace API_TEST.Controllers
         public async Task<GetPastryMaterial> GetSpecificPastryMaterial(string pastry_material_id)
         {
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
-            if (currentPastryMat == null) { return GetPastryMaterial.DefaultResponse(); }
+            if (currentPastryMat == null) { return new GetPastryMaterial(); }
 
             List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMat.pastry_material_id).ToListAsync();
 
@@ -295,7 +441,7 @@ namespace API_TEST.Controllers
 
             GetPastryMaterial response = new GetPastryMaterial(currentPastryMat, subIngredientList);
 
-            await _actionLogger.LogAction(User, "GET, Pastry Material " + currentPastryMat.pastry_material_id);
+            await _actionLogger.LogAction(User, "GET", "Pastry Material " + currentPastryMat.pastry_material_id);
             return response;
 
         }
@@ -356,20 +502,20 @@ namespace API_TEST.Controllers
                 response.Add(newEntry);
 
             }
-            await _actionLogger.LogAction(User, "GET, All Pastry Material Ingredients");
+            await _actionLogger.LogAction(User, "GET", "All Pastry Material Ingredients");
             return response;
         }
 
         //POST
         [HttpPost]
-        public async Task<IActionResult> AddNewPastryMaterial(string designId, List<PostIngredients> entries)
+        public async Task<IActionResult> AddNewPastryMaterial(PostPastryMaterial newEntry)
         {
             //Code to check if designID exists here
             //
             //
+            string designId = newEntry.design_id;
 
-
-            foreach (PostIngredients entry in entries)
+            foreach (PostIngredients entry in newEntry.ingredients)
             {
                 switch (entry.ingredient_type)
                 {
@@ -423,7 +569,7 @@ namespace API_TEST.Controllers
                 lastIngredientId = newIngredientId;
             }
 
-            foreach (PostIngredients entry in entries)
+            foreach (PostIngredients entry in newEntry.ingredients)
             {
                 Ingredients newIngredientsEntry = new Ingredients();
                 string newId = IdFormat.IncrementId(IdFormat.ingredientIdFormat, IdFormat.idNumLength, lastIngredientId);
@@ -446,7 +592,7 @@ namespace API_TEST.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "POST, Add Pastry Materials " + newPastryMaterialEntry.pastry_material_id );
+            await _actionLogger.LogAction(User, "POST", "Add Pastry Materials " + newPastryMaterialEntry.pastry_material_id );
             return Ok(new { message = "Data inserted to the database." });
 
         }
@@ -502,7 +648,7 @@ namespace API_TEST.Controllers
             await _context.Ingredients.AddAsync(newIngredientsEntry);
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "POST, Add Ingredient " + newIngredientsEntry.ingredient_id + " to " + pastry_material_id);
+            await _actionLogger.LogAction(User, "POST", "Add Ingredient " + newIngredientsEntry.ingredient_id + " to " + pastry_material_id);
             return Ok(new { message = "Data inserted to the database." });
 
         }
@@ -526,7 +672,7 @@ namespace API_TEST.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Update Pastry Material " + pastry_material_id);
+            await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material " + pastry_material_id);
             return Ok(new { message = "Pastry Material updated." });
 
         }
@@ -568,7 +714,7 @@ namespace API_TEST.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Update Pastry Material Ingredient " + pastry_material_id);
+            await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Ingredient " + pastry_material_id);
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
         }
@@ -595,7 +741,7 @@ namespace API_TEST.Controllers
             currentPastryMaterial.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
-            await _actionLogger.LogAction(User, "DELETE, Delete Pastry Material " + pastry_material_id);
+            await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material " + pastry_material_id);
             return Ok(new { message = "Pastry Material deleted." });
         }
         [HttpDelete("{pastry_material_id}/{ingredient_id}")]
@@ -614,7 +760,7 @@ namespace API_TEST.Controllers
             ingredientAboutToBeDeleted.isActive = false;
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "DELETE, Delete Pastry Material Ingredient " + ingredient_id);
+            await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material Ingredient " + ingredient_id);
             return Ok(new { message = "Ingredient deleted." });
         }
     }
@@ -634,7 +780,7 @@ namespace API_TEST.Controllers
 
         //GET
         [HttpGet]
-        public async Task<List<GetMaterials>> GetAllMaterials(int? page, int? record_per_page)
+        public async Task<List<GetMaterials>> GetAllMaterials(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
 
             //Default GET request without parameters
@@ -648,8 +794,96 @@ namespace API_TEST.Controllers
             List<Materials> dbMaterials;
             List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.Where(row => row.isActive == true).ToListAsync();
 
+            //Base query for the materials database to retrieve rows
+            IQueryable<Materials> materialQuery = _context.Materials.Where(row => row.isActive == true);
+            //Row sorting algorithm
+            if (sortBy != null)
+            {
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "material_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.material_id);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.material_id);
+                                break;
+                        }
+                        break;
+                    case "material_name":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.material_name);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.material_name);
+                                break;
+                        }
+                        break;
+                    case "amount":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.amount);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.amount);
+                                break;
+                        }
+                        break;
+                    case "amount_measurement":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.amount_measurement);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.amount_measurement);
+                                break;
+                        }
+                        break;
+                    case "date_added":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                    case "last_modified_date":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.last_modified_date);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.last_modified_date);
+                                break;
+                        }
+                        break;
+                    default:
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                }
+            }
             //Paging algorithm
-            if (page == null) { dbMaterials = await _context.Materials.Where(row => row.isActive == true).ToListAsync(); }
+            if (page == null) { dbMaterials = await materialQuery.ToListAsync(); }
             else
             {
                 int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
@@ -657,10 +891,10 @@ namespace API_TEST.Controllers
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
-                dbMaterials = await _context.Materials.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                dbMaterials = await materialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            if (dbMaterials.IsNullOrEmpty()) { response.Add(GetMaterials.DefaultResponse()); return response; }
+            if (dbMaterials.IsNullOrEmpty()) { return response; }
 
             foreach (Materials material in dbMaterials)
             {
@@ -685,7 +919,7 @@ namespace API_TEST.Controllers
                 response.Add(row);
             }
 
-            await _actionLogger.LogAction(User, "GET, All materials");
+            await _actionLogger.LogAction(User, "GET", "All materials");
             return response;
         }
         [HttpGet("{material_id}")]
@@ -698,8 +932,8 @@ namespace API_TEST.Controllers
 
             Materials? currentMaterial = await _context.Materials.FindAsync(material_id);
 
-            if (currentMaterial == null) { return GetMaterials.DefaultResponse(); }
-            if (currentMaterial.isActive == false) { return GetMaterials.DefaultResponse(); }
+            if (currentMaterial == null) { return new GetMaterials(); }
+            if (currentMaterial.isActive == false) { return new GetMaterials(); }
 
             List<MaterialIngredients> x = await _context.MaterialIngredients.ToListAsync();
             List<MaterialIngredients> y = x.FindAll(x => x.material_id == currentMaterial.material_id && x.isActive == true);
@@ -717,7 +951,7 @@ namespace API_TEST.Controllers
             //
             response = new GetMaterials(new SubGetMaterials(currentMaterial), currentMaterialIngredients, estimatedCost);
 
-            await _actionLogger.LogAction(User, "GET, Material " + currentMaterial.material_id);
+            await _actionLogger.LogAction(User, "GET", "Material " + currentMaterial.material_id);
             return response;
 
             /*
@@ -781,7 +1015,7 @@ namespace API_TEST.Controllers
                 default: response = BadRequest(new { message = "Specified column does not exist." }); break;
             }
 
-            await _actionLogger.LogAction(User, "GET, Material " + material_id + " - Column " + column_name);
+            await _actionLogger.LogAction(User, "GET", "Material " + material_id + " - Column " + column_name);
             return response;
             /*
             if (currentMaterial != null)
@@ -911,7 +1145,7 @@ namespace API_TEST.Controllers
                 await _context.MaterialIngredients.AddRangeAsync(newIngredientsEntry);
                 _context.SaveChanges();
 
-                await _actionLogger.LogAction(User, "POST, Add Material " + newMaterialsEntry.material_id);
+                await _actionLogger.LogAction(User, "POST", "Add Material " + newMaterialsEntry.material_id);
                 return Ok(new { message = "Data inserted to the database." });
 
             }
@@ -1021,7 +1255,7 @@ namespace API_TEST.Controllers
             }
             catch (Exception ex) { return Problem("Data not inserted to database."); }
 
-            await _actionLogger.LogAction(User, "POST, Add Material Ingredient to " + material_id);
+            await _actionLogger.LogAction(User, "POST", "Add Material Ingredient to " + material_id);
             return Ok(new { message = "Material ingredient inserted to database." });
         }
 
@@ -1043,7 +1277,7 @@ namespace API_TEST.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Update Material " + material_id);
+            await _actionLogger.LogAction(User, "PATCH", "Update Material " + material_id);
             return Ok(new { message = "Material updated." });
         }
         [HttpPatch("{material_id}/ingredients/{material_ingredient_id}")]
@@ -1085,7 +1319,7 @@ namespace API_TEST.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Update Material " + material_id + " - Ingredient " + material_ingredient_id);
+            await _actionLogger.LogAction(User, "PATCH", "Update Material " + material_id + " - Ingredient " + material_ingredient_id);
             return Ok(new { message = "Material ingredient updated." });
         }
 
@@ -1147,7 +1381,7 @@ namespace API_TEST.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "DELETE, Delete Material " + material_id + " Also Associated Material&Pastry Ingredient " + delete_all_material_ingredient_connected.ToString() + "/" + delete_all_pastry_ingredients_connected.ToString());
+            await _actionLogger.LogAction(User, "DELETE", "Delete Material " + material_id + " Also Associated Material&Pastry Ingredient " + delete_all_material_ingredient_connected.ToString() + "/" + delete_all_pastry_ingredients_connected.ToString());
             return Ok(new { message = "Material deleted." });
         }
         [HttpDelete("{material_id}/ingredients/{material_ingredient_id}")]
@@ -1166,11 +1400,11 @@ namespace API_TEST.Controllers
             materialIngredientAboutToBeDeleted.isActive = false;
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "DELETE, Material " + material_id + " - Ingredient " + material_ingredient_id);
+            await _actionLogger.LogAction(User, "DELETE", "Material " + material_id + " - Ingredient " + material_ingredient_id);
             return Ok(new { message = "Material ingredient deleted." });
         }
     }
-    
+    /*
     [ApiController]
     [Route("BOM/obsolete/")]
     [Authorize(Roles = UserRoles.Admin)]
@@ -1200,7 +1434,7 @@ namespace API_TEST.Controllers
                 dbIngredients = await _context.Ingredients.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+            if (dbIngredients.IsNullOrEmpty() == true) { return response; }
 
             foreach (Ingredients i in dbIngredients)
             {
@@ -1208,7 +1442,7 @@ namespace API_TEST.Controllers
                 response.Add(newRow);
             }
 
-            await _actionLogger.LogAction(User, "GET, All Deleted Ingredients");
+            await _actionLogger.LogAction(User, "GET", "All Deleted Ingredients");
             return response;
         }
         [HttpGet("ingredients")]
@@ -1229,13 +1463,13 @@ namespace API_TEST.Controllers
 
                 dbIngredients = await _context.Ingredients.Where(row => row.isActive == true).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
-            if (dbIngredients.IsNullOrEmpty() == true) { response.Add(GetIngredients.DefaultResponse()); return response; }
+            if (dbIngredients.IsNullOrEmpty() == true) { return response; }
             foreach (Ingredients i in dbIngredients)
             {
                 GetIngredients newRow = new GetIngredients(i.ingredient_id, i.item_id, i.pastry_material_id, i.ingredient_type, i.amount, i.amount_measurement, i.date_added, i.last_modified_date);
                 response.Add(newRow);
             }
-            await _actionLogger.LogAction(User, "GET, All ingredients");
+            await _actionLogger.LogAction(User, "GET", "All ingredients");
             return response;
         }
         [HttpGet("ingredients/{ingredient_id}/{column_name}")]
@@ -1260,8 +1494,9 @@ namespace API_TEST.Controllers
                 default: response = BadRequest(new { message = "Specified column does not exist." }); break;
             }
 
-            await _actionLogger.LogAction(User, "GET, Ingredient " + ingredient_id + " - Column " + column_name);
+            await _actionLogger.LogAction(User, "GET", "Ingredient " + ingredient_id + " - Column " + column_name);
             return response;
         }
     }
+    */
 }

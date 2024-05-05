@@ -1,11 +1,14 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
 using BillOfMaterialsAPI.Services;
+using BillOfMaterialsAPI.Helpers;
+
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Globalization;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -25,22 +28,88 @@ namespace BillOfMaterialsAPI.Controllers
         //Getting deleted data
         //GET
         [HttpGet("pastry_materials/")]
-        public async Task<List<GetPastryMaterial>> GetAllDeletedPastryMaterial(int? page, int? record_per_page)
+        public async Task<List<GetPastryMaterial>> GetAllDeletedPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             List<PastryMaterials> pastryMaterials;
 
             List<GetPastryMaterial> response = new List<GetPastryMaterial>();
 
+            //Base query for the materials database to retrieve rows
+            IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.isActive == false);
+            //Row sorting algorithm
+            if (sortBy != null)
+            {
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "DesignId":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.DesignId);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.DesignId);
+                                break;
+                        }
+                        break;
+                    case "pastry_material_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.pastry_material_id);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.pastry_material_id);
+                                break;
+                        }
+                        break;
+                    case "date_added":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                    case "last_modified_date":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.last_modified_date);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.last_modified_date);
+                                break;
+                        }
+                        break;
+                    default:
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                }
+            }
             //Paging algorithm
-            if (page == null) { pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == false).ToListAsync(); }
+            if (page == null) { pastryMaterials = await pastryMaterialQuery.ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
-                pastryMaterials = await _context.PastryMaterials.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                pastryMaterials = await pastryMaterialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
             foreach (PastryMaterials i in pastryMaterials) 
@@ -89,7 +158,7 @@ namespace BillOfMaterialsAPI.Controllers
                 response.Add(new GetPastryMaterial(i, subIngredientList));
             }
 
-            await _actionLogger.LogAction(User, "GET, All Deleted Pastry Material ");
+            await _actionLogger.LogAction(User, "GET", "All Deleted Pastry Material ");
             return response;
 
         }
@@ -140,12 +209,12 @@ namespace BillOfMaterialsAPI.Controllers
                 response.Add(newEntry);
 
             }
-            await _actionLogger.LogAction(User, "GET, All Deleted Pastry Material Ingredients");
+            await _actionLogger.LogAction(User, "GET", "All Deleted Pastry Material Ingredients");
             return response;
         }
 
         [HttpGet("materials/")]
-        public async Task<List<GetMaterials>> GetDeletedMaterials(int? page, int? record_per_page)
+        public async Task<List<GetMaterials>> GetDeletedMaterials(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             //Default GET request without parameters
             //This should return all records in the BOM database
@@ -158,19 +227,107 @@ namespace BillOfMaterialsAPI.Controllers
             List<Materials> dbMaterials;
             List<MaterialIngredients> dbMaterialIngredients = await _context.MaterialIngredients.Where(row => row.isActive == false).ToListAsync();
 
+            //Base query for the materials database to retrieve rows
+            IQueryable<Materials> materialQuery = _context.Materials.Where(row => row.isActive == false);
+            //Row sorting algorithm
+            if (sortBy != null)
+            {
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "material_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.material_id);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.material_id);
+                                break;
+                        }
+                        break;
+                    case "material_name":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.material_name);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.material_name);
+                                break;
+                        }
+                        break;
+                    case "amount":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.amount);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.amount);
+                                break;
+                        }
+                        break;
+                    case "amount_measurement":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.amount_measurement);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.amount_measurement);
+                                break;
+                        }
+                        break;
+                    case "date_added":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                    case "last_modified_date":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.last_modified_date);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.last_modified_date);
+                                break;
+                        }
+                        break;
+                    default:
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                materialQuery = materialQuery.OrderByDescending(x => x.date_added);
+                                break;
+                            default:
+                                materialQuery = materialQuery.OrderBy(x => x.date_added);
+                                break;
+                        }
+                        break;
+                }
+            }
             //Paging algorithm
-            if (page == null) { dbMaterials = await _context.Materials.Where(row => row.isActive == false).ToListAsync(); }
+            if (page == null) { dbMaterials = await materialQuery.ToListAsync(); }
             else
             {
-                int record_limit = record_per_page == null || record_per_page.Value < 10 ? 10 : record_per_page.Value;
-                int current_page = page.Value < 1 ? 1 : page.Value;
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
                 int num_of_record_to_skip = (current_page * record_limit) - record_limit;
 
-                dbMaterials = await _context.Materials.Where(row => row.isActive == false).Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                dbMaterials = await materialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            if (dbMaterials.IsNullOrEmpty()) { response.Add(GetMaterials.DefaultResponse()); return response; }
+            if (dbMaterials.IsNullOrEmpty()) { response.Add(new GetMaterials()); return response; }
 
             foreach (Materials material in dbMaterials)
             {
@@ -194,7 +351,7 @@ namespace BillOfMaterialsAPI.Controllers
                 response.Add(row);
             }
 
-            await _actionLogger.LogAction(User, "GET, All Deleted Materials");
+            await _actionLogger.LogAction(User, "GET", "All Deleted Materials");
             return response;
         }
         [HttpGet("materials/{material_id}/ingredients")]
@@ -211,7 +368,7 @@ namespace BillOfMaterialsAPI.Controllers
             if (dbMaterialIngredients.IsNullOrEmpty() == true) { return new List<SubGetMaterialIngredients>([new SubGetMaterialIngredients(new MaterialIngredients())]); }
             foreach (MaterialIngredients i in dbMaterialIngredients) { materialIngredients.Add(new SubGetMaterialIngredients(i)); }
 
-            await _actionLogger.LogAction(User, "GET, All Deleted Material Ingredients");
+            await _actionLogger.LogAction(User, "GET", "All Deleted Material Ingredients");
             return materialIngredients;
         }
 
@@ -271,7 +428,7 @@ namespace BillOfMaterialsAPI.Controllers
             }
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Recover Pastry Materials " + pastry_material_id);
+            await _actionLogger.LogAction(User, "PATCH", "Recover Pastry Materials " + pastry_material_id);
 
             if (failedToRestoreEntries.IsNullOrEmpty()) { return Ok(new { message = "Pastry Materials restored. All associated ingredients recovered" }); }
             else { return Ok(new { message = "Pastry Materials restored. Some associated Ingredients failed to be restored however. Check results for more details", results = failedToRestoreEntries }); }
@@ -319,7 +476,7 @@ namespace BillOfMaterialsAPI.Controllers
             }
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Recover Ingredient " + ingredient_id);
+            await _actionLogger.LogAction(User, "PATCH", "Recover Ingredient " + ingredient_id);
             return Ok(new { message = "Ingredient restored" });
         }
 
@@ -457,7 +614,7 @@ namespace BillOfMaterialsAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Recover Material " + "Also Associated Material/Pastry Ingredient? " + restore_all_material_ingredient_connected.ToString() + "/" + restore_all_pastry_ingredients_connected.ToString());
+            await _actionLogger.LogAction(User, "PATCH", "Recover Material " + "Also Associated Material/Pastry Ingredient? " + restore_all_material_ingredient_connected.ToString() + "/" + restore_all_pastry_ingredients_connected.ToString());
 
             if (failedToRestoreEntries.IsNullOrEmpty() ) { return Ok(new { message = "Material restored. All associated Material Ingredient and Pastry Material Ingredient restored" }); }
             else { return Ok(new { message = "Material restored. Some associated Material Ingredient and/or Pastry Material Ingredient failed to be restored however. Check results for more details", results = failedToRestoreEntries }); }
@@ -506,7 +663,7 @@ namespace BillOfMaterialsAPI.Controllers
 
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "PATCH, Recover Material " + material_id + " - Material Ingredient " + material_ingredient_id);
+            await _actionLogger.LogAction(User, "PATCH", "Recover Material " + material_id + " - Material Ingredient " + material_ingredient_id);
             return Ok(new { message = "Material ingredient restored." });
         }
     }

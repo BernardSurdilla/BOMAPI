@@ -8,7 +8,7 @@ namespace BillOfMaterialsAPI.Schemas
     {
         [Required] public SubGetMaterials Material { get; set; }
         [Required] public List<SubGetMaterialIngredients> material_ingredients { get; set; }
-        public int costEstimate { get; set; }
+        public double costEstimate { get; set; }
 
         public GetMaterials(SubGetMaterials materials, List<SubGetMaterialIngredients> materialIngredients, int costEst)
         {
@@ -16,6 +16,7 @@ namespace BillOfMaterialsAPI.Schemas
             material_ingredients = materialIngredients;
             costEstimate = costEst;
         }
+        public GetMaterials() { }
         public static GetMaterials DefaultResponse()
         {
 
@@ -28,7 +29,7 @@ namespace BillOfMaterialsAPI.Schemas
     {
         [Key][Required][MaxLength(25)] public string material_id { get; set; }
         [Required][MaxLength(50)] public string material_name { get; set; }
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
@@ -53,7 +54,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
@@ -80,7 +81,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public DateTime date_added { get; set; }
@@ -111,6 +112,8 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
+        public double costEstimate { get; set; }
+
         public List<GetPastryMaterialIngredients> ingredients { get; set; }
 
         public static GetPastryMaterial DefaultResponse() { return new GetPastryMaterial(); }
@@ -134,7 +137,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public DateTime date_added { get; set; }

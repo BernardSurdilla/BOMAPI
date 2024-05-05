@@ -1,9 +1,12 @@
 ﻿using BillOfMaterialsAPI.Helpers;
 
 using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
 
 namespace BillOfMaterialsAPI.Services
@@ -15,7 +18,7 @@ namespace BillOfMaterialsAPI.Services
 
         public AccountManager(LoggingDatabaseContext logs, UserManager<APIUsers> users) { _logs = logs; _users = users; }
 
-        public async Task<int> LogAction(ClaimsPrincipal user, string action)
+        public async Task<int> LogAction(ClaimsPrincipal user, string transaction_type, string transaction_description)
         {
 
             //
@@ -48,7 +51,8 @@ namespace BillOfMaterialsAPI.Services
                     currentUserData.Id,
                     currentUserData.UserName == null ? "N/A" : currentUserData.UserName,
                     currentUserData.Email == null ? "N/A" : currentUserData.Email,
-                    action,
+                    transaction_type,
+                    transaction_description,
                     DateTime.Now
                     );
 
@@ -78,6 +82,7 @@ namespace BillOfMaterialsAPI.Services
                     userName == null ? "N/A" : userName,
                     email == null ? "N/A" : email,
                     "LOGIN",
+                    "User " + userName + " logged in.",
                     DateTime.Now
                     );
 
@@ -101,16 +106,57 @@ namespace BillOfMaterialsAPI.Services
         [Required] public string account_name { get; set; }
         [EmailAddress][Required] public string account_email { get; set; }
         [Required][MaxLength(100)] public string transaction_type { get; set; }
+        [Required][MaxLength(100)] public string transaction_description { get; set; }
         [Required] public DateTime date { get; set; }
 
-        public TransactionLogs(string log_id, string account_id, string account_name, string account_email, string transaction_type, DateTime date)
+        public TransactionLogs(string log_id, string account_id, string account_name, string account_email, string transaction_type, string transaction_description, DateTime date)
         {
             this.log_id = log_id;
             this.account_id = account_id;
             this.account_name = account_name;
             this.account_email = account_email;
             this.transaction_type = transaction_type;
+            this.transaction_description = transaction_description;
             this.date = date;
+        }
+    }
+
+    [ApiController]
+    [Route("logs/")]
+    [Authorize(Roles = UserRoles.Admin)]
+    public class LoggingController : ControllerBase
+    {
+        private readonly LoggingDatabaseContext _logs;
+        public LoggingController(LoggingDatabaseContext context) { _logs = context; }
+
+        [HttpGet]
+        public async Task<List<TransactionLogs>> GetLogs(int? page, int? record_per_page, string? log_type, string? account_id)
+        {
+            string[] possibleTypes = ["GET", "POST", "PATCH", "DELETE", "LOGIN"];
+            List<TransactionLogs> transactionLogs;
+
+            IQueryable<TransactionLogs> transactionLogsQuery = _logs.TransactionLogs.AsQueryable();
+
+            if (log_type != null)
+            {
+                if (possibleTypes.Contains(log_type.ToUpper())) { transactionLogsQuery = _logs.TransactionLogs.Where(x => x.transaction_type == log_type); }
+                else { return new List<TransactionLogs>(); }
+            }
+
+            //Paging algorithm
+            if (page == null) { transactionLogsQuery = transactionLogsQuery.OrderByDescending(x => x.date); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                transactionLogsQuery = transactionLogsQuery.OrderByDescending(x => x.date).Skip(num_of_record_to_skip).Take(record_limit);
+            }
+
+            transactionLogs = await transactionLogsQuery.ToListAsync();
+            return transactionLogs;
         }
     }
 }

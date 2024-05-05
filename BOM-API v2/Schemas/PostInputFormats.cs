@@ -2,20 +2,11 @@
 
 namespace BillOfMaterialsAPI.Schemas
 {
-    public class PostIngredients
-    {
-        //Which item in the inventory this ingredient pertains to
-        [Required][MaxLength(25)] public string item_id { get; set; }
-        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
-
-        [Required] public int amount { get; set; }
-        [Required][MaxLength(15)] public string amount_measurement { get; set; }
-    }
     //MaterialEntryFormat
     public class PostMaterial
     {
         [Required][MaxLength(50)] public string material_name { get; set; }
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
     //MaterialIngredientsEntryFormatWOMaterialId
@@ -25,7 +16,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(25)] public string item_id { get; set; }
         [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
     //MaterialIngredientEntryFormat
@@ -37,14 +28,14 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(25)] public string item_id { get; set; }
         [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
 
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
     //MaterialAndMaterialIngredientsEntryFormat
     public class PostMaterial_MaterialIngredients
     {
         [Required][MaxLength(50)] public string material_name { get; set; }
-        [Required] public int amount { get; set; }
+        [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
         [Required] public List<SubPostMaterialIngredients> ingredients { get; set; }
@@ -52,7 +43,16 @@ namespace BillOfMaterialsAPI.Schemas
 
     public class PostPastryMaterial
     {
-
+        [Required] public string design_id { get; set; }
+        [Required] public List<PostIngredients> ingredients { get; set; }
     }
-    
+    public class PostIngredients
+    {
+        //Which item in the inventory this ingredient pertains to
+        [Required][MaxLength(25)] public string item_id { get; set; }
+        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+
+        [Required] public double amount { get; set; }
+        [Required][MaxLength(15)] public string amount_measurement { get; set; }
+    }
 }

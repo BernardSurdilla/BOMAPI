@@ -6,7 +6,7 @@ namespace BillOfMaterialsAPI.Services
 {
     public interface IActionLogger
     {
-        Task<int> LogAction(ClaimsPrincipal user, string action);
+        Task<int> LogAction(ClaimsPrincipal user, string transaction_type, string transaction_description);
 
         Task<int> LogUserLogin(IdentityUser user);
     }

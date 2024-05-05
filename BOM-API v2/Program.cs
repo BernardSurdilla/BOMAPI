@@ -9,6 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
+using Microsoft.EntityFrameworkCore.InMemory;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,12 +43,13 @@ builder.Services.AddSwaggerGen(opt =>
 //
 // SERVER CONNECTIONS
 //
-//SqlServer Connection
-builder.Services.AddDbContext<DatabaseContext>(optionsAction: options => options.UseSqlServer(builder.Configuration.GetConnectionString("SQLServerMigrationTesting")));
-builder.Services.AddDbContext<LoggingDatabaseContext>(optionsAction: options => options.UseSqlServer(builder.Configuration.GetConnectionString("SQLServerMigrationTesting")));
-//NEW AUTHENTICATION METHOD
+
 var serverVersion = new MariaDbServerVersion(new Version(10, 4, 28));
+builder.Services.AddDbContext<DatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
+builder.Services.AddDbContext<LoggingDatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
 builder.Services.AddDbContext<AuthDB>(options => options.UseMySql(builder.Configuration.GetConnectionString("AUTHTESTING"), serverVersion));
+
+
 
 builder.Services.AddAuthorization();
 

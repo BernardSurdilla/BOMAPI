@@ -162,8 +162,10 @@ namespace JWTAuthentication.Controllers
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
             var userEmailExist = await userManager.FindByEmailAsync(model.Email);
-            if (userExists != null || userEmailExist != null)
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User already exists!" });
+            if (userExists != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified username already exists!" });
+            if (userEmailExist != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified email already exists!" });
 
             APIUsers user = new APIUsers()
             {
@@ -191,9 +193,10 @@ namespace JWTAuthentication.Controllers
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
             var userEmailExist = await userManager.FindByEmailAsync(model.Email);
-            if (userExists != null || userEmailExist != null)
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User already exists!" });
-
+            if (userExists != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified username already exists!" });
+            if (userEmailExist != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified email already exists!" });
             APIUsers user = new APIUsers()
             {
                 Email = model.Email,
@@ -219,8 +222,11 @@ namespace JWTAuthentication.Controllers
         public async Task<IActionResult> RegisterAdmin([FromBody] RegisterModel model)
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
+            var userEmailExist = await userManager.FindByEmailAsync(model.Email);
             if (userExists != null)
-                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User already exists!" });
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified username already exists!" });
+            if (userEmailExist != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified email already exists!" });
 
             APIUsers user = new APIUsers()
             {
@@ -281,7 +287,7 @@ namespace JWTAuthentication.Controllers
 
                 response.Add(newResponseEntry);
             }
-            await _actionLogger.LogAction(User, "GET, All User Information " + currentUser.Id);
+            await _actionLogger.LogAction(User, "GET", "All User Information " + currentUser.Id);
             return response;
         }
 
@@ -300,7 +306,7 @@ namespace JWTAuthentication.Controllers
 
             response.roles = (List<string>)await userManager.GetRolesAsync(currentUser);
 
-            await _actionLogger.LogAction(User, "GET, User Information " + currentUser.Id);
+            await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
             return response;
         }
         [Authorize][HttpPost("user/send_confirmation_email/")]
