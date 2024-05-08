@@ -19,34 +19,84 @@ using System.Globalization;
 
 namespace API_TEST.Controllers
 {
-    
+    [ApiController]
+    [Route("Debug/")]
+    public class TestEndpointsController
+    {
+        private readonly DatabaseContext _context;
+        private readonly IActionLogger _actionLogger;
+        private readonly KaizenTables _kaizenTables;
+
+        public TestEndpointsController(DatabaseContext context, IActionLogger logger, KaizenTables kaizenTables)
+        {
+            _context = context;
+            _actionLogger = logger;
+            _kaizenTables = kaizenTables;
+        }
+
+        [HttpGet("TEST")]
+        public async Task<List<MaterialIngredients>> test(string material_id)
+        {
+            List<MaterialIngredients> currentMaterialIngredients = _context.MaterialIngredients.Where(x => x.material_id == material_id).ToList();
+
+            int currentIndex = 0;
+            bool running = true;
+            while (running)
+            {
+                MaterialIngredients? currentMatIngInLoop = null;
+                try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
+                catch { running = false; break; }
+
+                if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
+                {
+                    List<MaterialIngredients> newEntriesToLoopThru = await _context.MaterialIngredients.Where(x => x.material_id == currentMatIngInLoop.item_id).ToListAsync();
+
+                    currentMaterialIngredients.AddRange(newEntriesToLoopThru);
+                }
+                currentIndex += 1;
+            }
+            return currentMaterialIngredients;
+        }
+    }
 
     [ApiController]
-    [Route("BOM/")]
+    [Route("BOM/data_analysis")]
     [Authorize(Roles = UserRoles.Admin)]
     public class BOMController : ControllerBase
     {
         private readonly DatabaseContext _context;
         private readonly IActionLogger _actionLogger;
+        private readonly KaizenTables _kaizenTables;
 
-        public BOMController(DatabaseContext context, IActionLogger logger)
+        public BOMController(DatabaseContext context, IActionLogger logger, KaizenTables kaizenTables)
         {
             _context = context;
             _actionLogger = logger;
+            _kaizenTables = kaizenTables;
         }
 
         [HttpGet("item_used/occurence/")]
-        public async Task<List<GetUsedItems>> GetMostCommonlyUsedItems(string? sortBy, string? sortOrder)
+        public async Task<List<GetUsedItemsByOccurence>> GetMostCommonlyUsedItems(string? sortBy, string? sortOrder)
         {
             List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
-
             List<MaterialIngredients> materialIngredientsItems = _context.MaterialIngredients.Where(row => row.isActive == true).Select(row => new MaterialIngredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, Materials = row.Materials }).ToList();
-
-            List<GetUsedItems> response = new List<GetUsedItems>();
 
             //Lists for checking if records referenced by ingredients and material_ingredients are active are active
             List<Materials> activeMaterials = await _context.Materials.Where(x => x.isActive == true).Select(x => new Materials() { material_id = x.material_id, material_name = x.material_name }).ToListAsync();
-            List<string> activeInventoryItems = new List<string>(); //Replace with function to get all active inventory items 
+            List<string> activeInventoryItems = new List<string>();  //Replace with function to get all active inventory items 
+
+            if (ingredientsItems.IsNullOrEmpty() && materialIngredientsItems.IsNullOrEmpty()) { return new List<GetUsedItemsByOccurence>(); }
+            if (activeInventoryItems.IsNullOrEmpty()) { return new List<GetUsedItemsByOccurence>(); }
+
+
+            List<GetUsedItemsByOccurence> response = new List<GetUsedItemsByOccurence>();
+
+            //Dictionaries for ratio calculation
+            //Dictionary<string, double> occurenceAsPastryIngredient = new Dictionary<string, double>();
+            //Dictionary<string, double> occurenceAsMaterialIngredient = new Dictionary<string, double>();
+
+            double totalNumberOfPastryIngredients = 0;
+            double totalNumberOfMaterialIngredients = 0;
 
             //Count the ingredients
             using (var ingItemEnum = ingredientsItems.GetEnumerator())
@@ -68,11 +118,11 @@ namespace API_TEST.Controllers
                             currentItemName = searchResult.material_name; break;
                     }
 
-                    GetUsedItems? currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
+                    GetUsedItemsByOccurence? currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
 
                     if (currentRecord == null)
                     {
-                        GetUsedItems newEntry = new GetUsedItems()
+                        GetUsedItemsByOccurence newEntry = new GetUsedItemsByOccurence()
                         {
                             item_id = ingItemEnum.Current.item_id,
                             item_name = currentItemName,
@@ -80,19 +130,19 @@ namespace API_TEST.Controllers
                             as_material_ingredient = new List<string>(),
                             as_cake_ingredient = new List<string>(),
                             num_of_uses_cake_ingredient = 0,
-                            num_of_uses_material_ingredient = 0
+                            num_of_uses_material_ingredient = 0,
+                            ratio_of_uses_cake_ingredient = 0.0,
+                            ratio_of_uses_material_ingredient = 0.0
                         };
-                        
 
                         response.Add(newEntry);
                         currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
                     }
-
+                    totalNumberOfPastryIngredients += 1;
                     currentRecord.num_of_uses_cake_ingredient += 1;
                     currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " <design_name_goes_here>");
                 }
             }
-
             //Count the material ingredients
             using (var matIngItemEnum = materialIngredientsItems.GetEnumerator())
             {
@@ -112,10 +162,10 @@ namespace API_TEST.Controllers
                             currentItemName = searchResult.material_name; break;
                     }
 
-                    GetUsedItems? currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
+                    GetUsedItemsByOccurence? currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
                     if (currentRecord == null)
                     {
-                        GetUsedItems newEntry = new GetUsedItems()
+                        GetUsedItemsByOccurence newEntry = new GetUsedItemsByOccurence()
                         {
                             item_id = matIngItemEnum.Current.item_id,
                             item_name = currentItemName,
@@ -123,18 +173,28 @@ namespace API_TEST.Controllers
                             as_material_ingredient = new List<string>(),
                             as_cake_ingredient = new List<string>(),
                             num_of_uses_cake_ingredient = 0,
-                            num_of_uses_material_ingredient = 0
+                            num_of_uses_material_ingredient = 0,
+                            ratio_of_uses_cake_ingredient = 0.0,
+                            ratio_of_uses_material_ingredient = 0.0
                         };
                         
                         response.Add(newEntry);
                         currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
                     }
-
+                    totalNumberOfMaterialIngredients += 1;
                     currentRecord.num_of_uses_material_ingredient += 1;
                     currentRecord.as_material_ingredient.Add(matIngItemEnum.Current.Materials.material_id + ": " + matIngItemEnum.Current.Materials.material_name);
                 }
             }
+            //Ratio calculation
+            foreach (GetUsedItemsByOccurence currentResponseRow in response)
+            {
+                double curRowNumOfUsesCakeIng = currentResponseRow.num_of_uses_cake_ingredient;
+                double curRowNumOfUsesMatIng = currentResponseRow.num_of_uses_material_ingredient;
 
+                currentResponseRow.ratio_of_uses_cake_ingredient = curRowNumOfUsesCakeIng <= 0 ? 0 : curRowNumOfUsesCakeIng /totalNumberOfPastryIngredients;
+                currentResponseRow.ratio_of_uses_material_ingredient = curRowNumOfUsesMatIng <= 0 ? 0 : curRowNumOfUsesMatIng / totalNumberOfMaterialIngredients;
+            }
             //Sorting Algorithm
             if (sortBy != null)
             {
@@ -198,21 +258,171 @@ namespace API_TEST.Controllers
                                 break;
                         }
                         break;
+                    case "ratio_of_uses_material_ingredient":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.ratio_of_uses_material_ingredient.CompareTo(x.ratio_of_uses_material_ingredient));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.ratio_of_uses_material_ingredient.CompareTo(y.ratio_of_uses_material_ingredient));
+                                break;
+                        }
+                        break;
+                    case "ratio_of_uses_cake_ingredient":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.ratio_of_uses_cake_ingredient.CompareTo(x.ratio_of_uses_cake_ingredient));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.ratio_of_uses_cake_ingredient.CompareTo(y.ratio_of_uses_cake_ingredient));
+                                break;
+                        }
+                        break;
                 }
             }
-
 
             await _actionLogger.LogAction(User, "GET", "Most Commonly Used Items ");
             return response;
         }
-        
 
+        /*
+         * 
+         * UNTESTED!!!!
+         * 
+         */
+        [HttpGet("item_used/seasonal_occurence")]
+        public async Task<List<GetUsedItemsBySeasonalTrends>> GetIngredientTrendsByMonths(string? sortBy, string? sortOrder, bool? ingredientsOnly)
+        {
+            List<Orders> ordersList = await _kaizenTables.Orders.Where(x => x.is_active == true).ToListAsync();
 
-        //Json serialization and deserialization
-        //string a = JsonSerializer.Serialize(ingredientAboutToBeDeleted);
-        //JsonSerializer.Deserialize<List<SubPastryMaterials_materials_column>>(a);
+            List<Ingredients> ingredientsItems = await _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToListAsync();
+            List<MaterialIngredients> materialIngredientsItems = await _context.MaterialIngredients.Where(x => x.Materials.isActive == true && x.isActive == true).ToListAsync();
+            List<PastryMaterials> allPastryMaterials = await _context.PastryMaterials.Where(x => x.isActive == true).ToListAsync(); 
+
+            if (ordersList.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
+            if (materialIngredientsItems.IsNullOrEmpty() && ingredientsItems.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
+            if (allPastryMaterials.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
+
+            List<GetUsedItemsBySeasonalTrends> response = new List<GetUsedItemsBySeasonalTrends>(); //List to return
+
+            Orders? oldestRecord = ordersList.MaxBy(x => x.created_at);
+            Orders? newestRecord = ordersList.MinBy(x => x.created_at);
+
+            Dictionary<string, int> occurenceCount = new Dictionary<string, int>(); //Stores the count of occurence for ingredients in the current loop below
+
+            foreach (DateTime currentDate in Iterators.LoopThroughMonths(oldestRecord.created_at, newestRecord.created_at))
+            {
+                GetUsedItemsBySeasonalTrends newResponseEntry = new GetUsedItemsBySeasonalTrends();
+                int currentDateYear = currentDate.Year;
+                int currentDateMonth = currentDate.Month;
+
+                int totalNumberOfIngredientsInInterval = 0;
+
+                newResponseEntry.date_start = new DateTime(currentDateYear, currentDateMonth, 1);
+                newResponseEntry.date_end = new DateTime(currentDateYear, currentDateMonth, DateTime.DaysInMonth(currentDateYear, currentDateMonth));
+
+                newResponseEntry.item_list = new List<ItemOccurence>();
+
+                List<Orders> ordersForCurrentDate = ordersList.Where(x => x.created_at >= newResponseEntry.date_start && x.created_at <= newResponseEntry.date_end).ToList();
+
+                foreach (Orders currentOrder in ordersForCurrentDate)
+                {
+                    DateTime currentOrderCreationDate = currentOrder.created_at;
+                    string currentOrderDesignId = Encoding.UTF8.GetString(currentOrder.design_id);
+
+                    PastryMaterials? currentOrderDesignRow = allPastryMaterials.Find(x => x.DesignId == currentOrderDesignId);
+                    if (currentOrderDesignRow != null) { continue; }
+
+                    List<Ingredients> currentOrderCakeIngredients = ingredientsItems.Where(x => x.pastry_material_id == currentOrderDesignId).ToList();
+                    if (currentOrderCakeIngredients.IsNullOrEmpty()) { continue; }
+
+                    foreach (Ingredients i in currentOrderCakeIngredients)
+                    {
+                        switch (i.ingredient_type)
+                        {
+                            case IngredientType.InventoryItem:
+                            { 
+                                    //Add check here if the inventory item exists
+                                    //
+                                    //
+                                    ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == i.item_id);
+                                    if (currentOccurenceEntry == null)
+                                    {
+                                        newResponseEntry.item_list.Add(new ItemOccurence()
+                                        {
+                                            item_id = i.item_id,
+                                            item_name = "<insert_item_name_here>", //Add code here to find the item name in inventory
+                                            item_type = i.ingredient_type,
+                                            occurence_count = 1
+                                        });
+                                    }
+                                    else { currentOccurenceEntry.occurence_count += 1; }
+
+                                    totalNumberOfIngredientsInInterval += 1;
+                                    break;
+                            }
+                            case IngredientType.Material:
+                            {
+                                List<MaterialIngredients> currentMaterialIngredients = materialIngredientsItems.Where(x => x.material_id == i.item_id).ToList();
+
+                                //This block loops thru the retrieved ingredients above
+                                //And adds all sub-ingredients for the "MAT" type entries
+                                int currentIndex = 0;
+                                bool running = true;
+                                while (running)
+                                {
+                                    MaterialIngredients? currentMatIngInLoop = null;
+                                    try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
+                                    catch { running = false; break; }
+
+                                    if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
+                                    {
+                                        List<MaterialIngredients> newEntriesToLoopThru = materialIngredientsItems.FindAll(x => x.material_id == currentMatIngInLoop.item_id);
+                                        currentMaterialIngredients.AddRange(newEntriesToLoopThru);
+                                    }
+                                    currentIndex += 1;
+                                }
+
+                                //Removes all the entries for the material
+                                //As the sub-ingredients for them is already in the list
+                                currentMaterialIngredients.RemoveAll(x => x.ingredient_type == IngredientType.Material);
+
+                                foreach (MaterialIngredients currentMaterialIngredient in currentMaterialIngredients)
+                                {
+                                    ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == currentMaterialIngredient.item_id);
+
+                                    if (currentOccurenceEntry == null)
+                                    {
+                                        newResponseEntry.item_list.Add(new ItemOccurence()
+                                        {
+                                            item_id = currentMaterialIngredient.item_id,
+                                            item_name = "<insert_item_name_here>", //Add code here to find the item name in inventory
+                                            item_type = currentMaterialIngredient.ingredient_type,
+                                            occurence_count = 1
+                                        });
+                                    }
+                                    else { currentOccurenceEntry.occurence_count += 1; }
+                                    totalNumberOfIngredientsInInterval += 1;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            //What to do here
+            //1. Create new GetUsedItemsBySeasonalTrends item to be inserted in response list for the specified time period
+            //2. Loop through all orders 
+            //3. Check what cake it is, get all ingredients for it
+            //4. Loop thru all ingredients retrieved, add or increase their count in the occurenceCount 
+            //5. Calculate the ratio for each ingredient, add them in the list of the new entry in the response list
+
+            return response;
+        }
     }
-
 
     [ApiController]
     [Route("BOM/pastry_materials")]
@@ -224,171 +434,172 @@ namespace API_TEST.Controllers
 
         public PastryIngredientController(DatabaseContext context, IActionLogger logs) { _context = context; _actionLogger = logs; }
 
-        //GET
-        [HttpGet]
-        public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
-        {
-            List<PastryMaterials> pastryMaterials;
-
-            List<GetPastryMaterial> response = new List<GetPastryMaterial>();
-
-            //Base query for the materials database to retrieve rows
-            IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.isActive == true);
-            //Row sorting algorithm
-            if (sortBy != null)
+            //GET
+            [HttpGet]
+            public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
             {
-                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+                List<PastryMaterials> pastryMaterials;
 
-                switch (sortBy)
+                List<GetPastryMaterial> response = new List<GetPastryMaterial>();
+
+                //Base query for the materials database to retrieve rows
+                IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.isActive == true);
+                //Row sorting algorithm
+                if (sortBy != null)
                 {
-                    case "DesignId":
-                        switch (sortOrder)
-                        {
-                            case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.DesignId);
-                                break;
-                            default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.DesignId);
-                                break;
-                        }
-                        break;
-                    case "pastry_material_id":
-                        switch (sortOrder)
-                        {
-                            case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.pastry_material_id);
-                                break;
-                            default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.pastry_material_id);
-                                break;
-                        }
-                        break;
-                    case "date_added":
-                        switch (sortOrder)
-                        {
-                            case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
-                                break;
-                            default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
-                                break;
-                        }
-                        break;
-                    case "last_modified_date":
-                        switch (sortOrder)
-                        {
-                            case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.last_modified_date);
-                                break;
-                            default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.last_modified_date);
-                                break;
-                        }
-                        break;
-                    default:
-                        switch (sortOrder)
-                        {
-                            case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
-                                break;
-                            default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
-                                break;
-                        }
-                        break;
-                }
-            }
-            //Paging algorithm
-            if (page == null) { pastryMaterials = await pastryMaterialQuery.ToListAsync(); }
-            else
-            {
-                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
-                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+                    sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
 
-                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
-
-                pastryMaterials = await pastryMaterialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
-            }
-
-            //Loop through all retrieved rows for the ingredients of the cake
-            foreach (PastryMaterials i in pastryMaterials)
-            {
-                //Get all associated ingredients of the current cake
-                List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == i.pastry_material_id).ToListAsync();
-
-                GetPastryMaterial newResponseRow = new GetPastryMaterial(){
-                    DesignId = i.DesignId,
-                    pastry_material_id = i.pastry_material_id,
-                    date_added = i.date_added,
-                    last_modified_date = i.last_modified_date,
-                };
-
-                //The object that will be attached to the new response entry
-                //Contains the ingredients of the current cake
-                List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
-
-                //Loop through all of the retireved ingredients of the current cake
-                foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
-                {
-                    GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
-                    newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
-                    newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
-                    newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
-                    newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
-                    newSubIngredientListEntry.amount = ifcm.amount;
-                    newSubIngredientListEntry.item_id = ifcm.item_id;
-                    newSubIngredientListEntry.date_added = ifcm.date_added;
-                    newSubIngredientListEntry.last_modified_date = ifcm.last_modified_date;
-
-                    //Check what kind of ingredient is the current ingredient
-                    //Either from the inventory or the materials list
-                    switch (ifcm.ingredient_type)
+                    switch (sortBy)
                     {
-
-                        case IngredientType.InventoryItem:
-                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
-                            break;
-
-                        case IngredientType.Material:
-                            //Find if the material that the current ingredient is referring to
-                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
-                            if (currentReferencedMaterial == null) { break; } //Skip the current entry if the material is not found or deletedd
-
-                            //Find all active ingredients of the current material
-                            List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
-
-                            //Check if there are material ingredients retrieved
-                            //Add the retireved materials to the current response entry if yes
-                            //Add an empty array to the current response entry if no
-                            if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                        case "DesignId":
+                            switch (sortOrder)
                             {
-                                List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
-
-                                foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
-                                {
-                                    SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
-                                    newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
-                                }
-                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                case "DESC":
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.DesignId);
+                                    break;
+                                default:
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.DesignId);
+                                    break;
                             }
-                            else
+                            break;
+                        case "pastry_material_id":
+                            switch (sortOrder)
                             {
-                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                case "DESC":
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.pastry_material_id);
+                                    break;
+                                default:
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.pastry_material_id);
+                                    break;
+                            }
+                            break;
+                        case "date_added":
+                            switch (sortOrder)
+                            {
+                                case "DESC":
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
+                                    break;
+                                default:
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
+                                    break;
+                            }
+                            break;
+                        case "last_modified_date":
+                            switch (sortOrder)
+                            {
+                                case "DESC":
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.last_modified_date);
+                                    break;
+                                default:
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.last_modified_date);
+                                    break;
+                            }
+                            break;
+                        default:
+                            switch (sortOrder)
+                            {
+                                case "DESC":
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.date_added);
+                                    break;
+                                default:
+                                    pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.date_added);
+                                    break;
                             }
                             break;
                     }
-                    subIngredientList.Add(newSubIngredientListEntry);
                 }
-                
-                newResponseRow.ingredients = subIngredientList;
+                //Paging algorithm
+                if (page == null) { pastryMaterials = await pastryMaterialQuery.ToListAsync(); }
+                else
+                {
+                    int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                    int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
 
-                response.Add(newResponseRow);
+                    int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                    pastryMaterials = await pastryMaterialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+                }
+
+                //Loop through all retrieved rows for the ingredients of the cake
+                foreach (PastryMaterials i in pastryMaterials)
+                {
+                    //Get all associated ingredients of the current cake
+                    List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == i.pastry_material_id).ToListAsync();
+
+                    GetPastryMaterial newResponseRow = new GetPastryMaterial()
+                    {
+                        DesignId = i.DesignId,
+                        pastry_material_id = i.pastry_material_id,
+                        date_added = i.date_added,
+                        last_modified_date = i.last_modified_date,
+                    };
+
+                    //The object that will be attached to the new response entry
+                    //Contains the ingredients of the current cake
+                    List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
+
+                    //Loop through all of the retireved ingredients of the current cake
+                    foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
+                    {
+                        GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
+                        newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
+                        newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
+                        newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
+                        newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
+                        newSubIngredientListEntry.amount = ifcm.amount;
+                        newSubIngredientListEntry.item_id = ifcm.item_id;
+                        newSubIngredientListEntry.date_added = ifcm.date_added;
+                        newSubIngredientListEntry.last_modified_date = ifcm.last_modified_date;
+
+                        //Check what kind of ingredient is the current ingredient
+                        //Either from the inventory or the materials list
+                        switch (ifcm.ingredient_type)
+                        {
+
+                            case IngredientType.InventoryItem:
+                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                break;
+
+                            case IngredientType.Material:
+                                //Find if the material that the current ingredient is referring to
+                                Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
+                                if (currentReferencedMaterial == null) { break; } //Skip the current entry if the material is not found or deletedd
+
+                                //Find all active ingredients of the current material
+                                List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
+
+                                //Check if there are material ingredients retrieved
+                                //Add the retireved materials to the current response entry if yes
+                                //Add an empty array to the current response entry if no
+                                if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                                {
+                                    List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                                    foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                    {
+                                        SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
+                                        newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                                    }
+                                    newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                }
+                                else
+                                {
+                                    newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                }
+                                break;
+                        }
+                        subIngredientList.Add(newSubIngredientListEntry);
+                    }
+
+                    newResponseRow.ingredients = subIngredientList;
+
+                    response.Add(newResponseRow);
+                }
+
+                await _actionLogger.LogAction(User, "GET", "All Pastry Material ");
+                return response;
             }
-
-            await _actionLogger.LogAction(User, "GET", "All Pastry Material ");
-            return response;
-
-        }
+        
         [HttpGet("{pastry_material_id}")]
         public async Task<GetPastryMaterial> GetSpecificPastryMaterial(string pastry_material_id)
         {
@@ -1017,40 +1228,6 @@ namespace API_TEST.Controllers
 
             await _actionLogger.LogAction(User, "GET", "Material " + material_id + " - Column " + column_name);
             return response;
-            /*
-            if (currentMaterial != null)
-            {
-                if (currentMaterial.isActive == true)
-                {
-                    switch (column_name)
-                    {
-                        case "material_id": response = currentMaterial.material_id; break;
-                        case "material_name": response = currentMaterial.material_name; break;
-                        case "amount": response = currentMaterial.amount; break;
-                        case "amount_measurement": response = currentMaterial.amount_measurement; break;
-                        case "date_added": response = currentMaterial.date_added; break;
-                        case "last_modified_date": response = currentMaterial.last_modified_date; break;
-                        case "cost_estimate":
-                            //Replace this with code that calculates the price estimation
-                            response = 0;
-                            break;
-                        case "material_ingredients":
-                            List<MaterialIngredients> x = _context.MaterialIngredients.ToList();
-                            List<MaterialIngredients> y = x.FindAll(x => x.material_id == currentMaterial.material_id && x.isActive == true);
-
-                            List<SubGetMaterialIngredients> currentMaterialIngredients = new List<SubGetMaterialIngredients>();
-                            foreach (MaterialIngredients material in y) { currentMaterialIngredients.Add(new SubGetMaterialIngredients(material)); }
-                            response = currentMaterialIngredients;
-                            break;
-
-                        default: response = BadRequest(new { message = "Specified column does not exist." }); break;
-                    }
-                }
-            }
-            else { response = NotFound(new { message = "Specified material with the material_id is not found or deleted." }); }
-
-            return response;
-            */
         }
 
         //POST

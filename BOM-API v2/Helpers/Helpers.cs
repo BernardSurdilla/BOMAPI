@@ -27,6 +27,14 @@
             return newId;
         }
     }
+    public class Iterators
+    {
+        public static IEnumerable<DateTime> LoopThroughMonths(DateTime start, DateTime end)
+        {
+            for (DateTime i = start; i <= end; i.AddMonths(1)) yield return i;
+        }
+    }
+
 
     public class Page
     {

@@ -8,13 +8,13 @@ namespace BillOfMaterialsAPI.Schemas
     {
         [Required] public SubGetMaterials Material { get; set; }
         [Required] public List<SubGetMaterialIngredients> material_ingredients { get; set; }
-        public double costEstimate { get; set; }
+        public double cost_estimate { get; set; }
 
         public GetMaterials(SubGetMaterials materials, List<SubGetMaterialIngredients> materialIngredients, int costEst)
         {
             Material = materials;
             material_ingredients = materialIngredients;
-            costEstimate = costEst;
+            cost_estimate = costEst;
         }
         public GetMaterials() { }
         public static GetMaterials DefaultResponse()
@@ -112,7 +112,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
-        public double costEstimate { get; set; }
+        public double cost_estimate { get; set; }
 
         public List<GetPastryMaterialIngredients> ingredients { get; set; }
 
@@ -147,7 +147,7 @@ namespace BillOfMaterialsAPI.Schemas
 
     }
 
-    public class GetUsedItems
+    public class GetUsedItemsByOccurence
     {
         [Required] public string item_id { get; set; }
         [Required] public string item_type { get; set; }
@@ -159,5 +159,24 @@ namespace BillOfMaterialsAPI.Schemas
         public int num_of_uses_material_ingredient { get; set; }
         public int num_of_uses_cake_ingredient { get; set; }
 
+        public double ratio_of_uses_material_ingredient { get; set; }
+        public double ratio_of_uses_cake_ingredient { get; set; }
+    }
+    public class GetUsedItemsBySeasonalTrends
+    {
+        [Required] public DateTime date_start {  get; set; }
+        [Required] public DateTime date_end { get; set; }
+
+        [Required] public List<ItemOccurence> item_list { get; set; }
+        
+    }
+    public class ItemOccurence
+    {
+        [Required] public string item_id { get; set; }
+        [Required] public string item_name { get; set; }
+        //[Required] public string item_type { get; set; }
+
+        [Required] public int occurence_count { get; set; }
+        [Required] public double ratio { get; set; }
     }
 }

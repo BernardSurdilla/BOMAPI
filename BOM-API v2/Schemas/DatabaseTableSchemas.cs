@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Runtime.InteropServices;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -92,13 +93,25 @@ namespace BillOfMaterialsAPI.Schemas
         public Materials Materials { get; set; }
     }
 
-    //ACCOUNT
-    /*
-    public class Users : IdentityUser
+    //
+    // Orders table: Kaizen
+    //
+    [PrimaryKey("order_id")]
+    [Table("orders")]
+    public class Orders
     {
-        [Required][MaxLength(50)] public string DisplayName { get; set; }
-        [Required] public DateTime JoinDate { get; set; }
+        [Column("OrderId")][Required][Key] public Guid order_id { get; set; }
+        [Column("CustomerId")][Required] public Guid customer_id { get; set; }
+        [Column("EmployeeId")][Required] public Guid? employee_id { get; set; }
 
+        [Column("CreatedAt")] public DateTime created_at { get; set; }
+        [Column("Status")][MaxLength(50)] public string status { get; set; }
+        [Column("DesignId")] public byte[] design_id { get; set; }
+        [Column("orderName")][MaxLength(50)] public string order_name {  get; set; }
+        public double price { get; set; }
+        [MaxLength(50)] public string? last_updated_by { get; set; }
+        public DateTime? last_updated_at { get; set; }
+        [MaxLength(50)] public string type { get; set; }
+        [Column("isActive")] public bool? is_active { get; set; }
     }
-    */
 }
