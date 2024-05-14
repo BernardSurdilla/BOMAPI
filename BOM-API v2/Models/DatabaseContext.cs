@@ -20,5 +20,6 @@ namespace BillOfMaterialsAPI.Models
         public KaizenTables(DbContextOptions<KaizenTables> options) : base(options) { }
 
         public DbSet<Orders> Orders { get; set; }
+        public DbSet<Item> Item { get; set; }
     }
 }

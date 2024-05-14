@@ -114,4 +114,19 @@ namespace BillOfMaterialsAPI.Schemas
         [MaxLength(50)] public string type { get; set; }
         [Column("isActive")] public bool? is_active { get; set; }
     }
+    [PrimaryKey("id")]
+    [Table("Item")]
+    public class Item
+    {
+        [Required][Key] public int id { get; set; }
+        [MaxLength(50)] public string item_name { get; set; }
+        public int quantity { get; set; }
+        public double price { get; set; }
+        [MaxLength(50)] public string status { get; set; }
+        [MaxLength(20)] public string type { get; set; }
+        public bool isActive { get; set; }
+        [Column("createdAt")] public DateTime created_at { get; set; }
+        [MaxLength(50)] public string? last_updated_by { get; set; }
+        public DateTime last_updated_at { get; set; }
+    }
 }

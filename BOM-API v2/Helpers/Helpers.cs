@@ -31,7 +31,10 @@
     {
         public static IEnumerable<DateTime> LoopThroughMonths(DateTime start, DateTime end)
         {
-            for (DateTime i = start; i <= end; i.AddMonths(1)) yield return i;
+            DateTime startDate = new DateTime(start.Year, start.Month, 1);
+            DateTime endDate = new DateTime(end.Year, end.Month, 1);
+
+            for (DateTime i = startDate; i <= endDate; i.AddMonths(1)) yield return i;
         }
     }
 
