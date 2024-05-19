@@ -40,12 +40,13 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("pastry_material_id")]
     public class PastryMaterials
     {
-        [Required][ForeignKey("Designs.DesignId")][MaxLength(16)] public string DesignId;
+        [Required][ForeignKey("Designs")][MaxLength(16)] public int DesignId;
         [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
+        public Designs Designs { get; set; }
     }
     public class SubPastryMaterials_materials_column
     {
@@ -106,7 +107,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Column("CreatedAt")] public DateTime created_at { get; set; }
         [Column("Status")][MaxLength(50)] public string status { get; set; }
-        [Column("DesignId")] public byte[] design_id { get; set; }
+        [Column("DesignId")] public int design_id { get; set; }
         [Column("orderName")][MaxLength(50)] public string order_name {  get; set; }
         public double price { get; set; }
         [MaxLength(50)] public string? last_updated_by { get; set; }
@@ -128,5 +129,15 @@ namespace BillOfMaterialsAPI.Schemas
         [Column("createdAt")] public DateTime created_at { get; set; }
         [MaxLength(50)] public string? last_updated_by { get; set; }
         public DateTime last_updated_at { get; set; }
+
+        public string measurements { get; set; }
+    }
+    [PrimaryKey("DesignId")]
+    [Table("designs")]
+    public class Designs
+    {
+        [Required][Key] public int DesignId { get; set; }
+        [Required] public string DisplayName { get; set; }
+        [Required] public string DisplayPictureURL { get; set; }
     }
 }

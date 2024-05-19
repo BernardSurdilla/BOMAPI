@@ -1,4 +1,5 @@
-﻿using JWTAuthentication.Authentication;
+﻿using BillOfMaterialsAPI.Helpers;
+using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using UnitsNet;
@@ -13,21 +14,7 @@ namespace BOM_API_v2.Controllers
         [HttpGet("valid_measurement_values")]
         public async Task<Dictionary<string, List<string>>> ValidMeasurementValues()
         {
-            Dictionary<string, List<string>> response = new Dictionary<string, List<string>>();
-
-
-            string[] validQuantities = ["Mass", "Volume"];
-            foreach (string currentQuantity in validQuantities)
-            {
-                List<string> currentQuantityUnits = new List<string>();
-                foreach (UnitInfo currentUnit in Quantity.ByName[currentQuantity].UnitInfos)
-                {
-                    currentQuantityUnits.Add(currentUnit.Name);
-                }
-                response.Add(currentQuantity, currentQuantityUnits);
-            }
-
-            return response;
+            return ValidUnits.ValidMeasurementUnits();
         }
         [HttpGet("valid_item_types")]
         public async Task<string[]> ValidItemTypes()

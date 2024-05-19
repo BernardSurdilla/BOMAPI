@@ -45,14 +45,14 @@ builder.Services.AddSwaggerGen(opt =>
 //
 
 var serverVersion = new MariaDbServerVersion(new Version(10, 4, 28));
-//builder.Services.AddDbContext<DatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
+builder.Services.AddDbContext<DatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
 builder.Services.AddDbContext<LoggingDatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
 builder.Services.AddDbContext<AuthDB>(options => options.UseMySql(builder.Configuration.GetConnectionString("AUTHTESTING"), serverVersion));
+builder.Services.AddDbContext<KaizenTables>(options => options.UseMySql(builder.Configuration.GetConnectionString("connection"), serverVersion));
 
 //Use in memory db for testing
-builder.Services.AddDbContext<KaizenTables>(options => options.UseInMemoryDatabase("DBTest"));
-builder.Services.AddDbContext<DatabaseContext>(options => options.UseInMemoryDatabase("DBTest"));
-
+//builder.Services.AddDbContext<KaizenTables>(options => options.UseInMemoryDatabase("DBTest"));
+//builder.Services.AddDbContext<DatabaseContext>(options => options.UseInMemoryDatabase("DBTest"));
 
 builder.Services.AddAuthorization();
 

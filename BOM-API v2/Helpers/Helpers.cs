@@ -1,4 +1,5 @@
-﻿namespace BillOfMaterialsAPI.Helpers
+﻿using UnitsNet;
+namespace BillOfMaterialsAPI.Helpers
 {
     public class IdFormat
     {
@@ -38,10 +39,31 @@
         }
     }
 
-
     public class Page
     {
         public static int DefaultStartingPageNumber = 1;
         public static int DefaultNumberOfEntriesPerPage = 10;
+    }
+
+    public class ValidUnits
+    {
+        public static Dictionary<string, List<string>> ValidMeasurementUnits()
+        {
+            Dictionary<string, List<string>> response = new Dictionary<string, List<string>>();
+
+            string[] validQuantities = ["Mass", "Volume"];
+            foreach (string currentQuantity in validQuantities)
+            {
+                List<string> currentQuantityUnits = new List<string>();
+                foreach (UnitInfo currentUnit in Quantity.ByName[currentQuantity].UnitInfos)
+                {
+                    currentQuantityUnits.Add(currentUnit.Name);
+                }
+                response.Add(currentQuantity, currentQuantityUnits);
+            }
+            response.Add("Count", new List<string> { "Piece" });
+
+            return response;
+        }
     }
 }

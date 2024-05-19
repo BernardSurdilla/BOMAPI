@@ -21,5 +21,6 @@ namespace BillOfMaterialsAPI.Models
 
         public DbSet<Orders> Orders { get; set; }
         public DbSet<Item> Item { get; set; }
+        public DbSet<Designs> Designs { get; set; }
     }
 }

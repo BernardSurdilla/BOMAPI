@@ -28,83 +28,6 @@ namespace API_TEST.Controllers
             _actionLogger = logger;
             _kaizenTables = kaizenTables;
         }
-
-        [HttpGet("TEST")]
-        public async Task<List<MaterialIngredients>> test(string material_id)
-        {
-            List<MaterialIngredients> currentMaterialIngredients = _context.MaterialIngredients.Where(x => x.material_id == material_id).ToList();
-
-            int currentIndex = 0;
-            bool running = true;
-            while (running)
-            {
-                MaterialIngredients? currentMatIngInLoop = null;
-                try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
-                catch { running = false; break; }
-
-                if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
-                {
-                    List<MaterialIngredients> newEntriesToLoopThru = await _context.MaterialIngredients.Where(x => x.material_id == currentMatIngInLoop.item_id).ToListAsync();
-
-                    currentMaterialIngredients.AddRange(newEntriesToLoopThru);
-                }
-                currentIndex += 1;
-            }
-            return currentMaterialIngredients;
-        }
-        
-        [HttpPost("ADDMOCKDATA")]
-        public async Task<IActionResult> AddMockData()
-        {
-            List<PastryMaterials> pEntries = new List<PastryMaterials>();
-            List<Ingredients> pmEntries = new List<Ingredients>();
-
-            List<Materials> mEntries = new List<Materials>();
-            List<MaterialIngredients> miEntries = new List<MaterialIngredients>();
-
-            List<Item> kiEntries = new List<Item>();
-            List<Orders> koEntries = new List<Orders>();
-
-            pEntries.Add(new PastryMaterials { DesignId = "1231", pastry_material_id = "PMID000000000001", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now });
-            pEntries.Add(new PastryMaterials { DesignId = "1232", pastry_material_id = "PMID000000000002", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now });
-            pEntries.Add(new PastryMaterials { DesignId = "1233", pastry_material_id = "PMID000000000003", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now });
-            pEntries.Add(new PastryMaterials { DesignId = "1234", pastry_material_id = "PMID000000000004", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now });
-            pEntries.Add(new PastryMaterials { DesignId = "1235", pastry_material_id = "PMID000000000005", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now });
-
-            pmEntries.Add(new Ingredients { pastry_material_id = "PMID000000000001", ingredient_id = "IID000000000001", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now, amount = 12, amount_measurement = "grams", ingredient_type = "INV", item_id = "2231" });
-            pmEntries.Add(new Ingredients { pastry_material_id = "PMID000000000002", ingredient_id = "IID000000000002", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now, amount = 15, amount_measurement = "grams", ingredient_type = "INV", item_id = "2231" });
-            pmEntries.Add(new Ingredients { pastry_material_id = "PMID000000000003", ingredient_id = "IID000000000003", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now, amount = 100, amount_measurement = "milliliters", ingredient_type = "INV", item_id = "2233" });
-            pmEntries.Add(new Ingredients { pastry_material_id = "PMID000000000004", ingredient_id = "IID000000000004", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now, amount = 75, amount_measurement = "grams", ingredient_type = "INV", item_id = "2232" });
-            pmEntries.Add(new Ingredients { pastry_material_id = "PMID000000000005", ingredient_id = "IID000000000005", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now, amount = 1, amount_measurement = "piece", ingredient_type = "MAT", item_id = "MID000000000001" });
-
-            kiEntries.Add(new Item { id = 2231, price = 100, quantity = 15, status = "NORMAL", isActive = true, item_name = "Butter", type = "LIQUID", created_at = DateTime.Now, last_updated_at = DateTime.Now, last_updated_by = "ME!" });
-            kiEntries.Add(new Item { id = 2232, price = 10, quantity = 500, status = "NORMAL", isActive = true, item_name = "Sugar", type = "SOLID", created_at = DateTime.Now, last_updated_at = DateTime.Now, last_updated_by = "ME!" });
-            kiEntries.Add(new Item { id = 2233, price = 24, quantity = 40, status = "NORMAL", isActive = true, item_name = "Milk", type = "LIQUID", created_at = DateTime.Now, last_updated_at = DateTime.Now, last_updated_by = "ME!" });
-            kiEntries.Add(new Item { id = 2234, price = 67, quantity = 10, status = "NORMAL", isActive = true, item_name = "Flour", type = "SOLID", created_at = DateTime.Now, last_updated_at = DateTime.Now, last_updated_by = "ME!" });
-            kiEntries.Add(new Item { id = 2235, price = 15, quantity = 105, status = "NORMAL", isActive = true, item_name = "Eggs", type = "SOLID", created_at = DateTime.Now, last_updated_at = DateTime.Now, last_updated_by = "ME!" });
-
-            mEntries.Add(new Materials { material_id = "MID000000000001", material_name = "Chocolate", amount = 100, amount_measurement = "milliliters", isActive = true, date_added = DateTime.Now, last_modified_date = DateTime.Now });
-
-            miEntries.Add(new MaterialIngredients { Materials = mEntries[0], material_id = "MID000000000001", material_ingredient_id = "MIID000000000001", item_id = "2231", amount = 2, amount_measurement = "pieces", ingredient_type = "INV", date_added = DateTime.Now, last_modified_date = DateTime.Now, isActive = true });
-            miEntries.Add(new MaterialIngredients { Materials = mEntries[0], material_id = "MID000000000001", material_ingredient_id = "MIID000000000002", item_id = "2232", amount = 20, amount_measurement = "grams", ingredient_type = "INV", date_added = DateTime.Now, last_modified_date = DateTime.Now, isActive = true });
-            miEntries.Add(new MaterialIngredients { Materials = mEntries[0], material_id = "MID000000000001", material_ingredient_id = "MIID000000000003", item_id = "2235", amount = 2, amount_measurement = "pieces", ingredient_type = "INV", date_added = DateTime.Now, last_modified_date = DateTime.Now, isActive = true });
-
-
-
-            _context.PastryMaterials.AddRange(pEntries);
-            _context.Materials.AddRange(mEntries);
-            _context.SaveChanges();
-
-            _context.Ingredients.AddRange(pmEntries);
-            _context.MaterialIngredients.AddRange(miEntries);
-            _context.SaveChanges();
-
-            _kaizenTables.Item.AddRange(kiEntries);
-            _kaizenTables.Orders.AddRange(koEntries);
-            _kaizenTables.SaveChanges();
-
-            return Ok();
-        }
         
     }
 
@@ -354,21 +277,21 @@ namespace API_TEST.Controllers
 
         //!!!UNTESTED!!!
         [HttpGet("item_used/seasonal_occurence")]
-        public async Task<List<GetUsedItemsBySeasonalTrends>> GetIngredientTrendsByMonths(string? sortBy, string? sortOrder, bool? ingredientsOnly)
+        public async Task<List<GetUsedItemsBySeasonalTrends>> GetIngredientTrendsByMonths(string? sortOrder)
         {
             List<Orders> ordersList = await _kaizenTables.Orders.Where(x => x.is_active == true).ToListAsync();
+            if (ordersList.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
+
+            List<PastryMaterials> allPastryMaterials = await _context.PastryMaterials.Where(x => x.isActive == true).ToListAsync();
+            if (allPastryMaterials.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
+
             List<Item> allInventoryItems = await _kaizenTables.Item.Where(x => x.isActive == true).ToListAsync();
+            if (allInventoryItems.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
 
             List<Ingredients> ingredientsItems = await _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToListAsync();
             List<MaterialIngredients> materialIngredientsItems = await _context.MaterialIngredients.Where(x => x.Materials.isActive == true && x.isActive == true).ToListAsync();
-            List<PastryMaterials> allPastryMaterials = await _context.PastryMaterials.Where(x => x.isActive == true).ToListAsync();
-
-
-            if (ordersList.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
-            if (allInventoryItems.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
-
             if (materialIngredientsItems.IsNullOrEmpty() && ingredientsItems.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
-            if (allPastryMaterials.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
+
 
             List<GetUsedItemsBySeasonalTrends> response = new List<GetUsedItemsBySeasonalTrends>(); //List to return
 
@@ -396,12 +319,12 @@ namespace API_TEST.Controllers
                 foreach (Orders currentOrder in ordersForCurrentDate)
                 {
                     DateTime currentOrderCreationDate = currentOrder.created_at;
-                    string currentOrderDesignId = Encoding.UTF8.GetString(currentOrder.design_id);
+                    int currentOrderDesignId = currentOrder.design_id;
 
                     PastryMaterials? currentOrderDesignRow = allPastryMaterials.Find(x => x.DesignId == currentOrderDesignId);
                     if (currentOrderDesignRow != null) { continue; }
 
-                    List<Ingredients> currentOrderCakeIngredients = ingredientsItems.Where(x => x.pastry_material_id == currentOrderDesignId).ToList();
+                    List<Ingredients> currentOrderCakeIngredients = ingredientsItems.Where(x => x.pastry_material_id == currentOrderDesignRow.pastry_material_id).ToList();
                     if (currentOrderCakeIngredients.IsNullOrEmpty()) { continue; }
 
                     foreach (Ingredients i in currentOrderCakeIngredients)
@@ -492,15 +415,12 @@ namespace API_TEST.Controllers
                     }
                 }
                 //Calculate the ratio for the ingredients in the occurence list
-
+                foreach (ItemOccurence currentItemForRatioCalculation in newResponseEntry.item_list)
+                {
+                    currentItemForRatioCalculation.ratio = currentItemForRatioCalculation.occurence_count / totalNumberOfIngredientsInInterval;
+                }
             }
 
-            //What to do here
-            //1. Create new GetUsedItemsBySeasonalTrends item to be inserted in response list for the specified time period
-            //2. Loop through all orders 
-            //3. Check what cake it is, get all ingredients for it
-            //4. Loop thru all ingredients retrieved, add or increase their count in the occurenceCount 
-            //5. Calculate the ratio for each ingredient, add them in the list of the new entry in the response list
 
             await _actionLogger.LogAction(User, "GET", "All items by seasonal occurence");
             return response;

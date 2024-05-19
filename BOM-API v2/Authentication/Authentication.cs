@@ -189,6 +189,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
         [HttpPost("register_artist/")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RegisterArtist([FromBody] RegisterModel model)
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
@@ -219,8 +220,11 @@ namespace JWTAuthentication.Controllers
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
         [HttpPost("register_admin/")]
-        public async Task<IActionResult> RegisterAdmin([FromBody] RegisterModel model)
+        public async Task<IActionResult> RegisterAdmin([FromBody] RegisterModel model, string secret_key)
         {
+            string configSecretKey = _configuration.GetValue("AdminAccountCreationKey", "");
+            if (configSecretKey == "" || configSecretKey != secret_key) { return BadRequest(new { message = "Invalid secret key" }); }
+
             var userExists = await userManager.FindByNameAsync(model.Username);
             var userEmailExist = await userManager.FindByEmailAsync(model.Email);
             if (userExists != null)

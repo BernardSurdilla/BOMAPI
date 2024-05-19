@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
+using System.Net.NetworkInformation;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -20,6 +21,7 @@ namespace BillOfMaterialsAPI.Controllers
     public class ArchiveController : ControllerBase
     {
         private readonly DatabaseContext _context;
+        private readonly KaizenTables _kaizenTables;
         private readonly IActionLogger _actionLogger;
 
         public ArchiveController(DatabaseContext context, IActionLogger logs)
@@ -176,21 +178,16 @@ namespace BillOfMaterialsAPI.Controllers
             {
                 GetPastryMaterialIngredients newEntry = new GetPastryMaterialIngredients();
 
-                newEntry.ingredient_id = i.ingredient_id;
-                newEntry.pastry_material_id = i.pastry_material_id;
-                newEntry.ingredient_type = i.ingredient_type;
-                newEntry.item_id = i.item_id;
-                newEntry.amount = i.amount;
-                newEntry.amount_measurement = i.amount_measurement;
-                newEntry.date_added = i.date_added;
-                newEntry.last_modified_date = i.last_modified_date;
-
                 switch (i.ingredient_type)
                 {
                     case IngredientType.InventoryItem:
-                        //
-                        //Add code here to find the item in the inventory
-                        //
+                        //!!!UNTESTED!!!
+                        Item? currentInventoryItemI = null;
+                        try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(i.item_id)).FirstAsync(); }
+                        catch (Exception e) { }
+
+                        if (currentInventoryItemI == null) { continue; }
+
                         break;
                     case IngredientType.Material:
                         List<MaterialIngredients> allMatIng = await _context.MaterialIngredients.Where(x => x.material_id == i.item_id).ToListAsync();
@@ -205,6 +202,15 @@ namespace BillOfMaterialsAPI.Controllers
                     default:
                         break;
                 }
+
+                newEntry.ingredient_id = i.ingredient_id;
+                newEntry.pastry_material_id = i.pastry_material_id;
+                newEntry.ingredient_type = i.ingredient_type;
+                newEntry.item_id = i.item_id;
+                newEntry.amount = i.amount;
+                newEntry.amount_measurement = i.amount_measurement;
+                newEntry.date_added = i.date_added;
+                newEntry.last_modified_date = i.last_modified_date;
 
                 response.Add(newEntry);
 
