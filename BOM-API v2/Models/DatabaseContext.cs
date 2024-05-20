@@ -13,6 +13,7 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
+        public DbSet<Designs> Designs { get; set; }
     }   
 
     public class KaizenTables : DbContext
@@ -21,6 +22,16 @@ namespace BillOfMaterialsAPI.Models
 
         public DbSet<Orders> Orders { get; set; }
         public DbSet<Item> Item { get; set; }
-        public DbSet<Designs> Designs { get; set; }
+    }
+
+    public class InventoryAccounts : DbContext
+    {
+        public InventoryAccounts(DbContextOptions<InventoryAccounts> options) : base(options)
+        {
+
+        }
+        public DbSet<Users> Users { get; set; }
+        public DbSet<Employee> Employee { get; set; }
+        public DbSet<Customers> Customers { get; set; }
     }
 }

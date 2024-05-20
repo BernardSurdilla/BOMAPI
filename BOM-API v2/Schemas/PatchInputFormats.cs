@@ -24,7 +24,7 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class PatchPastryMaterials
     {
-        [Required][MaxLength(16)] public int DesignId { get; set; } 
+        [Required][MaxLength(16)] public byte[] design_id { get; set; } 
 
     }
 }

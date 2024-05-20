@@ -42,14 +42,14 @@ namespace BOM_API_v2.Controllers
 
                 switch (sortBy)
                 {
-                    case "DesignId":
+                    case "design_id":
                         switch (sortOrder)
                         {
                             case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.DesignId);
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.design_id);
                                 break;
                             default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.DesignId);
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.design_id);
                                 break;
                         }
                         break;
@@ -119,7 +119,7 @@ namespace BOM_API_v2.Controllers
 
                 GetPastryMaterial newResponseRow = new GetPastryMaterial()
                 {
-                    DesignId = i.DesignId,
+                    design_id = i.design_id,
                     pastry_material_id = i.pastry_material_id,
                     date_added = i.date_added,
                     last_modified_date = i.last_modified_date,
@@ -329,10 +329,10 @@ namespace BOM_API_v2.Controllers
         [HttpPost]
         public async Task<IActionResult> AddNewPastryMaterial(PostPastryMaterial newEntry)
         {
-            //Code to check if designID exists here
-            //
-            //
-            int designId = newEntry.design_id;
+            byte[] designId = newEntry.design_id;
+            try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
+            catch (InvalidOperationException e) { return NotFound(new { message = "Design with the specified id not found" }); }
+
 
             foreach (PostIngredients entry in newEntry.ingredients)
             {
@@ -376,7 +376,7 @@ namespace BOM_API_v2.Controllers
             lastPastryMaterialId = newPastryId;
 
             newPastryMaterialEntry.pastry_material_id = newPastryId;
-            newPastryMaterialEntry.DesignId = designId;
+            newPastryMaterialEntry.design_id = designId;
             newPastryMaterialEntry.date_added = currentTime;
             newPastryMaterialEntry.last_modified_date = currentTime;
             newPastryMaterialEntry.isActive = true;
@@ -485,9 +485,11 @@ namespace BOM_API_v2.Controllers
         [HttpPatch("{pastry_material_id}")]
         public async Task<IActionResult> UpdatePastryMaterial(string pastry_material_id, PatchPastryMaterials entry)
         {
-            //Code to check if design id exists here
-            //
-            //
+
+            byte[] designId = entry.design_id;
+            try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
+            catch (InvalidOperationException e) { return NotFound(new { message = "Design with the specified id not found" }); }
+
             PastryMaterials? currentPastryMaterial = null;
             try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true).FirstAsync(x => x.pastry_material_id == pastry_material_id); }
             catch (InvalidOperationException exO) { return NotFound(new { message = "The pastry material with the id " + pastry_material_id + " does not exist." }); }
@@ -496,7 +498,7 @@ namespace BOM_API_v2.Controllers
             DateTime currentTime = DateTime.Now;
 
             _context.PastryMaterials.Update(currentPastryMaterial);
-            currentPastryMaterial.DesignId = entry.DesignId;
+            currentPastryMaterial.design_id = entry.design_id;
             currentPastryMaterial.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();

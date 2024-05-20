@@ -40,7 +40,7 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("pastry_material_id")]
     public class PastryMaterials
     {
-        [Required][ForeignKey("Designs")][MaxLength(16)] public int DesignId;
+        [Required][ForeignKey("Designs")][MaxLength(16)] public byte[] design_id;
         [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public bool isActive { get; set; }
@@ -93,6 +93,14 @@ namespace BillOfMaterialsAPI.Schemas
 
         public Materials Materials { get; set; }
     }
+    [PrimaryKey("design_id")]
+    public class Designs
+    {
+        [Column("DesignId")][MaxLength(16)][Key] public byte[] design_id { get; set; }
+        [Column("DisplayName")][MaxLength(50)] public string display_name { get; set; }
+        [Column("DisplayPictureURL")][MaxLength(50)] public string display_picture_url { get; set; }
+        public bool isActive { get; set; }
+    }
 
     //
     // Orders table: Kaizen
@@ -107,7 +115,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Column("CreatedAt")] public DateTime created_at { get; set; }
         [Column("Status")][MaxLength(50)] public string status { get; set; }
-        [Column("DesignId")] public int design_id { get; set; }
+        [Column("DesignId")] public byte[] design_id { get; set; }
         [Column("orderName")][MaxLength(50)] public string order_name {  get; set; }
         public double price { get; set; }
         [MaxLength(50)] public string? last_updated_by { get; set; }
@@ -132,12 +140,39 @@ namespace BillOfMaterialsAPI.Schemas
 
         public string measurements { get; set; }
     }
-    [PrimaryKey("DesignId")]
-    [Table("designs")]
-    public class Designs
+
+    //Legacy account tables
+    [Table("users")]
+    [PrimaryKey("user_id")]
+    public class Users
     {
-        [Required][Key] public int DesignId { get; set; }
-        [Required] public string DisplayName { get; set; }
-        [Required] public string DisplayPictureURL { get; set; }
+        [Column("UserId")][Key] public byte[] user_id { get; set; }
+        [Column("Type")] public int type { get; set; }
+        [Column("Username")] public string user_name { get; set; }
+        [Column("Password")] public string password { get; set; }
+        [Column("DisplayName")] public string display_name { get; set; }
+        [Column("JoinDate")] public DateTime join_date { get; set; }
+        [Column("Email")] public string email { get; set; }
+        [Column("Contact")] public string contact { get; set; }
+    }
+    [Table("customers")]
+    [PrimaryKey("customer_id")]
+    public class Customers
+    {
+        [Column("CustomerId")][Key] public byte[] customer_id { get; set; }
+        [Column("UserId")][ForeignKey("Users")] public byte[] user_id { get; set; }
+        [Column("TimesOrdered")] public int times_ordered { get; set; }
+
+        public Users Users { get; set; }
+    }
+    [Table("employee")]
+    [PrimaryKey("employee_id")]
+    public class Employee
+    {
+        [Column("EmployeeId")][Key] public byte[] employee_id { get; set; }
+        [Column("UserId")][ForeignKey("Users")] public byte[] user_id { get; set; }
+        [Column("EmploymentDate")] public DateTime employment_date { get; set; }
+
+        public Users Users { get; set; }
     }
 }

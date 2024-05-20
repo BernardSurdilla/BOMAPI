@@ -43,7 +43,7 @@ namespace BillOfMaterialsAPI.Schemas
 
     public class PostPastryMaterial
     {
-        [Required] public int design_id { get; set; }
+        [Required] public byte[] design_id { get; set; }
         [Required] public List<PostIngredients> ingredients { get; set; }
     }
     public class PostIngredients
@@ -54,5 +54,10 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
+    }
+    public class PostDesign
+    {
+        [MaxLength(50)] public string display_name { get; set; }
+        [MaxLength(50)] public string display_picture_url { get; set; }
     }
 }

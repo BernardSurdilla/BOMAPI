@@ -1,6 +1,7 @@
 ﻿using BillOfMaterialsAPI.Schemas;
 using BillOfMaterialsAPI.Helpers;
 using BillOfMaterialsAPI.Services;
+using BOM_API_v2.Bridge;
 
 
 using JWTAuthentication.Authentication;
@@ -59,6 +60,8 @@ namespace JWTAuthentication.Authentication
         [Required(ErrorMessage = "Email is required")]
         public string Email { get; set; }
 
+        [MaxLength(10)] public string ContactNumber { get; set; }
+
         [Required(ErrorMessage = "Password is required")]
         public string Password { get; set; }
     }
@@ -104,9 +107,10 @@ namespace JWTAuthentication.Controllers
         private readonly IConfiguration _configuration;
         private readonly IActionLogger _actionLogger;
         private readonly IEmailService _emailService;
+        private readonly IInventoryBOMBridge _inventoryBOMBridge;
 
 
-        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger, IEmailService emailService, AuthDB auth)
+        public AuthenticateController(UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager, IConfiguration configuration, IActionLogger actionLogger, IEmailService emailService, AuthDB auth, IInventoryBOMBridge inventoryBOMBridge)
         {
             this.userManager = userManager;
             this.roleManager = roleManager;
@@ -114,6 +118,7 @@ namespace JWTAuthentication.Controllers
             _actionLogger = actionLogger;
             _emailService = emailService;
             _auth = auth;
+            this._inventoryBOMBridge = inventoryBOMBridge;
         }
 
         [HttpPost]
@@ -172,12 +177,14 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now
+                JoinDate = DateTime.Now,
+                PhoneNumber = model.ContactNumber,
             };
 
             var result = await userManager.CreateAsync(user, model.Password);
             if (!result.Succeeded)
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User creation failed! Please check user details and try again." });
+            else { await _inventoryBOMBridge.AddCreatedAccountToInventoryAccountTables(user, 1); }
 
             if (!await roleManager.RoleExistsAsync(UserRoles.Customer))
                 await roleManager.CreateAsync(new IdentityRole(UserRoles.Customer));
@@ -185,7 +192,7 @@ namespace JWTAuthentication.Controllers
             {
                 await userManager.AddToRoleAsync(user, UserRoles.Customer);
             }
-
+            
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
         [HttpPost("register_artist/")]
@@ -203,12 +210,14 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now
+                JoinDate = DateTime.Now,
+                PhoneNumber = model.ContactNumber,
             };
 
             var result = await userManager.CreateAsync(user, model.Password);
             if (!result.Succeeded)
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User creation failed! Please check user details and try again." });
+            else { await _inventoryBOMBridge.AddCreatedAccountToInventoryAccountTables(user, 2); }
 
             if (!await roleManager.RoleExistsAsync(UserRoles.Artist))
                 await roleManager.CreateAsync(new IdentityRole(UserRoles.Artist));
@@ -237,13 +246,15 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now
+                JoinDate = DateTime.Now,
+                PhoneNumber = model.ContactNumber,
             };
 
             var result = await userManager.CreateAsync(user, model.Password);
 
             if (!result.Succeeded)
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User creation failed! Please check user details and try again." });
+            else { await _inventoryBOMBridge.AddCreatedAccountToInventoryAccountTables(user, 3); }
 
             if (!await roleManager.RoleExistsAsync(UserRoles.Admin))
                 await roleManager.CreateAsync(new IdentityRole(UserRoles.Admin));
@@ -305,6 +316,7 @@ namespace JWTAuthentication.Controllers
             response.user_id = currentUser.Id;
             response.email = currentUser.Email;
             response.username = currentUser.UserName;
+            response.phone_number = currentUser.PhoneNumber;
             response.is_email_confirmed = currentUser.EmailConfirmed;
             response.join_date = currentUser.JoinDate;
 

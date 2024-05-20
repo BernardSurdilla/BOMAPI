@@ -10,6 +10,7 @@ using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
 using Microsoft.EntityFrameworkCore.InMemory;
+using BOM_API_v2.Bridge;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,7 +49,9 @@ var serverVersion = new MariaDbServerVersion(new Version(10, 4, 28));
 builder.Services.AddDbContext<DatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
 builder.Services.AddDbContext<LoggingDatabaseContext>(options => options.UseMySql(builder.Configuration.GetConnectionString("ProgramDB"), serverVersion));
 builder.Services.AddDbContext<AuthDB>(options => options.UseMySql(builder.Configuration.GetConnectionString("AUTHTESTING"), serverVersion));
+
 builder.Services.AddDbContext<KaizenTables>(options => options.UseMySql(builder.Configuration.GetConnectionString("connection"), serverVersion));
+builder.Services.AddDbContext<InventoryAccounts>(options => options.UseMySql(builder.Configuration.GetConnectionString("connection"), serverVersion));
 
 //Use in memory db for testing
 //builder.Services.AddDbContext<KaizenTables>(options => options.UseInMemoryDatabase("DBTest"));
@@ -84,6 +87,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddTransient<IActionLogger, AccountManager>(); //Logging service
 builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Service
+builder.Services.AddTransient<IInventoryBOMBridge, BOMInventoryBridge>(); //Inventory BOM Bridge Service
 
 
 var app = builder.Build();

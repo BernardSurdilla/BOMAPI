@@ -45,14 +45,14 @@ namespace BillOfMaterialsAPI.Controllers
 
                 switch (sortBy)
                 {
-                    case "DesignId":
+                    case "design_id":
                         switch (sortOrder)
                         {
                             case "DESC":
-                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.DesignId);
+                                pastryMaterialQuery = pastryMaterialQuery.OrderByDescending(x => x.design_id);
                                 break;
                             default:
-                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.DesignId);
+                                pastryMaterialQuery = pastryMaterialQuery.OrderBy(x => x.design_id);
                                 break;
                         }
                         break;

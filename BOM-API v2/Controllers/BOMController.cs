@@ -28,6 +28,16 @@ namespace API_TEST.Controllers
             _actionLogger = logger;
             _kaizenTables = kaizenTables;
         }
+
+        [HttpGet("{input}")]
+        public async Task<object> Test([FromRoute]byte[] input)
+        {
+            byte[] designId = input;
+            try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); return selectedDesign; }
+            catch (InvalidOperationException e) {  }
+
+            return designId;
+        }
         
     }
 
@@ -319,9 +329,9 @@ namespace API_TEST.Controllers
                 foreach (Orders currentOrder in ordersForCurrentDate)
                 {
                     DateTime currentOrderCreationDate = currentOrder.created_at;
-                    int currentOrderDesignId = currentOrder.design_id;
+                    byte[] currentOrderDesignId = currentOrder.design_id;
 
-                    PastryMaterials? currentOrderDesignRow = allPastryMaterials.Find(x => x.DesignId == currentOrderDesignId);
+                    PastryMaterials? currentOrderDesignRow = allPastryMaterials.Find(x => x.design_id == currentOrderDesignId);
                     if (currentOrderDesignRow != null) { continue; }
 
                     List<Ingredients> currentOrderCakeIngredients = ingredientsItems.Where(x => x.pastry_material_id == currentOrderDesignRow.pastry_material_id).ToList();
