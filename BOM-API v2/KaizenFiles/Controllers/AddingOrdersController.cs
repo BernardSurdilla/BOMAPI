@@ -5,6 +5,7 @@ using CRUDFI.Models;
 using System.Data.SqlTypes;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
+using JWTAuthentication.Authentication;
 
 namespace CRUDFI.Controllers
 {
@@ -23,6 +24,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> CreateOrder([FromBody] Order order, [FromQuery] string customerUsername, [FromQuery] string designName)
         {
             try
@@ -63,6 +65,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> GetAllOrders()
         {
             try
@@ -82,6 +85,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bytype/{type}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public IActionResult GetOrdersByType(string type)
         {
             try
@@ -143,6 +147,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("byemployeeusername")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist)]
         public async Task<IActionResult> GetOrdersByUsername([FromQuery] string username)
         {
             try
@@ -253,6 +258,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bycustomerusername/{customerUsername}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername)
         {
             try
@@ -347,6 +353,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bytype/{type}/{username}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
             try
@@ -427,6 +434,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("confirmation")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderName, [FromQuery] string action)
         {
             try
@@ -487,6 +495,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("assignemployee")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderName, [FromQuery] string employeeUsername)
         {
             try

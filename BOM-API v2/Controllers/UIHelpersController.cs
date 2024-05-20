@@ -8,7 +8,7 @@ namespace BOM_API_v2.Controllers
 {
     [ApiController]
     [Route("BOM/ui_helpers/")]
-    [Authorize(Roles = UserRoles.Admin)]
+    [Authorize]
     public class UIHelpersController: ControllerBase
     {
         [HttpGet("valid_measurement_values")]

@@ -50,6 +50,7 @@ namespace JWTAuthentication.Authentication
         public const string Admin = "Admin";
         public const string Artist = "Artist";
         public const string Customer = "Customer";
+        public const string Manager = "Manager";
     }
     public class RegisterModel
     {
@@ -228,6 +229,40 @@ namespace JWTAuthentication.Controllers
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
+        [HttpPost("register_manager/")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> RegisterManager([FromBody] RegisterModel model)
+        {
+            var userExists = await userManager.FindByNameAsync(model.Username);
+            var userEmailExist = await userManager.FindByEmailAsync(model.Email);
+            if (userExists != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified username already exists!" });
+            if (userEmailExist != null)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified email already exists!" });
+            APIUsers user = new APIUsers()
+            {
+                Email = model.Email,
+                SecurityStamp = Guid.NewGuid().ToString(),
+                UserName = model.Username,
+                JoinDate = DateTime.Now,
+                PhoneNumber = model.ContactNumber,
+            };
+
+            var result = await userManager.CreateAsync(user, model.Password);
+            if (!result.Succeeded)
+                return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "User creation failed! Please check user details and try again." });
+            else { await _inventoryBOMBridge.AddCreatedAccountToInventoryAccountTables(user, 4); }
+
+            if (!await roleManager.RoleExistsAsync(UserRoles.Manager))
+                await roleManager.CreateAsync(new IdentityRole(UserRoles.Manager));
+            if (await roleManager.RoleExistsAsync(UserRoles.Manager))
+            {
+                await userManager.AddToRoleAsync(user, UserRoles.Manager);
+            }
+
+            return Ok(new Response { Status = "Success", Message = "User created successfully!" });
+        }
+
         [HttpPost("register_admin/")]
         public async Task<IActionResult> RegisterAdmin([FromBody] RegisterModel model, string secret_key)
         {

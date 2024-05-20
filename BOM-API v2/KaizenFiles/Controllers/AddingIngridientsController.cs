@@ -12,7 +12,7 @@ namespace CRUDFI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize(Roles = UserRoles.Admin)]
+    [Authorize]
     public class AddingIngridientsController : ControllerBase
     {
         private readonly string connectionstring;
@@ -25,6 +25,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = UserRoles.Admin)]
         public IActionResult CreateIngredient([FromBody] Ingri ingredient)
         {
             try
@@ -89,6 +90,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("all")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetAllIngredients()
         {
             try
@@ -108,6 +110,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("{id}")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientById(int id)
         {
             try
@@ -155,6 +158,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("byname/{name}")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientByName(string name)
         {
             try
@@ -174,6 +178,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("bystatus/{status}")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientsByStatus(string status)
         {
             try
@@ -193,6 +198,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("bytype/{type}")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientsByType(string type)
         {
             try
@@ -212,6 +218,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpPatch("{id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public IActionResult UpdateIngredient(int id, [FromBody] Ingri updatedIngredient, string username)
         {
             try
