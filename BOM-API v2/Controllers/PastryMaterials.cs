@@ -30,8 +30,8 @@ namespace BOM_API_v2.Controllers
         public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             List<PastryMaterials> pastryMaterials;
-
             List<GetPastryMaterial> response = new List<GetPastryMaterial>();
+            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
 
             //Base query for the materials database to retrieve rows
             IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.isActive == true);
@@ -123,6 +123,7 @@ namespace BOM_API_v2.Controllers
                     pastry_material_id = i.pastry_material_id,
                     date_added = i.date_added,
                     last_modified_date = i.last_modified_date,
+                    cost_estimate = 0.0
                 };
 
                 //The object that will be attached to the new response entry
@@ -132,6 +133,31 @@ namespace BOM_API_v2.Controllers
                 //Loop through all of the retireved ingredients of the current cake
                 foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
                 {
+                    //Check if the measurement unit in the ingredient record is valid
+                    //If not found, skip current ingredient
+                    string? amountQuantityType = null;
+                    string? amountUnitMeasurement = null;
+
+                    bool isAmountMeasurementValid = false;
+                    foreach (string unitQuantity in validMeasurementUnits.Keys)
+                    {
+                        List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                        string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(ifcm.amount_measurement));
+
+                        if (currentMeasurement == null) { continue; }
+                        else
+                        {
+                            isAmountMeasurementValid = true;
+                            amountQuantityType = unitQuantity;
+                            amountUnitMeasurement = currentMeasurement;
+                        }
+                    }
+                    if (isAmountMeasurementValid == false) 
+                    { 
+                        return new List<GetPastryMaterial>(); //This should return something to identify the error
+                    }
+
                     GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
 
                     //Check what kind of ingredient is the current ingredient
@@ -139,44 +165,144 @@ namespace BOM_API_v2.Controllers
                     switch (ifcm.ingredient_type)
                     {
                         case IngredientType.InventoryItem:
-                            //!!!UNTESTED!!!
-                            Item? currentInventoryItemI = null;
-                            try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(ifcm.item_id)).FirstAsync(); }
-                            catch { continue; }
-                            if (currentInventoryItemI == null) { continue; }
-
-                            newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
-                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
-                            break;
-
-                        case IngredientType.Material:
-                            //Find if the material that the current ingredient is referring to
-                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
-                            if (currentReferencedMaterial == null) { continue; } //Skip the current entry if the material is not found or deletedd
-
-                            newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
-                            //Find all active ingredients of the current material
-                            List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
-
-                            //Check if there are material ingredients retrieved
-                            //Add the retireved materials to the current response entry if yes
-                            //Add an empty array to the current response entry if no
-                            if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
                             {
-                                List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+                                //!!!UNTESTED!!!
+                                Item? currentInventoryItemI = null;
+                                try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(ifcm.item_id)).FirstAsync(); }
+                                catch { continue; }
+                                if (currentInventoryItemI == null) { continue; }
 
-                                foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
-                                {
-                                    SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
-                                    newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
-                                }
-                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
-                            }
-                            else
-                            {
+                                newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
                                 newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+
+                                double convertedAmountI = UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentInventoryItemI.measurements);
+                                double calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
+
+                                newResponseRow.cost_estimate += calculatedAmountI;
+
+                                break;
                             }
-                            break;
+                        case IngredientType.Material:
+                            {
+                                //Find if the material that the current ingredient is referring to
+                                Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
+                                if (currentReferencedMaterial == null) { continue; } //Skip the current entry if the material is not found or deletedd
+
+                                newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
+                                //Find all active ingredients of the current material
+                                List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == ifcm.item_id).ToListAsync();
+
+                                //Check if there are material ingredients retrieved
+                                //Add the retireved materials to the current response entry if yes
+                                //Add an empty array to the current response entry if no
+                                if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                                {
+                                    List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                                    foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                    {
+                                        SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
+                                        newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                                    }
+                                    newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                }
+                                else
+                                {
+                                    newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                }
+
+                                //Price calculation code
+                                //Get all ingredient for currently referenced material
+                                List<MaterialIngredients> subIngredientsForCurrentIngredient = currentMaterialReferencedIngredients.Where(x => x.ingredient_type == IngredientType.InventoryItem).ToList();
+                                double currentSubIngredientCostMultiplier = amountUnitMeasurement.Equals(currentReferencedMaterial.amount_measurement) ? currentReferencedMaterial.amount / ifcm.amount : currentReferencedMaterial.amount / UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentReferencedMaterial.amount_measurement);
+                                foreach (MaterialIngredients subIng in subIngredientsForCurrentIngredient)
+                                {
+                                    Item? currentReferencedIngredientM = null;
+                                    try { currentReferencedIngredientM = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
+                                    catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+
+                                    double currentRefItemPrice = currentReferencedIngredientM.price;
+                                    double ingredientCost = currentReferencedIngredientM.measurements == subIng.amount_measurement ? (currentRefItemPrice * ifcm.amount) * currentSubIngredientCostMultiplier : (currentRefItemPrice * UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+
+                                    newResponseRow.cost_estimate += ingredientCost;
+                                }
+
+                                //Get All material types of ingredient of the current ingredient
+                                List<MaterialIngredients> subMaterials = currentMaterialReferencedIngredients.Where(x => x.ingredient_type == IngredientType.Material).ToList();
+                                int subMaterialIngLoopIndex = 0;
+                                bool isLoopingThroughSubMaterials = true;
+
+                                while (isLoopingThroughSubMaterials)
+                                {
+                                    MaterialIngredients currentSubMaterial;
+                                    try { currentSubMaterial = subMaterials[subMaterialIngLoopIndex]; }
+                                    catch (Exception e) { isLoopingThroughSubMaterials = false; break; }
+
+                                    Materials currentReferencedMaterialForSub = await _context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
+                                    
+                                    string refMatMeasurement = currentReferencedMaterialForSub.amount_measurement;
+                                    double refMatAmount = currentReferencedMaterialForSub.amount;
+
+                                    string subMatMeasurement = currentSubMaterial.amount_measurement;
+                                    double subMatAmount = currentSubMaterial.amount;
+
+                                    string measurementQuantity = "";
+
+                                    foreach (string unitQuantity in validMeasurementUnits.Keys)
+                                    {
+                                        List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                                        string? currentSubMatMeasurement = currentQuantityUnits.Find(x => x.Equals(subMatMeasurement));
+                                        string? currentRefMatMeasurement = currentQuantityUnits.Find(x => x.Equals(refMatMeasurement));
+
+                                        if (currentSubMatMeasurement != null && currentRefMatMeasurement != null) { measurementQuantity = unitQuantity; }
+                                        else { continue; }
+                                    }
+
+                                    double costMultiplier = refMatMeasurement == subMatMeasurement ? refMatAmount / subMatAmount : refMatAmount / UnitConverter.ConvertByName(subMatAmount, measurementQuantity, subMatMeasurement, refMatMeasurement);
+
+                                    List<MaterialIngredients> subMaterialIngredients = await _context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
+                                    foreach(MaterialIngredients subMaterialIngredientsRow in subMaterialIngredients)
+                                    {
+                                        switch (subMaterialIngredientsRow.ingredient_type) 
+                                        {
+                                            case IngredientType.InventoryItem:
+                                                Item? refItemForSubMatIng = null;
+                                                try { refItemForSubMatIng = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
+                                                catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+
+                                                string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
+                                                double subMatIngRowAmount = subMaterialIngredientsRow.amount;
+
+                                                string refItemMeasurement = refItemForSubMatIng.measurements;
+                                                double refItemPrice = refItemForSubMatIng.price;
+
+                                                string refItemQuantityUnit = "";
+                                                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                                                {
+                                                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                                                    string? currentSubMatMeasurement = currentQuantityUnits.Find(x => x.Equals(subMatIngRowMeasurement));
+                                                    string? currentRefMatMeasurement = currentQuantityUnits.Find(x => x.Equals(refItemMeasurement));
+
+                                                    if (currentSubMatMeasurement != null && currentRefMatMeasurement != null) { refItemQuantityUnit = unitQuantity; }
+                                                    else { continue; }
+                                                }
+
+                                                double currentSubMaterialIngredientPrice = refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? (refItemPrice * subMatIngRowAmount) * costMultiplier : (refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+
+                                                newResponseRow.cost_estimate += currentSubMaterialIngredientPrice;
+
+                                                break;
+                                            case IngredientType.Material:
+                                                subMaterials.Add(subMaterialIngredientsRow);
+                                                break;
+                                        }
+                                    }
+                                    subMaterialIngLoopIndex += 1;
+                                }
+                                break;
+                            }
                     }
                     newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
                     newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
@@ -206,11 +332,179 @@ namespace BOM_API_v2.Controllers
             if (currentPastryMat == null) { return new GetPastryMaterial(); }
 
             List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMat.pastry_material_id).ToListAsync();
+            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
 
             List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
+
+            double calculatedCost = 0.0;
+
             foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
             {
                 GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
+
+                //Check if the measurement unit in the ingredient record is valid
+                //If not found, skip current ingredient
+                string? amountQuantityType = null;
+                string? amountUnitMeasurement = null;
+
+                bool isAmountMeasurementValid = false;
+                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                {
+                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(ifcm.amount_measurement));
+
+                    if (currentMeasurement == null) { continue; }
+                    else
+                    {
+                        isAmountMeasurementValid = true;
+                        amountQuantityType = unitQuantity;
+                        amountUnitMeasurement = currentMeasurement;
+                    }
+                }
+                if (isAmountMeasurementValid == false)
+                {
+                    return new GetPastryMaterial(); //This should return something to identify the error
+                }
+
+                switch (ifcm.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        {
+                            //!!!UNTESTED!!!
+                            Item? currentInventoryItemI = null;
+                            try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(ifcm.item_id)).FirstAsync(); }
+                            catch { continue; }
+                            if (currentInventoryItemI == null) { continue; }
+
+                            newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
+                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+
+                            double convertedAmountI = UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentInventoryItemI.measurements);
+                            double calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
+
+                            calculatedCost += calculatedAmountI;
+
+                            break;
+                        }
+                    case IngredientType.Material:
+                        {
+                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
+                            if (currentPastryMat == null) { continue; }
+
+                            newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
+                            List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
+
+                            if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                            {
+                                List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                                foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                {
+                                    SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
+                                    newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                                }
+                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                            }
+                            else
+                            {
+                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                            }
+                            //Price calculation code
+                            //Get all ingredient for currently referenced material
+                            List<MaterialIngredients> subIngredientsForCurrentIngredient = currentMaterialReferencedIngredients.Where(x => x.ingredient_type == IngredientType.InventoryItem).ToList();
+                            double currentSubIngredientCostMultiplier = amountUnitMeasurement.Equals(currentReferencedMaterial.amount_measurement) ? currentReferencedMaterial.amount / ifcm.amount : currentReferencedMaterial.amount / UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentReferencedMaterial.amount_measurement);
+                            foreach (MaterialIngredients subIng in subIngredientsForCurrentIngredient)
+                            {
+                                Item? currentReferencedIngredientM = null;
+                                try { currentReferencedIngredientM = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
+                                catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+
+                                double currentRefItemPrice = currentReferencedIngredientM.price;
+                                double ingredientCost = currentReferencedIngredientM.measurements == subIng.amount_measurement ? (currentRefItemPrice * ifcm.amount) * currentSubIngredientCostMultiplier : (currentRefItemPrice * UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+
+                                calculatedCost += ingredientCost;
+                            }
+
+                            //Get All material types of ingredient of the current ingredient
+                            List<MaterialIngredients> subMaterials = currentMaterialReferencedIngredients.Where(x => x.ingredient_type == IngredientType.Material).ToList();
+                            int subMaterialIngLoopIndex = 0;
+                            bool isLoopingThroughSubMaterials = true;
+
+                            while (isLoopingThroughSubMaterials)
+                            {
+                                MaterialIngredients currentSubMaterial;
+                                try { currentSubMaterial = subMaterials[subMaterialIngLoopIndex]; }
+                                catch (Exception e) { isLoopingThroughSubMaterials = false; break; }
+
+                                Materials currentReferencedMaterialForSub = await _context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
+
+                                string refMatMeasurement = currentReferencedMaterialForSub.amount_measurement;
+                                double refMatAmount = currentReferencedMaterialForSub.amount;
+
+                                string subMatMeasurement = currentSubMaterial.amount_measurement;
+                                double subMatAmount = currentSubMaterial.amount;
+
+                                string measurementQuantity = "";
+
+                                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                                {
+                                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                                    string? currentSubMatMeasurement = currentQuantityUnits.Find(x => x.Equals(subMatMeasurement));
+                                    string? currentRefMatMeasurement = currentQuantityUnits.Find(x => x.Equals(refMatMeasurement));
+
+                                    if (currentSubMatMeasurement != null && currentRefMatMeasurement != null) { measurementQuantity = unitQuantity; }
+                                    else { continue; }
+                                }
+
+                                double costMultiplier = refMatMeasurement == subMatMeasurement ? refMatAmount / subMatAmount : refMatAmount / UnitConverter.ConvertByName(subMatAmount, measurementQuantity, subMatMeasurement, refMatMeasurement);
+
+                                List<MaterialIngredients> subMaterialIngredients = await _context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
+                                foreach (MaterialIngredients subMaterialIngredientsRow in subMaterialIngredients)
+                                {
+                                    switch (subMaterialIngredientsRow.ingredient_type)
+                                    {
+                                        case IngredientType.InventoryItem:
+                                            Item? refItemForSubMatIng = null;
+                                            try { refItemForSubMatIng = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
+                                            catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+
+                                            string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
+                                            double subMatIngRowAmount = subMaterialIngredientsRow.amount;
+
+                                            string refItemMeasurement = refItemForSubMatIng.measurements;
+                                            double refItemPrice = refItemForSubMatIng.price;
+
+                                            string refItemQuantityUnit = "";
+                                            foreach (string unitQuantity in validMeasurementUnits.Keys)
+                                            {
+                                                List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                                                string? currentSubMatMeasurement = currentQuantityUnits.Find(x => x.Equals(subMatIngRowMeasurement));
+                                                string? currentRefMatMeasurement = currentQuantityUnits.Find(x => x.Equals(refItemMeasurement));
+
+                                                if (currentSubMatMeasurement != null && currentRefMatMeasurement != null) { refItemQuantityUnit = unitQuantity; }
+                                                else { continue; }
+                                            }
+
+                                            double currentSubMaterialIngredientPrice = refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? (refItemPrice * subMatIngRowAmount) * costMultiplier : (refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+
+                                            calculatedCost += currentSubMaterialIngredientPrice;
+                                            break;
+                                        case IngredientType.Material:
+                                            subMaterials.Add(subMaterialIngredientsRow);
+                                            break;
+                                    }
+                                }
+                                subMaterialIngLoopIndex += 1;
+
+                                break;
+                            }
+                            break;
+                        }
+                }
+                
                 newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
                 newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
                 newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
@@ -218,46 +512,11 @@ namespace BOM_API_v2.Controllers
                 newSubIngredientListEntry.amount = ifcm.amount;
                 newSubIngredientListEntry.item_id = ifcm.item_id;
 
-                switch (ifcm.ingredient_type)
-                {
-                    case IngredientType.InventoryItem:
-                        //!!!UNTESTED!!!
-                        Item? currentInventoryItemI = null;
-                        try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(ifcm.item_id)).FirstAsync(); }
-                        catch { continue; }
-                        if (currentInventoryItemI == null) { continue; }
-
-                        newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
-                        newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
-                        break;
-                    case IngredientType.Material:
-                        Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
-                        if (currentPastryMat == null) { continue; }
-
-                        newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
-                        List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
-
-                        if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
-                        {
-                            List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
-
-                            foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
-                            {
-                                SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
-                                newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
-                            }
-                            newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
-                        }
-                        else
-                        {
-                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
-                        }
-                        break;
-                }
                 subIngredientList.Add(newSubIngredientListEntry);
             }
 
             GetPastryMaterial response = new GetPastryMaterial(currentPastryMat, subIngredientList);
+            response.cost_estimate = calculatedCost;
 
             await _actionLogger.LogAction(User, "GET", "Pastry Material " + currentPastryMat.pastry_material_id);
             return response;
@@ -633,9 +892,18 @@ namespace BOM_API_v2.Controllers
                 foreach (string unitQuantity in validMeasurementUnits.Keys)
                 {
                     List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
-                    foreach (string quantityUnit in currentQuantityUnits) { if (quantityUnit == currentIngredient.amount_measurement) { isAmountMeasurementValid = true; amountQuantityType = unitQuantity; amountUnitMeasurement = quantityUnit; }; }
+
+                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(currentIngredient.amount_measurement));
+
+                    if (currentMeasurement == null) { continue; }
+                    else 
+                    { 
+                        isAmountMeasurementValid = true; 
+                        amountQuantityType = unitQuantity; 
+                        amountUnitMeasurement = currentMeasurement;
+                    }
                 }
-                if (isAmountMeasurementValid == false) { continue; }
+                if (isAmountMeasurementValid == false) { return BadRequest(new { message = "The measurement of the pastry ingredient with the id " + currentIngredient.ingredient_id + " is not valid." }); }
 
                 switch (currentIngredient.ingredient_type)
                 {
@@ -654,6 +922,7 @@ namespace BOM_API_v2.Controllers
                             //Calculate the value to subtract here
                             InventorySubtractorInfo? inventorySubtractorInfoForCurrentIngredient = null;
                             inventoryItemsAboutToBeSubtracted.TryGetValue(currentIngredient.item_id, out inventorySubtractorInfoForCurrentIngredient);
+
                             if (inventorySubtractorInfoForCurrentIngredient == null)
                             {
                                 inventoryItemsAboutToBeSubtracted.Add(currentIngredient.item_id, new InventorySubtractorInfo(amountQuantityType, amountUnitMeasurement, currentIngredient.amount));
