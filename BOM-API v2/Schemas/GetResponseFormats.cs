@@ -10,7 +10,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public List<SubGetMaterialIngredients> material_ingredients { get; set; }
         public double cost_estimate { get; set; }
 
-        public GetMaterials(SubGetMaterials materials, List<SubGetMaterialIngredients> materialIngredients, int costEst)
+        public GetMaterials(SubGetMaterials materials, List<SubGetMaterialIngredients> materialIngredients, double costEst)
         {
             Material = materials;
             material_ingredients = materialIngredients;

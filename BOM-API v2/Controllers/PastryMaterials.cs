@@ -154,7 +154,8 @@ namespace BOM_API_v2.Controllers
                         }
                     }
                     if (isAmountMeasurementValid == false) 
-                    { 
+                    {
+                        Console.WriteLine("Invalid ingredient measurement for " + ifcm.ingredient_id);
                         return new List<GetPastryMaterial>(); //This should return something to identify the error
                     }
 
@@ -189,6 +190,8 @@ namespace BOM_API_v2.Controllers
                                 if (currentReferencedMaterial == null) { continue; } //Skip the current entry if the material is not found or deletedd
 
                                 newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
+
+
                                 //Find all active ingredients of the current material
                                 List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == ifcm.item_id).ToListAsync();
 
@@ -238,7 +241,9 @@ namespace BOM_API_v2.Controllers
                                     try { currentSubMaterial = subMaterials[subMaterialIngLoopIndex]; }
                                     catch (Exception e) { isLoopingThroughSubMaterials = false; break; }
 
-                                    Materials currentReferencedMaterialForSub = await _context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
+                                    Materials currentReferencedMaterialForSub;
+                                    try { currentReferencedMaterialForSub = await _context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync(); }
+                                    catch (Exception e) { Console.WriteLine("Error looking up for material " + currentSubMaterial.material_id + ": " + e.GetType().ToString() ); subMaterialIngLoopIndex += 1; continue; }
                                     
                                     string refMatMeasurement = currentReferencedMaterialForSub.amount_measurement;
                                     double refMatAmount = currentReferencedMaterialForSub.amount;
