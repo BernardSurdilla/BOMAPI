@@ -28,16 +28,6 @@ namespace API_TEST.Controllers
             _actionLogger = logger;
             _kaizenTables = kaizenTables;
         }
-
-        [HttpGet("{input}")]
-        public async Task<object> Test([FromRoute]byte[] input)
-        {
-            byte[] designId = input;
-            try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); return selectedDesign; }
-            catch (InvalidOperationException e) {  }
-
-            return designId;
-        }
         
     }
 

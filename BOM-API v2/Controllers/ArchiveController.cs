@@ -378,6 +378,77 @@ namespace BillOfMaterialsAPI.Controllers
             return materialIngredients;
         }
 
+        [HttpGet("designs/")]
+        public async Task<List<Designs>> GetDeletedDesigns(int? page, int? record_per_page, string? sortBy, string? sortOrder)
+        {
+            List<Designs> response;
+
+            //Base query for the materials database to retrieve rows
+            IQueryable<Designs> designQuery = _context.Designs.Where(row => row.isActive == false);
+            //Row sorting algorithm
+            if (sortBy != null)
+            {
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "design_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                designQuery = designQuery.OrderByDescending(x => x.design_id);
+                                break;
+                            default:
+                                designQuery = designQuery.OrderBy(x => x.design_id);
+                                break;
+                        }
+                        break;
+                    case "display_name":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                designQuery = designQuery.OrderByDescending(x => x.display_name);
+                                break;
+                            default:
+                                designQuery = designQuery.OrderBy(x => x.display_name);
+                                break;
+                        }
+                        break;
+                    case "display_picture_url":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                designQuery = designQuery.OrderByDescending(x => x.display_picture_url);
+                                break;
+                            default:
+                                designQuery = designQuery.OrderBy(x => x.display_picture_url);
+                                break;
+                        }
+                        break;
+                }
+            }
+            //Paging algorithm
+            if (page == null) { response = await designQuery.ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                response = await designQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+            return response;
+        }
+        [HttpGet("designs/{design_id}")]
+        public async Task<Designs> GetSpecifiedDeletedDesign(byte[] design_id)
+        {
+            if (design_id == null) { return new Designs(); }
+
+            try { return await _context.Designs.Where(x => x.isActive == false && x.design_id == design_id).FirstAsync(); }
+            catch { return new Designs(); }
+
+        }
         //
         //Restoring data
         //
@@ -671,6 +742,19 @@ namespace BillOfMaterialsAPI.Controllers
 
             await _actionLogger.LogAction(User, "PATCH", "Recover Material " + material_id + " - Material Ingredient " + material_ingredient_id);
             return Ok(new { message = "Material ingredient restored." });
+        }
+
+        [HttpPatch("designs/{design_id}")]
+        public async Task<IActionResult> RestoreDesign(byte[] design_id)
+        {
+            Designs? selectedRow;
+            try { selectedRow = await _context.Designs.Where(x => x.isActive == false && x.design_id == design_id).FirstAsync(); }
+            catch { return NotFound(new { message = "Design with the specified id not found" }); }
+
+            _context.Designs.Update(selectedRow);
+            selectedRow.isActive = true;
+            await _context.SaveChangesAsync();
+            return Ok(new { message = "Design restored sucessfully" });
         }
     }
 }

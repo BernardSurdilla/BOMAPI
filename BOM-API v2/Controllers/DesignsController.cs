@@ -12,7 +12,7 @@ using BillOfMaterialsAPI.Services;
 namespace BOM_API_v2.Controllers
 {
     [ApiController]
-    [Authorize(Roles = UserRoles.Admin)]
+    [Authorize]
     [Route("BOM/designs/")]
     public class DesignsController : ControllerBase
     {
@@ -22,6 +22,7 @@ namespace BOM_API_v2.Controllers
         public DesignsController(DatabaseContext databaseContext, IActionLogger actionLogger) { _databaseContext = databaseContext; _actionLogger = actionLogger; }
 
         [HttpGet]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<List<Designs>> GetAllDesigns(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             IQueryable<Designs> dbQuery = _databaseContext.Designs.Where(x => x.isActive == true);
@@ -82,6 +83,7 @@ namespace BOM_API_v2.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewDesign(PostDesign input)
         {
             byte[] newEntryId = Guid.NewGuid().ToByteArray();
@@ -100,6 +102,7 @@ namespace BOM_API_v2.Controllers
         }
 
         [HttpPatch("{designId}/")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute]byte[] designId)
         {
             Designs? foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync();
@@ -118,6 +121,7 @@ namespace BOM_API_v2.Controllers
         }
 
         [HttpDelete("{designId}/")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesign([FromRoute] byte[] designId)
         {
             Designs? foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync();
