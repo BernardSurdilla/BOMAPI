@@ -438,6 +438,7 @@ namespace BillOfMaterialsAPI.Controllers
 
                 response = await designQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
+            await _actionLogger.LogAction(User, "GET", "All deleted designs");
             return response;
         }
         [HttpGet("designs/{design_id}")]
@@ -448,6 +449,64 @@ namespace BillOfMaterialsAPI.Controllers
             try { return await _context.Designs.Where(x => x.isActive == false && x.design_id == design_id).FirstAsync(); }
             catch { return new Designs(); }
 
+        }
+
+        [HttpGet("designs/tags/")]
+        public async Task<List<GetDesignTag>> GetDeletedTags(int? page, int? record_per_page, string? sortBy, string? sortOrder)
+        {
+            IQueryable<DesignTags> dbQuery = _context.DesignTags.Where(x => x.isActive == false);
+
+            List<DesignTags> current_design_records = new List<DesignTags>();
+            List<GetDesignTag> response = new List<GetDesignTag>();
+
+            switch (sortBy)
+            {
+                case "design_tag_id":
+                    switch (sortOrder)
+                    {
+                        case "DESC":
+                            dbQuery = dbQuery.OrderByDescending(x => x.design_tag_id);
+                            break;
+                        default:
+                            dbQuery = dbQuery.OrderBy(x => x.design_tag_id);
+                            break;
+                    }
+                    break;
+                case "design_tag_name":
+                    switch (sortOrder)
+                    {
+                        case "DESC":
+                            dbQuery = dbQuery.OrderByDescending(x => x.design_tag_name);
+                            break;
+                        default:
+                            dbQuery = dbQuery.OrderBy(x => x.design_tag_name);
+                            break;
+                    }
+                    break;
+            }
+
+            //Paging algorithm
+            if (page == null) { current_design_records = await dbQuery.ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                current_design_records = await dbQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            foreach (DesignTags currentDesignTag in current_design_records)
+            {
+                GetDesignTag newResponseEntry = new GetDesignTag();
+                newResponseEntry.design_tag_id = currentDesignTag.design_tag_id;
+                newResponseEntry.design_tag_name = currentDesignTag.design_tag_name;
+                response.Add(newResponseEntry);
+            }
+
+            await _actionLogger.LogAction(User, "GET", "All Design tags");
+            return response;
         }
         //
         //Restoring data
@@ -755,6 +814,21 @@ namespace BillOfMaterialsAPI.Controllers
             selectedRow.isActive = true;
             await _context.SaveChangesAsync();
             return Ok(new { message = "Design restored sucessfully" });
+        }
+        [HttpDelete("designs/tags/{design_tag_id}")]
+        public async Task<IActionResult> DeleteDesignTag(Guid design_tag_id)
+        {
+            DesignTags? selectedDesignTag;
+            try { selectedDesignTag = await _context.DesignTags.Where(x => x.isActive == false && x.design_tag_id == design_tag_id).FirstAsync(); }
+            catch (InvalidOperationException ex) { return BadRequest(new { message = "Specified design tag with the id " + design_tag_id + " does not exist" }); }
+            catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
+
+            _context.DesignTags.Update(selectedDesignTag);
+            selectedDesignTag.isActive = true;
+
+            await _context.SaveChangesAsync();
+            _actionLogger.LogAction(User, "DELETE", "Delete design tag " + selectedDesignTag.design_tag_id);
+            return Ok(new { message = "Design " + selectedDesignTag.design_tag_id + " deleted" });
         }
     }
 }
