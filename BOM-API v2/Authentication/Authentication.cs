@@ -32,6 +32,8 @@ namespace JWTAuthentication.Authentication
 
         }
         public DbSet<EmailConfirmationKeys> EmailConfirmationKeys { get; set; } //Table for storing user confirmation keys
+        public DbSet<ProfileImages> ProfileImages { get; set; } //Table for storing user profile images
+
     }
     public class APIUsers : IdentityUser
     {
@@ -43,6 +45,11 @@ namespace JWTAuthentication.Authentication
         [Required] public string ConfirmationKey { get; set; }
         [Required] public DateTime ValidUntil { get; set; } 
 
+    }
+    public class ProfileImages
+    {
+        [Required][ForeignKey("APIUsers")] public string Id { get; set; }
+        [Required] public byte[] picture_data { get; set; }
     }
 
     public static class UserRoles
@@ -438,6 +445,37 @@ namespace JWTAuthentication.Controllers
             await _auth.SaveChangesAsync();
 
             return Ok(new { message = "Email confirmed successfully" });
+        }
+
+        [Authorize][HttpGet("user/profile_picture")]
+        public async Task<byte[]?> CurrentUserProfilePicture()
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return null; }
+
+            ProfileImages? currentUserImage = null;
+            try { currentUserImage = await _auth.ProfileImages.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            catch (Exception ex) { return null; }
+
+            _actionLogger.LogAction(User, "GET", "Profile image for " + currentUser.Id);
+            return currentUserImage.picture_data;
+            
+        }
+        [Authorize][HttpPost("user/upload_profile_picture")]
+        public async Task<IActionResult> UploadProfilePicture([FromBody] byte[] picture_data)
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return BadRequest(new { message = "User not found" }); }
+
+            ProfileImages newImage = new ProfileImages();
+            newImage.Id = currentUser.Id;
+            newImage.picture_data = picture_data;
+
+            await _auth.ProfileImages.AddAsync(newImage);
+            await _auth.SaveChangesAsync();
+
+            _actionLogger.LogAction(User, "POST", "Upload image for " + currentUser.Id);
+            return Ok(new { message = "Image uploaded for " + currentUser.Id });
         }
     }
 }
