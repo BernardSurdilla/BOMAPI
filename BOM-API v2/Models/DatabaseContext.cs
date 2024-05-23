@@ -13,7 +13,11 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
+
         public DbSet<Designs> Designs { get; set; }
+        public DbSet<DesignTags> DesignTags { get; set; }
+        public DbSet<DesignTagsForCake> DesignTagsForCakes { get; set; }
+        public DbSet<DesignImage> DesignImage { get; set; }
     }   
 
     public class KaizenTables : DbContext

@@ -93,13 +93,43 @@ namespace BillOfMaterialsAPI.Schemas
 
         public Materials Materials { get; set; }
     }
+
     [PrimaryKey("design_id")]
     public class Designs
     {
         [Column("DesignId")][MaxLength(16)][Key] public byte[] design_id { get; set; }
         [Column("DisplayName")][MaxLength(50)] public string display_name { get; set; }
         [Column("DisplayPictureURL")][MaxLength(50)] public string display_picture_url { get; set; }
+        public string? cake_description { get; set; }
         public bool isActive { get; set; }
+    }
+    [PrimaryKey("design_tag_id")]
+    public class DesignTags
+    {
+        [Key] public Guid design_tag_id { get; set; }
+        public string design_tag_name { get; set; }
+        public bool isActive { get; set; }
+    }
+    [PrimaryKey("design_tags_for_cake_id")]
+    public class DesignTagsForCake
+    {
+        [Key]public Guid design_tags_for_cake_id { get; set; }
+        [ForeignKey("Designs")]public byte[] design_id { get; set; }
+        [ForeignKey("DesignTags")]public Guid design_tag_id { get; set; }
+        public bool isActive { get; set; }
+
+        public DesignTags DesignTags { get; set; }
+        public Designs Designs { get; set; }
+    }
+    [PrimaryKey("design_picture_id")]
+    public class DesignImage
+    {
+        [Key] public Guid design_picture_id { get; set; }
+        [ForeignKey("Designs")] public byte[] design_id { get; set; }
+        public byte[] picture_data { get; set; }
+        public bool isActive { get; set; }
+
+        public Designs Designs { get; set; }
     }
 
     //

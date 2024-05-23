@@ -440,5 +440,4 @@ namespace JWTAuthentication.Controllers
             return Ok(new { message = "Email confirmed successfully" });
         }
     }
-    
 }

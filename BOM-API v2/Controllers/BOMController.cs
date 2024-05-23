@@ -14,6 +14,10 @@ using UnitsNet;
 
 namespace API_TEST.Controllers
 {
+    //
+    // TESTING END
+    //
+
     [ApiController]
     [Route("Debug/")]
     public class TestEndpointsController : ControllerBase
@@ -28,8 +32,8 @@ namespace API_TEST.Controllers
             _actionLogger = logger;
             _kaizenTables = kaizenTables;
         }
-        
     }
+    
 
     [ApiController]
     [Route("BOM/data_analysis")]
@@ -425,6 +429,7 @@ namespace API_TEST.Controllers
             await _actionLogger.LogAction(User, "GET", "All items by seasonal occurence");
             return response;
         }
+
     }
 
 }

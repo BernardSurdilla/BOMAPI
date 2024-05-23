@@ -11,6 +11,7 @@ using Swashbuckle.AspNetCore.Filters;
 using System.Text;
 using Microsoft.EntityFrameworkCore.InMemory;
 using BOM_API_v2.Bridge;
+using API_TEST.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 

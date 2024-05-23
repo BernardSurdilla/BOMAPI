@@ -60,7 +60,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
-        
+
         public SubGetMaterialIngredients() { }
         public SubGetMaterialIngredients(MaterialIngredients dbRow)
         {
@@ -168,7 +168,7 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class GetUsedItemsBySeasonalTrends
     {
-        [Required] public DateTime date_start {  get; set; }
+        [Required] public DateTime date_start { get; set; }
         [Required] public DateTime date_end { get; set; }
 
         [Required] public List<ItemOccurence> item_list { get; set; }
@@ -181,5 +181,32 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public int occurence_count { get; set; }
         [Required] public double ratio { get; set; }
+    }
+
+    public class GetDesign
+    {
+        [Required] public byte[] design_id { get; set; }
+        [Required] public string display_name { get; set; }
+        public string? cake_description { get; set; }
+
+        public string? design_picture_url { get; set; }
+        public byte[]? display_picture_data { get; set; }
+
+        public List<SubGetDesignTags>? design_tags { get; set; }
+    }
+    public class SubGetDesignImage
+    {
+        public Guid design_picture_id { get; set; }
+        public byte[] picture_data { get; set; }
+    }
+    public class SubGetDesignTags
+    {
+        public Guid design_tag_id;
+        public string design_tag_name;
+    }
+    public class GetDesignTag
+    {
+        public Guid design_tag_id { get; set; }
+        public string design_tag_name { get; set; }
     }
 }
