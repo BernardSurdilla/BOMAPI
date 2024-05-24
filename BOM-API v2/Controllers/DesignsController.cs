@@ -179,7 +179,7 @@ namespace BOM_API_v2.Controllers
 
         [HttpGet("{designId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<GetDesign> GetSpecificDesign(byte[] designId)
+        public async Task<GetDesign> GetSpecificDesign([FromRoute]byte[] designId)
         {
             Designs? selectedDesign;
             try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
@@ -208,6 +208,20 @@ namespace BOM_API_v2.Controllers
             }
 
             await _actionLogger.LogAction(User, "GET", "Design " + designId);
+            return response;
+        }
+        [HttpGet("tags/{design_tag_id}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<GetTag> GetSpecificTag([FromRoute] Guid design_tag_id)
+        {
+            DesignTags? selectedTag = null;
+            try { selectedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == design_tag_id).FirstAsync(); }
+            catch (Exception e) { return new GetTag(); }
+
+            GetTag response = new GetTag();
+            response.design_tag_name = selectedTag.design_tag_name;
+
+            await _actionLogger.LogAction(User, "GET", "Design tag " + selectedTag.design_tag_id);
             return response;
         }
 

@@ -218,4 +218,8 @@ namespace BillOfMaterialsAPI.Schemas
         public Guid design_tag_id { get; set; }
         public string design_tag_name { get; set; }
     }
+    public class GetTag
+    {
+        public string design_tag_name { get; set;}
+    }
 }
