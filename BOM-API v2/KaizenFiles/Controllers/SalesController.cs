@@ -6,11 +6,14 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using BOM_API_v2.KaizenFiles.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Authorization;
+using JWTAuthentication.Authentication;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class SalesController : ControllerBase
     {
         private readonly string connectionstring;
@@ -23,6 +26,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllSales()
         {
             try
