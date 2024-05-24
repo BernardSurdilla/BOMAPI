@@ -98,6 +98,11 @@ namespace JWTAuthentication.Authentication
         public bool is_email_confirmed { get; set; }
         public DateTime join_date { get; set; }
     }
+    public class PatchUser
+    {
+        public string username { get; set; }
+        public string phone_number { get; set; }
+    }
 }
 
 
@@ -476,6 +481,24 @@ namespace JWTAuthentication.Controllers
 
             _actionLogger.LogAction(User, "POST", "Upload image for " + currentUser.Id);
             return Ok(new { message = "Image uploaded for " + currentUser.Id });
+        }
+
+        [Authorize][HttpPatch("user/update/")]
+        public async Task<IActionResult> UpdateUser(PatchUser input)
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return NotFound(new { message = "User not found" }); }
+
+            currentUser.PhoneNumber = input.phone_number;
+            currentUser.UserName = input.username;
+
+            if (await _inventoryBOMBridge.UpdateUser(currentUser, input) == 1)
+            {
+                await userManager.UpdateAsync(currentUser);
+                return Ok(new { messsage = "User " + currentUser.Id + " updated" });
+            }
+            else { return BadRequest(new { message = "Something unexpected occured in saving the account in the inventory accounts" }); }
+            
         }
     }
 }

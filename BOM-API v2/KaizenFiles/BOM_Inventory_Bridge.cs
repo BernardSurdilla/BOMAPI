@@ -65,10 +65,32 @@ namespace BOM_API_v2.Bridge
 
             return 1;
         }
+        public async Task<int> UpdateUser(APIUsers newUser, PatchUser updateInfo)
+        {
+            Users? selectedInventoryAccount = null;
+            try
+            {
+                selectedInventoryAccount = await _inventoryAccounts.Users.Where(x => x.email == newUser.Email).FirstAsync();
+            }
+            catch(Exception ex)
+            {
+                return 0;
+            }
+
+            selectedInventoryAccount.display_name = updateInfo.username;
+            selectedInventoryAccount.user_name = updateInfo.username;
+            selectedInventoryAccount.contact = updateInfo.phone_number;
+
+            await _inventoryAccounts.Users.AddAsync(selectedInventoryAccount);
+            await _inventoryAccounts.SaveChangesAsync();
+
+            return 1;
+        }
     }
 
     public interface IInventoryBOMBridge
     {
         public Task<int> AddCreatedAccountToInventoryAccountTables(APIUsers newUser, int accessLevel);
+        public Task<int> UpdateUser(APIUsers newUser, PatchUser updateInfo);
     }
 }
