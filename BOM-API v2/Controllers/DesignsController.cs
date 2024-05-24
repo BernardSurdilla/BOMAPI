@@ -206,8 +206,13 @@ namespace BOM_API_v2.Controllers
             foreach(DesignTagsForCake currentTag in tagsForCurrentCake)
             {
                 SubGetDesignTags newTagListEntry = new SubGetDesignTags();
-                newTagListEntry.design_tag_name = currentTag.DesignTags.design_tag_name;
                 newTagListEntry.design_tag_id = currentTag.design_tag_id;
+                if (currentTag.DesignTags != null)
+                {
+                    newTagListEntry.design_tag_name = currentTag.DesignTags.design_tag_name;
+                }
+                else { newTagListEntry.design_tag_name = "?"; }
+
                 currentDesignTags.Add(newTagListEntry);
             }
 
