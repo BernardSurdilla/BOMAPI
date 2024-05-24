@@ -105,8 +105,9 @@ namespace BOM_API_v2.Controllers
                     newResponseEntryTagEntry.design_tag_name = currentTag.DesignTags.design_tag_name;
                     newResponseEntryTagList.Add(newResponseEntryTagEntry);
                 }
-
-                newResponseEntry.display_picture_data = image.picture_data;
+                if (image != null) { newResponseEntry.display_picture_data = image.picture_data; }
+                else { newResponseEntry.display_picture_data = null; }
+                
                 newResponseEntry.design_tags = newResponseEntryTagList;
 
                 response.Add(newResponseEntry);
@@ -246,6 +247,7 @@ namespace BOM_API_v2.Controllers
                 newDesignImage.design_id = newEntry.design_id;
                 newDesignImage.design_picture_id = new Guid();
                 newDesignImage.picture_data = input.display_picture_data;
+                newDesignImage.isActive = true;
             }
 
             _databaseContext.Designs.Add(newEntry);
