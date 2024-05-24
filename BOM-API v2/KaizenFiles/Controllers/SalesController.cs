@@ -6,8 +6,8 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using BOM_API_v2.KaizenFiles.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Authorization;
 using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {

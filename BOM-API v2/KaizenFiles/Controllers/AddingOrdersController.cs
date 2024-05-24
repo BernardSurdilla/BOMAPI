@@ -487,21 +487,21 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpPatch("confirmation")] //added
+        [HttpPatch("confirmation")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderName, [FromQuery] string action)
+        public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderIdHex, [FromQuery] string action)
         {
+            byte[] orderId = null;
+
             try
             {
-                // Check if the order with the given name exists
-                byte[] orderId = await GetOrderIdByOrderName(orderName);
-                if (orderId == null || orderId.Length == 0)
-                {
-                    return NotFound("No order found with the specified name.");
-                }
+
+                // Convert the hexadecimal string to a byte array
+                orderId = FromHexString(orderIdHex);
 
                 // Get the current order status
                 bool isActive = await GetOrderStatus(orderId);
+
 
                 // Update the order status based on the action
                 if (action.Equals("confirm", StringComparison.OrdinalIgnoreCase))
@@ -516,7 +516,7 @@ namespace CRUDFI.Controllers
                     }
                     else
                     {
-                        return BadRequest($"Order with name '{orderName}' is already confirmed.");
+                        return BadRequest($"Order with ID '{BitConverter.ToString(orderId)}' is already confirmed.");
                     }
                 }
                 else if (action.Equals("cancel", StringComparison.OrdinalIgnoreCase))
@@ -529,7 +529,7 @@ namespace CRUDFI.Controllers
                     }
                     else
                     {
-                        return BadRequest($"Order with name '{orderName}' is already canceled.");
+                        return BadRequest($"Order with ID '{BitConverter.ToString(orderId)}' is already canceled.");
                     }
                 }
                 else
@@ -537,77 +537,184 @@ namespace CRUDFI.Controllers
                     return BadRequest("Invalid action. Please choose 'confirm' or 'cancel'.");
                 }
 
-                return Ok($"Order with name '{orderName}' has been successfully {action}ed.");
+                return Ok($"Order with ID '{BitConverter.ToString(orderId)}' has been successfully {action}ed.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request to {action} order with name '{orderName}'.");
-                return StatusCode(500, $"An error occurred while processing the request to {action} order with name '{orderName}'.");
+                _logger.LogError(ex, $"An error occurred while processing the request to {action} order with ID '{BitConverter.ToString(orderId)}'.");
+                return StatusCode(500, $"An error occurred while processing the request to {action} order with ID '{BitConverter.ToString(orderId)}'.");
             }
         }
 
+        private byte[] FromHexString(string hexString)
+        {
+            // Remove the leading "0x" if present
+            if (hexString.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                hexString = hexString.Substring(2);
+            }
 
-        [HttpPatch("orderstatus")] //added
+            // Convert the hexadecimal string to a byte array
+            byte[] bytes = new byte[hexString.Length / 2];
+            for (int i = 0; i < bytes.Length; i++)
+            {
+                bytes[i] = Convert.ToByte(hexString.Substring(i * 2, 2), 16);
+            }
+            return bytes;
+        }
+
+
+        [HttpPatch("orderstatus")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderName, [FromQuery] string action)
+        public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
             try
             {
-                // Check if the order with the given name exists
-                byte[] orderId = await GetOrderIdByOrderName(orderName);
-                if (orderId == null || orderId.Length == 0)
-                {
-                    return NotFound("No order found with the specified name.");
-                }
+                // Convert the orderId from string to byte array
+                byte[] orderIdBytes = FromHexString(orderId);
 
                 // Update the order status based on the action
                 if (action.Equals("send", StringComparison.OrdinalIgnoreCase))
                 {
-                    await UpdateOrderStatus(orderId, true); // Set isActive to true
-                    await UpdateStatus(orderId, "for pick up");
-                    await UpdateLastUpdatedAt(orderId);
+                    await UpdateOrderStatus(orderIdBytes, true); // Set isActive to true
+                    await UpdateStatus(orderIdBytes, "for pick up");
+                    await UpdateLastUpdatedAt(orderIdBytes);
                 }
                 else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Call the stored procedure to process the order
-                    await ExecuteStoredProcedure(orderName, action);
+
+                    await UpdateSalesTable(orderIdBytes);
 
                     // Update the status in the database
-                    await UpdateOrderStatus(orderId, false); // Set isActive to false
-                    await UpdateStatus(orderId, "done");
+                    await UpdateOrderStatus(orderIdBytes, false); // Set isActive to false
+                    await UpdateStatus(orderIdBytes, "done");
 
                     // Update the last_updated_at column
-                    await UpdateLastUpdatedAt(orderId);
+                    await UpdateLastUpdatedAt(orderIdBytes);
                 }
                 else
                 {
                     return BadRequest("Invalid action. Please choose 'send' or 'done'.");
                 }
 
-                return Ok($"Order with name '{orderName}' has been successfully updated to '{action}'.");
+                return Ok($"Order with ID '{orderId}' has been successfully updated to '{action}'.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request to update order status for '{orderName}'.");
-                return StatusCode(500, $"An error occurred while processing the request to update order status for '{orderName}'.");
+                _logger.LogError(ex, $"An error occurred while processing the request to update order status for '{orderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to update order status for '{orderId}'.");
             }
         }
 
-        private async Task ExecuteStoredProcedure(string orderName, string action) //added
+
+        private async Task UpdateSalesTable(byte[] orderIdBytes)
         {
-            // Assuming you have a MySqlConnection object named "connection" defined somewhere in your class
+            // Retrieve order details from the orders table
+            var forSalesDetails = await GetOrderDetails(orderIdBytes);
+
+            // If order details found, update the sales table
+            if (forSalesDetails != null)
+            {
+                var existingTotal = await GetExistingTotal(forSalesDetails.name);
+
+                if (existingTotal.HasValue)
+                {
+                    // If the orderName already exists, update the Total
+                    await UpdateTotalInSalesTable(forSalesDetails.name, existingTotal.Value + forSalesDetails.total);
+                }
+                else
+                {
+                    // If the orderName doesn't exist, insert a new record
+                    await InsertIntoSalesTable(forSalesDetails);
+                }
+            }
+        }
+
+        private async Task<forSales> GetOrderDetails(byte[] orderIdBytes)
+        {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandType = CommandType.StoredProcedure;
-                    command.CommandText = "ProcessOrder"; // Name of your stored procedure
+                    command.CommandText = @"SELECT o.orderName, o.price, o.EmployeeId, o.CreatedAt, o.quantity, 
+                                        u.Contact, u.Email 
+                                        FROM orders o
+                                        JOIN users u ON o.EmployeeId = u.UserId
+                                        WHERE o.OrderId = @orderId";
+                    command.Parameters.AddWithValue("@orderId", orderIdBytes);
 
-                    // Add parameters if needed
-                    command.Parameters.AddWithValue("@p_orderName", orderName);
-                    command.Parameters.AddWithValue("@p_action", action);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (reader.Read())
+                        {
+                            return new forSales
+                            {
+                                name = reader.GetString("orderName"),
+                                cost = reader.GetDouble("price"),
+                                contact = reader.GetInt32("Contact"),
+                                email = reader.GetString("Email"),
+                                date = reader.GetDateTime("CreatedAt"),
+                                total = reader.GetInt32("quantity"),
+
+                            };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        private async Task<int?> GetExistingTotal(string orderName)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "SELECT Total FROM sales WHERE Name = @orderName";
+                    command.Parameters.AddWithValue("@orderName", orderName);
+
+                    var result = await command.ExecuteScalarAsync();
+                    return result != null ? Convert.ToInt32(result) : (int?)null;
+                }
+            }
+        }
+
+        private async Task UpdateTotalInSalesTable(string orderName, int total)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "UPDATE sales SET Total = @total WHERE Name = @orderName";
+                    command.Parameters.AddWithValue("@total", total);
+                    command.Parameters.AddWithValue("@orderName", orderName);
+
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        private async Task InsertIntoSalesTable(forSales forSalesDetails)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "INSERT INTO sales (Name, Cost, Date, Contact, Email, Total) VALUES (@name, @cost, @date, @contact, @email, @total)";
+                    command.Parameters.AddWithValue("@name", forSalesDetails.name);
+                    command.Parameters.AddWithValue("@cost", forSalesDetails.cost);
+                    command.Parameters.AddWithValue("@date", forSalesDetails.date);
+                    command.Parameters.AddWithValue("@contact", forSalesDetails.contact);
+                    command.Parameters.AddWithValue("@email", forSalesDetails.email);
+                    command.Parameters.AddWithValue("@total", forSalesDetails.total);
 
                     await command.ExecuteNonQueryAsync();
                 }
@@ -615,7 +722,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        private async Task UpdateStatus(byte[] orderId, string status) //added
+        private async Task UpdateStatus(byte[] orderId, string status)
         {
             try
             {
@@ -642,18 +749,20 @@ namespace CRUDFI.Controllers
 
 
 
-
         [HttpPatch("assignemployee")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderName, [FromQuery] string employeeUsername)
+        public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderId, [FromQuery] string employeeUsername)
         {
             try
             {
-                // Check if the order with the given name exists
-                byte[] orderId = await GetOrderIdByOrderName(orderName);
-                if (orderId == null || orderId.Length == 0)
+                // Convert the orderId from string to byte array
+                byte[] orderIdBytes = FromHexString(orderId);
+
+                // Check if the order with the given ID exists
+                bool orderExists = await CheckOrderExists(orderIdBytes);
+                if (!orderExists)
                 {
-                    return NotFound("Order does not exist. Please try another name.");
+                    return NotFound("Order does not exist. Please try another ID.");
                 }
 
                 // Check if the employee with the given username exists
@@ -664,14 +773,31 @@ namespace CRUDFI.Controllers
                 }
 
                 // Update the order with the employee ID
-                await UpdateOrderEmployeeId(orderId, employeeId);
+                await UpdateOrderEmployeeId(orderIdBytes, employeeId);
 
-                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order '{orderName}'.");
+                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{orderId}'.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request to assign employee to order '{orderName}'.");
-                return StatusCode(500, $"An error occurred while processing the request to assign employee to order '{orderName}'.");
+                _logger.LogError(ex, $"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
+            }
+        }
+
+        private async Task<bool> CheckOrderExists(byte[] orderIdBytes)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = "SELECT COUNT(*) FROM orders WHERE OrderId = @orderId";
+                    command.Parameters.AddWithValue("@orderId", orderIdBytes);
+
+                    var result = await command.ExecuteScalarAsync();
+                    return Convert.ToInt32(result) > 0;
+                }
             }
         }
 
