@@ -10,6 +10,7 @@ using BillOfMaterialsAPI.Services;
 using Microsoft.IdentityModel.Tokens;
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Web;
 
 
 namespace BOM_API_v2.Controllers
@@ -282,38 +283,40 @@ namespace BOM_API_v2.Controllers
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute]byte[] designId)
         {
-            Designs? foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync();
 
-            if (foundEntry == null) { return NotFound(new { message = "Design with the specified id not found" }); }
-            else
+            Designs? foundEntry = null;
+            try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
+            catch (InvalidOperationException e) { return NotFound(new { message = "Design with the specified id not found" }); }
+            catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
+
+            _databaseContext.Designs.Update(foundEntry);
+            foundEntry.display_name = input.display_name;
+            foundEntry.display_picture_url = input.display_picture_url;
+
+            List<DesignTagsForCake> allDesignTagsForCake = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_id == foundEntry.design_id).ToListAsync();
+            List<Guid> normalizedInputTagIdList = input.design_tag_ids != null ? input.design_tag_ids.Distinct().ToList() : new List<Guid>();
+
+            foreach (Guid currentTagId in normalizedInputTagIdList)
             {
-                _databaseContext.Designs.Update(foundEntry);
-                foundEntry.display_name = input.display_name;
-                foundEntry.display_picture_url = input.display_picture_url;
+                DesignTags referencedTag;
+                try { referencedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == currentTagId).FirstAsync(); }
+                catch (InvalidOperationException e) { return BadRequest(new { message = "The tag with the id " + currentTagId + " does not exist" }); }
+                catch (Exception e) { return StatusCode(500, new { message = e.GetType().ToString() }); }
 
-                List<DesignTagsForCake> allDesignTagsForCake = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_id == foundEntry.design_id).ToListAsync();
-
-                foreach (Guid currentTagId in input.design_tag_ids)
+                if (allDesignTagsForCake.Where(x => x.design_tag_id == currentTagId).IsNullOrEmpty())
                 {
-                    DesignTags referencedTag;
-                    try { referencedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == currentTagId).FirstAsync(); }
-                    catch (InvalidOperationException e) { return BadRequest(new { message = "The tag with the id " + currentTagId + " does not exist" }); }
-                    catch (Exception e) { return StatusCode(500, new { message = e.GetType().ToString() }); }
+                    DesignTagsForCake newTagConnection = new DesignTagsForCake();
+                    newTagConnection.design_tags_for_cake_id = new Guid();
+                    newTagConnection.design_id = designId;
+                    newTagConnection.design_tag_id = currentTagId;
+                    newTagConnection.isActive = true;
 
-                    if (allDesignTagsForCake.Where(x => x.design_tag_id == currentTagId).IsNullOrEmpty())
-                    {
-                        DesignTagsForCake newTagConnection = new DesignTagsForCake();
-                        newTagConnection.design_tags_for_cake_id = new Guid();
-                        newTagConnection.design_id = designId;
-                        newTagConnection.design_tag_id = currentTagId;
-                        newTagConnection.isActive = true;
-
-                        await _databaseContext.DesignTagsForCakes.AddAsync(newTagConnection);
-                    }
+                    await _databaseContext.DesignTagsForCakes.AddAsync(newTagConnection);
                 }
-
-                await _databaseContext.SaveChangesAsync();
             }
+
+            await _databaseContext.SaveChangesAsync();
+            
 
             await _actionLogger.LogAction(User, "PATCH", "Update design " + designId.ToString());
             return Ok(new { message = "Design " + designId.ToString() + " updated" });
@@ -338,15 +341,15 @@ namespace BOM_API_v2.Controllers
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesign([FromRoute] byte[] designId)
         {
-            Designs? foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync();
+            Designs? foundEntry = null;
+            try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
+            catch (InvalidOperationException e) { return NotFound(new { message = "Design with the specified id not found" }); }
+            catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
 
-            if (foundEntry == null) { return NotFound(new { message = "Design with the specified id not found" }); }
-            else
-            {
-                _databaseContext.Designs.Update(foundEntry);
-                foundEntry.isActive = false;
-                await _databaseContext.SaveChangesAsync();
-            }
+            _databaseContext.Designs.Update(foundEntry);
+            foundEntry.isActive = false;
+            await _databaseContext.SaveChangesAsync();
+            
 
             await _actionLogger.LogAction(User, "DELETE", "Delete design " + designId.ToString());
             return Ok(new { message = "Design " + designId.ToString() + " deleted" });
@@ -363,8 +366,32 @@ namespace BOM_API_v2.Controllers
             selectedDesignTag.isActive = false;
 
             await _databaseContext.SaveChangesAsync();
-            _actionLogger.LogAction(User, "DELETE", "Delete design tag " + selectedDesignTag.design_tag_id);
+            await _actionLogger.LogAction(User, "DELETE", "Delete design tag " + selectedDesignTag.design_tag_id);
             return Ok(new { message = "Design " + selectedDesignTag.design_tag_id + " deleted" });
+        }
+        [HttpDelete("{designId}/tags")]
+        public async Task<IActionResult> RemoveDesignTag([FromRoute]byte[] designId, [FromBody] List<Guid> tag_ids)
+        {
+
+            Designs? foundEntry = null;
+            try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
+            catch (InvalidOperationException e) { return NotFound(new { message = "Design with the specified id not found" }); }
+
+            List<DesignTagsForCake> currentTags = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_id == foundEntry.design_id).ToListAsync();
+            List<Guid> normalizedCakeTagIds = tag_ids.Distinct().ToList();
+            foreach (Guid tagId in normalizedCakeTagIds)
+            {
+                DesignTagsForCake? currentReferencedTag = currentTags.Where(x => x.design_tag_id == tagId).FirstOrDefault();
+                if (currentReferencedTag != null)
+                {
+                    _databaseContext.DesignTagsForCakes.Update(currentReferencedTag);
+                    currentReferencedTag.isActive = false;
+                }
+            }
+            await _databaseContext.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "DELETE", "Tags for " + foundEntry.design_id);
+            return Ok(new { message = "Tags removed successfully" });
         }
     }
 }

@@ -429,7 +429,7 @@ namespace API_TEST.Controllers
         }
 
         [HttpGet("tags_used/occurrence/")]
-        public async Task<List<GetTagOccurrence>> GetTagOccurence(string? sortBy, string? sortOrder)
+        public async Task<List<GetTagOccurrence>> GetTagOccurrence(string? sortBy, string? sortOrder)
         {
             List<DesignTags> allTags = await _context.DesignTags.Where(x => x.isActive == true).ToListAsync();
             if (allTags.IsNullOrEmpty()) { return new List<GetTagOccurrence>(); }
@@ -437,6 +437,83 @@ namespace API_TEST.Controllers
 
             List<GetTagOccurrence> response = new List<GetTagOccurrence>();
 
+            foreach (DesignTagsForCake designTagsForCake in allTagsForCake)
+            {
+                DesignTags? selectedTag = allTags.Where(x => x.design_tag_id == designTagsForCake.design_tag_id).FirstOrDefault();
+                if (selectedTag == null) { continue; }
+                GetTagOccurrence? selectedResponseRow = response.Where(x => x.design_tag_id == selectedTag.design_tag_id).FirstOrDefault();
+                if (selectedResponseRow != null) { selectedResponseRow.occurrence_count += 1; }
+                else
+                {
+                    GetTagOccurrence newResponseEntry = new GetTagOccurrence();
+                    newResponseEntry.design_tag_id = selectedTag.design_tag_id;
+                    newResponseEntry.design_tag_name = selectedTag.design_tag_name;
+                    newResponseEntry.occurrence_count = 1;
+                    newResponseEntry.ratio = 0.0;
+                    response.Add(newResponseEntry);
+                }
+            }
+            double totalAmountOfCakeTags = Convert.ToDouble(allTagsForCake.Count());
+            foreach (GetTagOccurrence currentResponseRow in response)
+            {
+                currentResponseRow.ratio = currentResponseRow.occurrence_count / totalAmountOfCakeTags;
+            }
+            //Sorting Algorithm
+            if (sortBy != null)
+            {
+
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "design_tag_name":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.design_tag_name.CompareTo(x.design_tag_name));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.design_tag_name.CompareTo(y.design_tag_name));
+                                break;
+                        }
+                        break;
+                    case "occurrence_count":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.occurrence_count.CompareTo(x.occurrence_count));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.occurrence_count.CompareTo(y.occurrence_count));
+                                break;
+                        }
+                        break;
+                    case "ratio":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.ratio.CompareTo(x.ratio));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.ratio.CompareTo(y.ratio));
+                                break;
+                        }
+                        break;
+                    default:
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                response.Sort((x, y) => y.design_tag_id.CompareTo(x.design_tag_id));
+                                break;
+                            default:
+                                response.Sort((x, y) => x.design_tag_id.CompareTo(y.design_tag_id));
+                                break;
+                        }
+                        break;
+                }
+            }
+
+            await _actionLogger.LogAction(User, "GET", "Tag occurence");
             return response;
         }
         
