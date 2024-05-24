@@ -86,7 +86,7 @@ builder.Services.AddAuthentication(options =>
 //NOTE: Services can also be dependency injected
 //E.G: Using a DBContext in the constructor to get a database context
 
-builder.Services.AddSingleton<IActionLogger, AccountManager>(); //Logging service
+builder.Services.AddScoped<IActionLogger, AccountManager>(); //Logging service
 builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Service
 builder.Services.AddTransient<IInventoryBOMBridge, BOMInventoryBridge>(); //Inventory BOM Bridge Service
 
