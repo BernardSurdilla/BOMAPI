@@ -103,7 +103,11 @@ namespace BOM_API_v2.Controllers
                 {
                     SubGetDesignTags newResponseEntryTagEntry = new SubGetDesignTags();
                     newResponseEntryTagEntry.design_tag_id = currentTag.design_tag_id;
-                    newResponseEntryTagEntry.design_tag_name = currentTag.DesignTags.design_tag_name;
+                    if (currentTag.DesignTags != null)
+                    {
+                        newResponseEntryTagEntry.design_tag_name = currentTag.DesignTags.design_tag_name;
+                    }
+                    else { newResponseEntryTagEntry.design_tag_name = "?"; }
                     newResponseEntryTagList.Add(newResponseEntryTagEntry);
                 }
                 if (image != null) { newResponseEntry.display_picture_data = image.picture_data; }
