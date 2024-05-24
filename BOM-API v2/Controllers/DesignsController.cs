@@ -275,8 +275,8 @@ namespace BOM_API_v2.Controllers
             await _databaseContext.DesignTags.AddAsync(newTags);
             await _databaseContext.SaveChangesAsync();
 
-            _actionLogger.LogAction(User, "POST", "Add new tag " + newTags.design_tag_name.ToString());
-            return Ok();
+            await _actionLogger.LogAction(User, "POST", "Add new tag " + newTags.design_tag_name.ToString());
+            return Ok(new {message = "Tag " + newTags.design_tag_id + " created"});
         }
 
         [HttpPatch("{designId}/")]

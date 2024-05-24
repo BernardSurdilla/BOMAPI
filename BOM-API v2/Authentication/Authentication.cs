@@ -369,7 +369,7 @@ namespace JWTAuthentication.Controllers
 
             response.roles = (List<string>)await userManager.GetRolesAsync(currentUser);
 
-            await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
+            //await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
             return response;
         }
         [Authorize][HttpPost("user/send_confirmation_email/")]
@@ -479,7 +479,7 @@ namespace JWTAuthentication.Controllers
             await _auth.ProfileImages.AddAsync(newImage);
             await _auth.SaveChangesAsync();
 
-            _actionLogger.LogAction(User, "POST", "Upload image for " + currentUser.Id);
+            await _actionLogger.LogAction(User, "POST", "Upload image for " + currentUser.Id);
             return Ok(new { message = "Image uploaded for " + currentUser.Id });
         }
 
@@ -499,6 +499,24 @@ namespace JWTAuthentication.Controllers
             }
             else { return BadRequest(new { message = "Something unexpected occured in saving the account in the inventory accounts" }); }
             
+        }
+        [Authorize][HttpPatch("user/profile_picture")]
+        public async Task<IActionResult> UpdateUserProfileImage([FromBody] byte[] picture_data)
+        {
+            var currentUser = await userManager.GetUserAsync(User);
+            if (currentUser == null) { return BadRequest(new { message = "User not found" }); }
+            ProfileImages? currentUserImage = null;
+            try { currentUserImage = await _auth.ProfileImages.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            catch { return BadRequest(new { message = "User image not found" }); }
+
+            _auth.ProfileImages.Update(currentUserImage);
+
+            currentUserImage.picture_data = picture_data;
+
+            await _auth.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "PATCH", "Update image for " + currentUser.Id);
+            return Ok(new { message = "Image uploaded for " + currentUser.Id });
         }
     }
 }
