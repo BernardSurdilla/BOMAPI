@@ -13,7 +13,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class SalesController : ControllerBase
     {
         private readonly string connectionstring;

@@ -10,7 +10,7 @@ namespace BOM_API_v2.Bridge
     public class BOMInventoryBridge : IInventoryBOMBridge
     {
         private readonly InventoryAccounts _inventoryAccounts;
-        
+
         private readonly UserManager<APIUsers> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
@@ -52,12 +52,13 @@ namespace BOM_API_v2.Bridge
                     newEmployeeEntry.employee_id = Guid.NewGuid().ToByteArray();
                     newEmployeeEntry.user_id = Guid.Parse(newUser.Id).ToByteArray();
                     newEmployeeEntry.employment_date = newUser.JoinDate;
-                    
+
                     await _inventoryAccounts.Employee.AddAsync(newEmployeeEntry);
 
                     break;
                 case 3: // Admin
-
+                    break;
+                case 4: //Manager
                     break;
             }
 
@@ -72,7 +73,7 @@ namespace BOM_API_v2.Bridge
             {
                 selectedInventoryAccount = await _inventoryAccounts.Users.Where(x => x.email == newUser.Email).FirstAsync();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 return 0;
             }

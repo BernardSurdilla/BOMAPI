@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using JWTAuthentication.Authentication;
 using System.Data;
+using System.Globalization;
 
 namespace CRUDFI.Controllers
 {
@@ -26,7 +27,7 @@ namespace CRUDFI.Controllers
 
         [HttpPost]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string customerUsername, [FromQuery] string designName)
+        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string customerUsername, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description)
         {
             try
             {
@@ -54,13 +55,40 @@ namespace CRUDFI.Controllers
                     price = orderDto.Price,
                     quantity = orderDto.Quantity,
                     type = orderDto.Type,
-                    status = orderDto.Status,
                     CreatedAt = DateTime.UtcNow,
-                    isActive = !orderDto.Type.Equals("cart", StringComparison.OrdinalIgnoreCase)
+                    Description = description
                 };
 
+                // Set the status to pending
+                order.status = "Pending";
+
+                // Fetch the count of confirmed orders
+                int confirmedOrderCount = await GetConfirmedOrderCount();
+
+                // Determine the pickup date based on order type and confirmed orders count
+                DateTime pickupDate;
+                if (confirmedOrderCount < 5)
+                {
+                    pickupDate = order.type == "rush" ? DateTime.Today.AddDays(3) : DateTime.Today.AddDays(7);
+                }
+                else
+                {
+                    pickupDate = order.type == "rush" ? DateTime.Today.AddDays(4) : DateTime.Today.AddDays(8);
+                }
+
+                // Parse the pickup time string to get the hour, minute, and AM/PM values
+                DateTime parsedTime = DateTime.ParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture);
+
+                // Combine the pickup date and parsed time into a single DateTime object
+                DateTime pickupDateTime = new DateTime(pickupDate.Year, pickupDate.Month, pickupDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+
+                // Set the combined pickup date and time
+                order.PickupDateTime = pickupDateTime;
+
+                bool isActive = false;
+
                 // Insert the order into the database
-                await InsertOrder(order);
+                await InsertOrder(order, customerId, designId, isActive);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -69,6 +97,23 @@ namespace CRUDFI.Controllers
                 // Log and return an error message if an exception occurs
                 _logger.LogError(ex, "An error occurred while creating the order");
                 return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
+            }
+        }
+
+
+        private async Task<int> GetConfirmedOrderCount()
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT COUNT(*) FROM orders WHERE Status = 'Confirmed'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    object result = await command.ExecuteScalarAsync();
+                    return Convert.ToInt32(result);
+                }
             }
         }
 
@@ -443,6 +488,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("confirmation")] //added
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderName, [FromQuery] string action)
         {
             try
@@ -502,6 +548,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("orderstatus")] //added
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderName, [FromQuery] string action)
         {
             try
@@ -785,25 +832,27 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order)
+        private async Task InsertOrder(Order order, byte[] customerId, byte[] designId, bool isActive)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, OrderName, Price, Quantity, last_updated_by, last_updated_at, Type, IsActive) 
-                       VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @orderName, @price, @quantity, NULL, NULL, @type, @isActive)";
+                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description) 
+            VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@customerId", order.customerId);
-                    command.Parameters.AddWithValue("@designId", order.designId);
-                    command.Parameters.AddWithValue("@orderName", order.orderName);
+                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@designId", designId);
+                    command.Parameters.AddWithValue("@status", order.status);
+                    command.Parameters.AddWithValue("@order_name", order.orderName);
                     command.Parameters.AddWithValue("@price", order.price);
                     command.Parameters.AddWithValue("@quantity", order.quantity);
                     command.Parameters.AddWithValue("@type", order.type);
-                    command.Parameters.AddWithValue("@status", order.status);
-                    command.Parameters.AddWithValue("@isActive", order.isActive);
+                    command.Parameters.AddWithValue("@isActive", isActive);
+                    command.Parameters.AddWithValue("@pickupDateTime", order.PickupDateTime);
+                    command.Parameters.AddWithValue("@Description", order.Description);
 
                     await command.ExecuteNonQueryAsync();
                 }
@@ -813,7 +862,7 @@ namespace CRUDFI.Controllers
         private async Task<List<Order>> GetAllOrdersFromDatabase()
         {
             List<Order> orders = new List<Order>();
-             
+
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();

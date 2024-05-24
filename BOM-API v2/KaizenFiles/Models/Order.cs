@@ -31,6 +31,10 @@ namespace CRUDFI.Models
         public string lastUpdatedBy { get; set; } = ""; //confirmed or not
 
         public DateTime? lastUpdatedAt { get; set; } //when was confirmed or not,, picked up or not
+
+        public DateTime PickupDateTime { get; set; }
+
+        public string Description { get; set; }
     }
     public class OrderDTO
     {
@@ -38,7 +42,6 @@ namespace CRUDFI.Models
         public decimal Price { get; set; }
         public string Type { get; set; } = "";
         public int Quantity { get; set; }
-        public string Status { get; set; } = "";
     }
 
 }
