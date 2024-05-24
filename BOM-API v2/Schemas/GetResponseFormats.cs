@@ -220,6 +220,6 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class GetTag
     {
-        public string design_tag_name { get; set;}
+        public string design_tag_name { get; set; }
     }
 }
