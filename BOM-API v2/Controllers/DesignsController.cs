@@ -306,6 +306,7 @@ namespace BOM_API_v2.Controllers
                         newTagConnection.design_tags_for_cake_id = new Guid();
                         newTagConnection.design_id = designId;
                         newTagConnection.design_tag_id = currentTagId;
+                        newTagConnection.isActive = true;
 
                         await _databaseContext.DesignTagsForCakes.AddAsync(newTagConnection);
                     }

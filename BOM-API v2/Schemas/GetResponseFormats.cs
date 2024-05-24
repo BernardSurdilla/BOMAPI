@@ -151,6 +151,7 @@ namespace BillOfMaterialsAPI.Schemas
 
     }
 
+    //BOM Data analysis
     public class GetUsedItemsByOccurence
     {
         [Required] public string item_id { get; set; }
@@ -179,10 +180,18 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public string item_name { get; set; }
         [Required] public string item_type { get; set; }
 
-        [Required] public int occurence_count { get; set; }
+        [Required] public int occurrence_count { get; set; }
         [Required] public double ratio { get; set; }
     }
+    public class GetTagOccurrence
+    {
+        public Guid design_tag_id { get; set; }
+        public string design_tag_name { get; set; }
+        public double occurrence_count { get; set; }
+        public double ratio { get; set; }
+    }
 
+    //Design Related
     public class GetDesign
     {
         [Required] public byte[] design_id { get; set; }

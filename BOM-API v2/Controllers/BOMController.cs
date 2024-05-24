@@ -33,7 +33,7 @@ namespace API_TEST.Controllers
             _kaizenTables = kaizenTables;
         }
     }
-    
+
 
     [ApiController]
     [Route("BOM/data_analysis")]
@@ -52,7 +52,7 @@ namespace API_TEST.Controllers
         }
 
         //!!!MIGHT HAVE BUGS!!!
-        [HttpGet("item_used/occurence/")]
+        [HttpGet("item_used/occurrence/")]
         public async Task<List<GetUsedItemsByOccurence>> GetMostCommonlyUsedItems(string? sortBy, string? sortOrder)
         {
             List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
@@ -77,7 +77,7 @@ namespace API_TEST.Controllers
 
             //Count the ingredients
             using (var ingItemEnum = ingredientsItems.GetEnumerator())
-            { 
+            {
                 while (ingItemEnum.MoveNext())
                 {
 
@@ -93,7 +93,7 @@ namespace API_TEST.Controllers
                             if (searchResultI == null) { continue; }
 
                             if (searchResultI == null) continue;
-                            currentItemName = searchResultI.item_name; 
+                            currentItemName = searchResultI.item_name;
                             break;
                         case IngredientType.Material:
                             Materials? searchResultM = activeMaterials.Find(x => x.material_id == ingItemEnum.Current.item_id);
@@ -169,7 +169,7 @@ namespace API_TEST.Controllers
                             ratio_of_uses_cake_ingredient = 0.0,
                             ratio_of_uses_material_ingredient = 0.0
                         };
-                        
+
                         response.Add(newEntry);
                         currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
                     }
@@ -184,14 +184,14 @@ namespace API_TEST.Controllers
                 double curRowNumOfUsesCakeIng = currentResponseRow.num_of_uses_cake_ingredient;
                 double curRowNumOfUsesMatIng = currentResponseRow.num_of_uses_material_ingredient;
 
-                currentResponseRow.ratio_of_uses_cake_ingredient = curRowNumOfUsesCakeIng <= 0 ? 0 : curRowNumOfUsesCakeIng /totalNumberOfPastryIngredients;
+                currentResponseRow.ratio_of_uses_cake_ingredient = curRowNumOfUsesCakeIng <= 0 ? 0 : curRowNumOfUsesCakeIng / totalNumberOfPastryIngredients;
                 currentResponseRow.ratio_of_uses_material_ingredient = curRowNumOfUsesMatIng <= 0 ? 0 : curRowNumOfUsesMatIng / totalNumberOfMaterialIngredients;
             }
             //Sorting Algorithm
             if (sortBy != null)
             {
 
-                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC": sortOrder.ToUpper();
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
 
                 switch (sortBy)
                 {
@@ -280,7 +280,7 @@ namespace API_TEST.Controllers
         }
 
         //!!!UNTESTED!!!
-        [HttpGet("item_used/seasonal_occurence")]
+        [HttpGet("item_used/seasonal_occurrence")]
         public async Task<List<GetUsedItemsBySeasonalTrends>> GetIngredientTrendsByMonths(string? sortOrder)
         {
             List<Orders> ordersList = await _kaizenTables.Orders.Where(x => x.is_active == true).ToListAsync();
@@ -336,100 +336,109 @@ namespace API_TEST.Controllers
                         switch (i.ingredient_type)
                         {
                             case IngredientType.InventoryItem:
-                            {
-                                //Add check here if the inventory item exists
-                                //
-                                //
-
-                                //!!!UNTESTED!!!
-                                Item? currentInventoryItem = null;
-                                try { currentInventoryItem = allInventoryItems.Find(x => x.id == Convert.ToInt32(i.item_id)); }
-                                catch { continue; }
-                                if (currentInventoryItem == null) { continue; }
-
-                                ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == i.item_id);
-                                if (currentOccurenceEntry == null)
                                 {
-                                    newResponseEntry.item_list.Add(new ItemOccurence()
-                                    {
-                                        item_id = i.item_id,
-                                        item_name = currentInventoryItem.item_name, //Add code here to find the item name in inventory
-                                        item_type = i.ingredient_type,
-                                        occurence_count = 1
-                                    });
-                                }
-                                else { currentOccurenceEntry.occurence_count += 1; }
+                                    //Add check here if the inventory item exists
+                                    //
+                                    //
 
-                                totalNumberOfIngredientsInInterval += 1;
-                                break;
-                            }
-                            case IngredientType.Material:
-                            {
-                                List<MaterialIngredients> currentMaterialIngredients = materialIngredientsItems.Where(x => x.material_id == i.item_id).ToList();
-
-                                //This block loops thru the retrieved ingredients above
-                                //And adds all sub-ingredients for the "MAT" type entries
-                                int currentIndex = 0;
-                                bool running = true;
-                                while (running)
-                                {
-                                    MaterialIngredients? currentMatIngInLoop = null;
-                                    try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
-                                    catch { running = false; break; }
-
-                                    if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
-                                    {
-                                        List<MaterialIngredients> newEntriesToLoopThru = materialIngredientsItems.FindAll(x => x.material_id == currentMatIngInLoop.item_id);
-                                        currentMaterialIngredients.AddRange(newEntriesToLoopThru);
-                                    }
-                                    currentIndex += 1;
-                                }
-
-                                //Removes all the entries for the material
-                                //As the sub-ingredients for them is already in the list
-                                currentMaterialIngredients.RemoveAll(x => x.ingredient_type == IngredientType.Material);
-
-                                foreach (MaterialIngredients currentMaterialIngredient in currentMaterialIngredients)
-                                {
                                     //!!!UNTESTED!!!
                                     Item? currentInventoryItem = null;
-                                    try { currentInventoryItem = allInventoryItems.Find(x => x.id == Convert.ToInt32(currentMaterialIngredient.item_id)); }
+                                    try { currentInventoryItem = allInventoryItems.Find(x => x.id == Convert.ToInt32(i.item_id)); }
                                     catch { continue; }
+                                    if (currentInventoryItem == null) { continue; }
 
-                                    if (currentInventoryItem == null) continue;
-
-                                    ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == currentMaterialIngredient.item_id);
-
+                                    ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == i.item_id);
                                     if (currentOccurenceEntry == null)
                                     {
                                         newResponseEntry.item_list.Add(new ItemOccurence()
                                         {
-                                            item_id = currentMaterialIngredient.item_id,
+                                            item_id = i.item_id,
                                             item_name = currentInventoryItem.item_name, //Add code here to find the item name in inventory
-                                            item_type = currentMaterialIngredient.ingredient_type,
-                                            occurence_count = 1
+                                            item_type = i.ingredient_type,
+                                            occurrence_count = 1
                                         });
                                     }
-                                    else { currentOccurenceEntry.occurence_count += 1; }
+                                    else { currentOccurenceEntry.occurrence_count += 1; }
+
                                     totalNumberOfIngredientsInInterval += 1;
+                                    break;
                                 }
-                                break;
-                            }
+                            case IngredientType.Material:
+                                {
+                                    List<MaterialIngredients> currentMaterialIngredients = materialIngredientsItems.Where(x => x.material_id == i.item_id).ToList();
+
+                                    //This block loops thru the retrieved ingredients above
+                                    //And adds all sub-ingredients for the "MAT" type entries
+                                    int currentIndex = 0;
+                                    bool running = true;
+                                    while (running)
+                                    {
+                                        MaterialIngredients? currentMatIngInLoop = null;
+                                        try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
+                                        catch { running = false; break; }
+
+                                        if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
+                                        {
+                                            List<MaterialIngredients> newEntriesToLoopThru = materialIngredientsItems.FindAll(x => x.material_id == currentMatIngInLoop.item_id);
+                                            currentMaterialIngredients.AddRange(newEntriesToLoopThru);
+                                        }
+                                        currentIndex += 1;
+                                    }
+
+                                    //Removes all the entries for the material
+                                    //As the sub-ingredients for them is already in the list
+                                    currentMaterialIngredients.RemoveAll(x => x.ingredient_type == IngredientType.Material);
+
+                                    foreach (MaterialIngredients currentMaterialIngredient in currentMaterialIngredients)
+                                    {
+                                        //!!!UNTESTED!!!
+                                        Item? currentInventoryItem = null;
+                                        try { currentInventoryItem = allInventoryItems.Find(x => x.id == Convert.ToInt32(currentMaterialIngredient.item_id)); }
+                                        catch { continue; }
+
+                                        if (currentInventoryItem == null) continue;
+
+                                        ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == currentMaterialIngredient.item_id);
+
+                                        if (currentOccurenceEntry == null)
+                                        {
+                                            newResponseEntry.item_list.Add(new ItemOccurence()
+                                            {
+                                                item_id = currentMaterialIngredient.item_id,
+                                                item_name = currentInventoryItem.item_name, //Add code here to find the item name in inventory
+                                                item_type = currentMaterialIngredient.ingredient_type,
+                                                occurrence_count = 1
+                                            });
+                                        }
+                                        else { currentOccurenceEntry.occurrence_count += 1; }
+                                        totalNumberOfIngredientsInInterval += 1;
+                                    }
+                                    break;
+                                }
                         }
                     }
                 }
                 //Calculate the ratio for the ingredients in the occurence list
                 foreach (ItemOccurence currentItemForRatioCalculation in newResponseEntry.item_list)
                 {
-                    currentItemForRatioCalculation.ratio = currentItemForRatioCalculation.occurence_count / totalNumberOfIngredientsInInterval;
+                    currentItemForRatioCalculation.ratio = currentItemForRatioCalculation.occurrence_count / totalNumberOfIngredientsInInterval;
                 }
             }
-
-
             await _actionLogger.LogAction(User, "GET", "All items by seasonal occurence");
             return response;
         }
 
-    }
+        [HttpGet("tags_used/occurrence/")]
+        public async Task<List<GetTagOccurrence>> GetTagOccurence(string? sortBy, string? sortOrder)
+        {
+            List<DesignTags> allTags = await _context.DesignTags.Where(x => x.isActive == true).ToListAsync();
+            if (allTags.IsNullOrEmpty()) { return new List<GetTagOccurrence>(); }
+            List<DesignTagsForCake> allTagsForCake = await _context.DesignTagsForCakes.Where(x => x.isActive == true).ToListAsync();
 
+            List<GetTagOccurrence> response = new List<GetTagOccurrence>();
+
+            return response;
+        }
+        
+    }
 }
