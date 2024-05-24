@@ -243,6 +243,7 @@ namespace BOM_API_v2.Controllers
             if (input.display_picture_data != null)
             {
                 newDesignImage = new DesignImage();
+                newDesignImage.design_id = newEntry.design_id;
                 newDesignImage.design_picture_id = new Guid();
                 newDesignImage.picture_data = input.display_picture_data;
             }
