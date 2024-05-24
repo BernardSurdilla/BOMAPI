@@ -815,8 +815,8 @@ namespace BillOfMaterialsAPI.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Design restored sucessfully" });
         }
-        [HttpDelete("designs/tags/{design_tag_id}")]
-        public async Task<IActionResult> DeleteDesignTag(Guid design_tag_id)
+        [HttpPatch("designs/tags/{design_tag_id}")]
+        public async Task<IActionResult> RecoverDesignTag(Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;
             try { selectedDesignTag = await _context.DesignTags.Where(x => x.isActive == false && x.design_tag_id == design_tag_id).FirstAsync(); }
