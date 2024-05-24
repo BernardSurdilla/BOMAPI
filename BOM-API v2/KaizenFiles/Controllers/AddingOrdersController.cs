@@ -6,6 +6,7 @@ using System.Data.SqlTypes;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Authorization;
 using JWTAuthentication.Authentication;
+using System.Data;
 
 namespace CRUDFI.Controllers
 {
@@ -24,8 +25,8 @@ namespace CRUDFI.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public async Task<IActionResult> CreateOrder([FromBody] Order order, [FromQuery] string customerUsername, [FromQuery] string designName)
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string customerUsername, [FromQuery] string designName)
         {
             try
             {
@@ -43,14 +44,23 @@ namespace CRUDFI.Controllers
                     return BadRequest("Design not found");
                 }
 
-                // Generate a new Guid for the Order's Id
-                order.Id = Guid.NewGuid();
-
-                // Set isActive based on the type
-                bool isActive = order.type.Equals("cart", StringComparison.OrdinalIgnoreCase) ? false : true;
+                // Map the OrderDTO to an Order entity
+                Order order = new Order
+                {
+                    Id = Guid.NewGuid(), // Generate a new Guid for the Order's Id
+                    customerId = new Guid(customerId), // Assuming customerId can be converted to Guid
+                    designId = designId,
+                    orderName = orderDto.OrderName,
+                    price = orderDto.Price,
+                    quantity = orderDto.Quantity,
+                    type = orderDto.Type,
+                    status = orderDto.Status,
+                    CreatedAt = DateTime.UtcNow,
+                    isActive = !orderDto.Type.Equals("cart", StringComparison.OrdinalIgnoreCase)
+                };
 
                 // Insert the order into the database
-                await InsertOrder(order, customerId, designId, isActive);
+                await InsertOrder(order);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -61,7 +71,6 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
             }
         }
-
 
 
         [HttpGet]
@@ -433,8 +442,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpPatch("confirmation")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [HttpPatch("confirmation")] //added
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderName, [FromQuery] string action)
         {
             try
@@ -456,7 +464,7 @@ namespace CRUDFI.Controllers
                     {
                         // Set isActive to true
                         await UpdateOrderStatus(orderId, true);
-
+                        await UpdateStatus(orderId, "confirmed");
                         // Update the last_updated_at column
                         await UpdateLastUpdatedAt(orderId);
                     }
@@ -471,6 +479,7 @@ namespace CRUDFI.Controllers
                     {
                         // Set isActive to false
                         await UpdateOrderStatus(orderId, false);
+                        await UpdateStatus(orderId, "cancelled");
                     }
                     else
                     {
@@ -488,6 +497,99 @@ namespace CRUDFI.Controllers
             {
                 _logger.LogError(ex, $"An error occurred while processing the request to {action} order with name '{orderName}'.");
                 return StatusCode(500, $"An error occurred while processing the request to {action} order with name '{orderName}'.");
+            }
+        }
+
+
+        [HttpPatch("orderstatus")] //added
+        public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderName, [FromQuery] string action)
+        {
+            try
+            {
+                // Check if the order with the given name exists
+                byte[] orderId = await GetOrderIdByOrderName(orderName);
+                if (orderId == null || orderId.Length == 0)
+                {
+                    return NotFound("No order found with the specified name.");
+                }
+
+                // Update the order status based on the action
+                if (action.Equals("send", StringComparison.OrdinalIgnoreCase))
+                {
+                    await UpdateOrderStatus(orderId, true); // Set isActive to true
+                    await UpdateStatus(orderId, "for pick up");
+                    await UpdateLastUpdatedAt(orderId);
+                }
+                else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Call the stored procedure to process the order
+                    await ExecuteStoredProcedure(orderName, action);
+
+                    // Update the status in the database
+                    await UpdateOrderStatus(orderId, false); // Set isActive to false
+                    await UpdateStatus(orderId, "done");
+
+                    // Update the last_updated_at column
+                    await UpdateLastUpdatedAt(orderId);
+                }
+                else
+                {
+                    return BadRequest("Invalid action. Please choose 'send' or 'done'.");
+                }
+
+                return Ok($"Order with name '{orderName}' has been successfully updated to '{action}'.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while processing the request to update order status for '{orderName}'.");
+                return StatusCode(500, $"An error occurred while processing the request to update order status for '{orderName}'.");
+            }
+        }
+
+        private async Task ExecuteStoredProcedure(string orderName, string action) //added
+        {
+            // Assuming you have a MySqlConnection object named "connection" defined somewhere in your class
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandType = CommandType.StoredProcedure;
+                    command.CommandText = "ProcessOrder"; // Name of your stored procedure
+
+                    // Add parameters if needed
+                    command.Parameters.AddWithValue("@p_orderName", orderName);
+                    command.Parameters.AddWithValue("@p_action", action);
+
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+
+        private async Task UpdateStatus(byte[] orderId, string status) //added
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = "UPDATE orders SET Status = @status WHERE OrderId = @orderId";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@status", status);
+                        command.Parameters.AddWithValue("@orderId", orderId);
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while updating status for order with ID '{orderId}'.");
+                throw;
             }
         }
 
@@ -683,35 +785,35 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order, byte[] customerId, byte[] designId, bool isActive)
+        private async Task InsertOrder(Order order)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive) 
-                       VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), 'Pending', @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive)";
+                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, OrderName, Price, Quantity, last_updated_by, last_updated_at, Type, IsActive) 
+                       VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @orderName, @price, @quantity, NULL, NULL, @type, @isActive)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@customerId", customerId);
-                    command.Parameters.AddWithValue("@designId", designId);
-                    command.Parameters.AddWithValue("@order_name", order.orderName);
+                    command.Parameters.AddWithValue("@customerId", order.customerId);
+                    command.Parameters.AddWithValue("@designId", order.designId);
+                    command.Parameters.AddWithValue("@orderName", order.orderName);
                     command.Parameters.AddWithValue("@price", order.price);
                     command.Parameters.AddWithValue("@quantity", order.quantity);
                     command.Parameters.AddWithValue("@type", order.type);
-                    command.Parameters.AddWithValue("@isActive", isActive);
+                    command.Parameters.AddWithValue("@status", order.status);
+                    command.Parameters.AddWithValue("@isActive", order.isActive);
 
                     await command.ExecuteNonQueryAsync();
                 }
             }
         }
 
-
         private async Task<List<Order>> GetAllOrdersFromDatabase()
         {
             List<Order> orders = new List<Order>();
-
+             
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();

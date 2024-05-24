@@ -1,4 +1,5 @@
-﻿using CRUDFI.Models;
+﻿using BillOfMaterialsAPI.Services;
+using CRUDFI.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -17,8 +18,9 @@ namespace CRUDFI.Controllers
     {
         private readonly string connectionstring;
         private readonly ILogger<AddingIngridientsController> _logger;
+        private readonly IActionLogger dbLogger;
 
-        public AddingIngridientsController(IConfiguration configuration, ILogger<AddingIngridientsController> logger)
+        public AddingIngridientsController(IConfiguration configuration, ILogger<AddingIngridientsController> logger, IActionLogger dbLogger)
         {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
@@ -26,17 +28,35 @@ namespace CRUDFI.Controllers
 
         [HttpPost]
         [Authorize(Roles = UserRoles.Admin)]
-        public IActionResult CreateIngredient([FromBody] Ingri ingredient)
+        public IActionResult CreateIngredient([FromBody] IngriDTO ingredientDto)
         {
             try
             {
-                ingredient.itemName = ingredient.itemName.ToLower();
-                byte[] lastUpdatedBy = FetchUserId(ingredient.username);
+                // Convert itemName to lowercase
+                ingredientDto.itemName = ingredientDto.itemName.ToLower();
+
+                // Fetch the UserId for the given username
+                byte[] lastUpdatedBy = FetchUserId(ingredientDto.username);
+
+                // Create a new Ingri object and map properties from IngriDTO
+                Ingri ingredient = new Ingri
+                {
+                    itemName = ingredientDto.itemName,
+                    quantity = ingredientDto.quantity,
+                    measurements = ingredientDto.measurements,
+                    price = ingredientDto.price,
+                    status = ingredientDto.status,
+                    type = ingredientDto.type,
+                    CreatedAt = DateTime.UtcNow, // Setting CreatedAt to the current date and time
+                    lastUpdatedBy = lastUpdatedBy,
+                    lastUpdatedAt = DateTime.UtcNow // Setting lastUpdatedAt to the current date and time
+                };
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     connection.Open();
 
+                    // Check if the ingredient already exists in the database
                     string sqlCheck = "SELECT COUNT(*) FROM Item WHERE LOWER(item_name) = @item_name";
                     using (var checkCommand = new MySqlCommand(sqlCheck, connection))
                     {
@@ -45,20 +65,22 @@ namespace CRUDFI.Controllers
 
                         if (ingredientCount > 0)
                         {
+                            // Update the existing ingredient
                             string sqlUpdate = "UPDATE Item SET quantity = quantity + @quantity, price = @price, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at WHERE LOWER(item_name) = @item_name";
                             using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                             {
                                 updateCommand.Parameters.AddWithValue("@quantity", ingredient.quantity);
                                 updateCommand.Parameters.AddWithValue("@price", ingredient.price);
                                 updateCommand.Parameters.AddWithValue("@item_name", ingredient.itemName);
-                                updateCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
-                                updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                                updateCommand.Parameters.AddWithValue("@last_updated_by", ingredient.lastUpdatedBy);
+                                updateCommand.Parameters.AddWithValue("@last_updated_at", ingredient.lastUpdatedAt);
 
                                 updateCommand.ExecuteNonQuery();
                             }
                         }
                         else
                         {
+                            // Insert the new ingredient
                             string sqlInsert = "INSERT INTO Item(item_name, quantity, price, status, type, createdAt, last_updated_by, last_updated_at, measurements) VALUES(@item_name, @quantity, @price, @status, @type, @createdAt, @last_updated_by, @last_updated_at, @measurements)";
                             using (var insertCommand = new MySqlCommand(sqlInsert, connection))
                             {
@@ -68,8 +90,8 @@ namespace CRUDFI.Controllers
                                 insertCommand.Parameters.AddWithValue("@status", ingredient.status);
                                 insertCommand.Parameters.AddWithValue("@type", ingredient.type);
                                 insertCommand.Parameters.AddWithValue("@createdAt", ingredient.CreatedAt);
-                                insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
-                                insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                                insertCommand.Parameters.AddWithValue("@last_updated_by", ingredient.lastUpdatedBy);
+                                insertCommand.Parameters.AddWithValue("@last_updated_at", ingredient.lastUpdatedAt);
                                 insertCommand.Parameters.AddWithValue("@measurements", ingredient.measurements);
 
                                 insertCommand.ExecuteNonQuery();
@@ -89,7 +111,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("all")]
+        [HttpGet]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetAllIngredients()
         {
@@ -219,34 +241,54 @@ namespace CRUDFI.Controllers
 
         [HttpPatch("{id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public IActionResult UpdateIngredient(int id, [FromBody] Ingri updatedIngredient, string username)
+        public IActionResult UpdateIngredient(int id, [FromBody] IngriDTP updatedIngredient, string username)
         {
             try
             {
+                // Retrieve the existing ingredient from the database
                 Ingri existingIngredient = GetIngredientFromDatabase(id);
 
                 if (existingIngredient == null)
+                {
                     return NotFound();
+                }
 
+                // Map properties from IngriDTP to Ingri
                 if (!string.IsNullOrEmpty(updatedIngredient.itemName))
+                {
                     existingIngredient.itemName = updatedIngredient.itemName;
+                }
                 if (updatedIngredient.quantity > 0)
                 {
                     existingIngredient.quantity = updatedIngredient.quantity;
                     existingIngredient.isActive = true;
                 }
                 else
+                {
                     existingIngredient.isActive = false;
+                }
                 if (updatedIngredient.price > 0)
+                {
                     existingIngredient.price = updatedIngredient.price;
+                }
                 if (!string.IsNullOrEmpty(updatedIngredient.status))
+                {
                     existingIngredient.status = updatedIngredient.status;
+                }
                 if (!string.IsNullOrEmpty(updatedIngredient.type))
+                {
                     existingIngredient.type = updatedIngredient.type;
+                }
+                if (!string.IsNullOrEmpty(updatedIngredient.measurements))
+                {
+                    existingIngredient.measurements = updatedIngredient.measurements;
+                }
 
+                // Set the last updated fields
                 existingIngredient.lastUpdatedBy = FetchUserId(username);
                 existingIngredient.lastUpdatedAt = DateTime.UtcNow;
 
+                // Update the ingredient in the database
                 UpdateIngredientInDatabase(existingIngredient);
 
                 return Ok();
