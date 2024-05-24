@@ -267,6 +267,7 @@ namespace BOM_API_v2.Controllers
             DesignTags newTags = new DesignTags();
             newTags.design_tag_id = new Guid();
             newTags.design_tag_name = input.design_tag_name;
+            newTags.isActive = true;
 
             await _databaseContext.DesignTags.AddAsync(newTags);
             await _databaseContext.SaveChangesAsync();
