@@ -433,13 +433,13 @@ namespace API_TEST.Controllers
         {
             List<DesignTags> allTags = await _context.DesignTags.Where(x => x.isActive == true).ToListAsync();
             if (allTags.IsNullOrEmpty()) { return new List<GetTagOccurrence>(); }
-            List<DesignTagsForCake> allTagsForCake = await _context.DesignTagsForCakes.Where(x => x.isActive == true).ToListAsync();
+            List<DesignTagsForCakes> allTagsForCake = await _context.DesignTagsForCakes.Where(x => x.isActive == true).ToListAsync();
 
             List<GetTagOccurrence> response = new List<GetTagOccurrence>();
 
-            foreach (DesignTagsForCake designTagsForCake in allTagsForCake)
+            foreach (DesignTagsForCakes DesignTagsForCakes in allTagsForCake)
             {
-                DesignTags? selectedTag = allTags.Where(x => x.design_tag_id == designTagsForCake.design_tag_id).FirstOrDefault();
+                DesignTags? selectedTag = allTags.Where(x => x.design_tag_id == DesignTagsForCakes.design_tag_id).FirstOrDefault();
                 if (selectedTag == null) { continue; }
                 GetTagOccurrence? selectedResponseRow = response.Where(x => x.design_tag_id == selectedTag.design_tag_id).FirstOrDefault();
                 if (selectedResponseRow != null) { selectedResponseRow.occurrence_count += 1; }

@@ -65,5 +65,35 @@ namespace BillOfMaterialsAPI.Helpers
 
             return response;
         }
+        public static bool IsSameQuantityUnit(string x, string y)
+        {
+            Dictionary<string, List<string>> response = new Dictionary<string, List<string>>();
+
+            string[] validQuantities = ["Mass", "Volume", "Count"];
+            foreach (string currentQuantity in validQuantities)
+            {
+                if (currentQuantity.Equals("Count") == false)
+                {
+                    bool doesXExistInCurrentQuantityUnit = false;
+                    bool doesYExistInCurrentQuantityUnit = false;
+
+                    foreach (UnitInfo currentUnit in Quantity.ByName[currentQuantity].UnitInfos)
+                    {
+                        if (currentUnit.Name.Equals(x)) { doesXExistInCurrentQuantityUnit = true; }
+                        if (currentUnit.Name.Equals(y)) { doesYExistInCurrentQuantityUnit = true; }
+                        if (doesXExistInCurrentQuantityUnit == true && doesYExistInCurrentQuantityUnit == true) { break; }
+                    }
+                    if (doesXExistInCurrentQuantityUnit == true && doesYExistInCurrentQuantityUnit == true) { return true; }
+                }
+                else
+                {
+                    string validMeasurement = "Piece";
+                    if (x.Equals(validMeasurement) && y.Equals(validMeasurement)) { return true; }
+                }
+            }
+            return false;
+
+        }
     }
+    
 }

@@ -16,7 +16,7 @@ namespace BillOfMaterialsAPI.Models
 
         public DbSet<Designs> Designs { get; set; }
         public DbSet<DesignTags> DesignTags { get; set; }
-        public DbSet<DesignTagsForCake> DesignTagsForCakes { get; set; }
+        public DbSet<DesignTagsForCakes> DesignTagsForCakes { get; set; }
         public DbSet<DesignImage> DesignImage { get; set; }
     }   
 

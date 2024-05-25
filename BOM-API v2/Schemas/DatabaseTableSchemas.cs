@@ -111,7 +111,7 @@ namespace BillOfMaterialsAPI.Schemas
         public bool isActive { get; set; }
     }
     [PrimaryKey("design_tags_for_cake_id")]
-    public class DesignTagsForCake
+    public class DesignTagsForCakes
     {
         [Key]public Guid design_tags_for_cake_id { get; set; }
         [ForeignKey("Designs")]public byte[] design_id { get; set; }
@@ -165,7 +165,7 @@ namespace BillOfMaterialsAPI.Schemas
         [MaxLength(20)] public string type { get; set; }
         public bool isActive { get; set; }
         [Column("createdAt")] public DateTime created_at { get; set; }
-        [MaxLength(50)] public string? last_updated_by { get; set; }
+        [MaxLength(50)] public byte[]? last_updated_by { get; set; }
         public DateTime last_updated_at { get; set; }
 
         public string measurements { get; set; }
