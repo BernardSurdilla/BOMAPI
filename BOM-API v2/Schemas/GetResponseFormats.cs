@@ -201,17 +201,19 @@ namespace BillOfMaterialsAPI.Schemas
         public string? design_picture_url { get; set; }
         public byte[]? display_picture_data { get; set; }
 
-        public List<SubGetDesignTags>? design_tags { get; set; }
+        public List<string>? design_tags { get; set; }
     }
+    /*
+    public class SubGetDesignTags
+    {
+        //public Guid design_tag_id;
+        public string design_tag_name;
+    }
+    */
     public class SubGetDesignImage
     {
         public Guid design_picture_id { get; set; }
         public byte[] picture_data { get; set; }
-    }
-    public class SubGetDesignTags
-    {
-        public Guid design_tag_id;
-        public string design_tag_name;
     }
     public class GetDesignTag
     {

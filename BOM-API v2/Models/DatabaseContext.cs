@@ -18,6 +18,7 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<DesignTags> DesignTags { get; set; }
         public DbSet<DesignTagsForCakes> DesignTagsForCakes { get; set; }
         public DbSet<DesignImage> DesignImage { get; set; }
+
     }   
 
     public class KaizenTables : DbContext

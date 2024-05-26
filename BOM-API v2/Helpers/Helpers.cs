@@ -92,7 +92,18 @@ namespace BillOfMaterialsAPI.Helpers
                 }
             }
             return false;
+        }
+        public static bool IsUnitValid(string x)
+        {
+            Dictionary<string, List<string>> validUnitList = ValidMeasurementUnits();
 
+            foreach (string quantity in validUnitList.Keys) 
+            {
+                List<string> units = validUnitList[quantity];
+                if (units.Contains(x)) { return true; }
+                else { continue; }
+            }
+            return false;
         }
     }
     

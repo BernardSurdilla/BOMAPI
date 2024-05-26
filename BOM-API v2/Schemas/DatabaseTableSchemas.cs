@@ -114,12 +114,14 @@ namespace BillOfMaterialsAPI.Schemas
     public class DesignTagsForCakes
     {
         [Key]public Guid design_tags_for_cake_id { get; set; }
+
         [ForeignKey("Designs")]public byte[] design_id { get; set; }
         [ForeignKey("DesignTags")]public Guid design_tag_id { get; set; }
+
         public bool isActive { get; set; }
 
-        public DesignTags DesignTags { get; set; }
         public Designs Designs { get; set; }
+        public DesignTags DesignTags { get; set; }
     }
     [PrimaryKey("design_picture_id")]
     public class DesignImage

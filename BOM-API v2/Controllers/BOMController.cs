@@ -61,6 +61,7 @@ namespace API_TEST.Controllers
             //Lists for checking if records referenced by ingredients and material_ingredients are active are active
             List<Materials> activeMaterials = await _context.Materials.Where(x => x.isActive == true).Select(x => new Materials() { material_id = x.material_id, material_name = x.material_name }).ToListAsync();
             List<Item> activeInventoryItems = await _kaizenTables.Item.Where(x => x.isActive == true).ToListAsync();  //Replace with function to get all active inventory items 
+            List<Designs> allDesigns = await _context.Designs.Where(x => x.isActive == true).ToListAsync();
 
             if (ingredientsItems.IsNullOrEmpty() && materialIngredientsItems.IsNullOrEmpty()) { return new List<GetUsedItemsByOccurence>(); }
             if (activeInventoryItems.IsNullOrEmpty()) { return new List<GetUsedItemsByOccurence>(); }
@@ -80,6 +81,9 @@ namespace API_TEST.Controllers
             {
                 while (ingItemEnum.MoveNext())
                 {
+                    Designs? currentParentPastryMaterialReferencedDesign = null;
+                    try { currentParentPastryMaterialReferencedDesign = allDesigns.Where(x => x.design_id.SequenceEqual(ingItemEnum.Current.PastryMaterials.design_id)).First(); }
+                    catch (Exception e) { continue; }
 
                     string currentItemName = "N/A";
                     switch (ingItemEnum.Current.ingredient_type)
@@ -124,7 +128,7 @@ namespace API_TEST.Controllers
                     }
                     totalNumberOfPastryIngredients += 1;
                     currentRecord.num_of_uses_cake_ingredient += 1;
-                    currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " <design_name_goes_here>");
+                    currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " " + currentParentPastryMaterialReferencedDesign.display_name);
                 }
             }
             //Count the material ingredients
