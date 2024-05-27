@@ -1,4 +1,4 @@
-﻿using BillOfMaterialsAPI.Services;
+﻿using BOM_API_v2.Services;
 using CRUDFI.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;

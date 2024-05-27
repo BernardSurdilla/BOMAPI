@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using BillOfMaterialsAPI.Schemas;
+using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 
-namespace BillOfMaterialsAPI.Services
+namespace BOM_API_v2.Services
 {
     public interface IActionLogger
     {
@@ -13,5 +14,12 @@ namespace BillOfMaterialsAPI.Services
     public interface IEmailService
     {
         Task<int> SendEmailConfirmationEmail(string recepientName, [EmailAddress] string recepientEmail, [Url] string confirmEmailLink);
+    }
+
+    //Tightly Connected
+    public interface ICakePriceCalculator
+    {
+        Task<double> CalculateSubMaterialCost(MaterialIngredients data);
+        Task<double> CalculateSubMaterialCost(Ingredients data);
     }
 }

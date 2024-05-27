@@ -89,6 +89,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddScoped<IActionLogger, AccountManager>(); //Logging service
 builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Service
 builder.Services.AddTransient<IInventoryBOMBridge, BOMInventoryBridge>(); //Inventory BOM Bridge Service
+builder.Services.AddTransient<ICakePriceCalculator, CakePriceCalculatorService>();
 
 
 var app = builder.Build();

@@ -5,7 +5,6 @@ using MailKit;
 using MimeKit;
 
 using System.ComponentModel.DataAnnotations;
-using BillOfMaterialsAPI.Services;
 
 namespace BOM_API_v2.Services
 {

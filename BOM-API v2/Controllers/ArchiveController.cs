@@ -1,6 +1,5 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Services;
 using BillOfMaterialsAPI.Helpers;
 
 using JWTAuthentication.Authentication;
@@ -10,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Globalization;
 using System.Net.NetworkInformation;
+using BOM_API_v2.Services;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
