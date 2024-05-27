@@ -303,7 +303,6 @@ namespace BOM_API_v2.Controllers
                 switch (currentMaterialIngredient.ingredient_type)
                 {
                     case IngredientType.InventoryItem:
-                        //!!!UNTESTED!!!
                         //Skip the current material ingredient if it is an inventory item and does not exist in the inventory
                         Item? currentInventoryItemI = null;
                         try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(currentMaterialIngredient.item_id)).FirstAsync(); }

@@ -913,7 +913,6 @@ namespace BOM_API_v2.Controllers
                 {
                     case IngredientType.InventoryItem:
                         {
-                            //!!!UNTESTED!!!
                             Item? currentInventoryItemI = null;
                             try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(currentIngredient.item_id)).FirstAsync(); }
                             catch { continue; }

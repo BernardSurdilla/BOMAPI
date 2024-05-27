@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using JWTAuthentication.Authentication;
 using System.Data;
 using System.Globalization;
+using System.Security.Claims;
 
 namespace CRUDFI.Controllers
 {
@@ -27,12 +28,20 @@ namespace CRUDFI.Controllers
 
         [HttpPost]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string customerUsername, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size)
+        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size)
         {
             try
             {
-                // Get the customer's ID using the provided username
-                byte[] customerId = await GetUserIdByCustomerUsername(customerUsername);
+                // Extract the customerUsername from the token
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the customer's ID using the extracted username
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
                 if (customerId == null || customerId.Length == 0)
                 {
                     return BadRequest("Customer not found");
@@ -101,6 +110,36 @@ namespace CRUDFI.Controllers
             }
         }
 
+        private async Task<byte[]> GetUserIdByAllUsername(string username)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (1, 3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@username", username);
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        // Return the binary value directly
+                        byte[] userIdBytes = (byte[])result;
+
+                        // Debug.WriteLine to display the value of userIdBytes
+                        Debug.WriteLine($"UserId bytes for username '{username}': {BitConverter.ToString(userIdBytes)}");
+
+                        return userIdBytes;
+                    }
+                    else
+                    {
+                        return null; // User not found or type not matching
+                    }
+                }
+            }
+        }
 
 
         private async Task<int> GetConfirmedOrderCount()
@@ -418,7 +457,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bytype/{type}/{username}")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
             try

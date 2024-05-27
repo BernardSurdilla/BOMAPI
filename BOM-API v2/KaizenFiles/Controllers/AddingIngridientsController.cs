@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MySql.Data.MySqlClient;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 
 namespace CRUDFI.Controllers
@@ -32,67 +33,63 @@ namespace CRUDFI.Controllers
         {
             try
             {
-                // Convert itemName to lowercase
-                ingredientDto.itemName = ingredientDto.itemName.ToLower();
+                // Extract the username from the token
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
 
-                // Fetch the UserId for the given username
-                byte[] lastUpdatedBy = FetchUserId(ingredientDto.username);
-
-                // Create a new Ingri object and map properties from IngriDTO
-                Ingri ingredient = new Ingri
+                if (string.IsNullOrEmpty(username))
                 {
-                    itemName = ingredientDto.itemName,
-                    quantity = ingredientDto.quantity,
-                    measurements = ingredientDto.measurements,
-                    price = ingredientDto.price,
-                    status = ingredientDto.status,
-                    type = ingredientDto.type,
-                    CreatedAt = DateTime.UtcNow, // Setting CreatedAt to the current date and time
-                    lastUpdatedBy = lastUpdatedBy,
-                    lastUpdatedAt = DateTime.UtcNow // Setting lastUpdatedAt to the current date and time
-                };
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Fetch the user ID of the user performing the update
+                byte[] lastUpdatedBy = FetchUserId(username);
+
+                if (lastUpdatedBy == null)
+                {
+                    return Unauthorized("User ID not found");
+                }
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     connection.Open();
 
                     // Check if the ingredient already exists in the database
-                    string sqlCheck = "SELECT COUNT(*) FROM Item WHERE LOWER(item_name) = @item_name";
+                    string sqlCheck = "SELECT COUNT(*) FROM Item WHERE item_name = @item_name";
                     using (var checkCommand = new MySqlCommand(sqlCheck, connection))
                     {
-                        checkCommand.Parameters.AddWithValue("@item_name", ingredient.itemName);
+                        checkCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
                         int ingredientCount = Convert.ToInt32(checkCommand.ExecuteScalar());
 
                         if (ingredientCount > 0)
                         {
-                            // Update the existing ingredient
-                            string sqlUpdate = "UPDATE Item SET quantity = quantity + @quantity, price = @price, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at WHERE LOWER(item_name) = @item_name";
+                            // If the ingredient exists, update the existing record
+                            string sqlUpdate = "UPDATE Item SET quantity = quantity + @quantity, price = @price, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at WHERE item_name = @item_name";
                             using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                             {
-                                updateCommand.Parameters.AddWithValue("@quantity", ingredient.quantity);
-                                updateCommand.Parameters.AddWithValue("@price", ingredient.price);
-                                updateCommand.Parameters.AddWithValue("@item_name", ingredient.itemName);
-                                updateCommand.Parameters.AddWithValue("@last_updated_by", ingredient.lastUpdatedBy);
-                                updateCommand.Parameters.AddWithValue("@last_updated_at", ingredient.lastUpdatedAt);
+                                updateCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
+                                updateCommand.Parameters.AddWithValue("@price", ingredientDto.price);
+                                updateCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
+                                updateCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                                updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
 
                                 updateCommand.ExecuteNonQuery();
                             }
                         }
                         else
                         {
-                            // Insert the new ingredient
+                            // If the ingredient does not exist, insert a new record
                             string sqlInsert = "INSERT INTO Item(item_name, quantity, price, status, type, createdAt, last_updated_by, last_updated_at, measurements) VALUES(@item_name, @quantity, @price, @status, @type, @createdAt, @last_updated_by, @last_updated_at, @measurements)";
                             using (var insertCommand = new MySqlCommand(sqlInsert, connection))
                             {
-                                insertCommand.Parameters.AddWithValue("@item_name", ingredient.itemName);
-                                insertCommand.Parameters.AddWithValue("@quantity", ingredient.quantity);
-                                insertCommand.Parameters.AddWithValue("@price", ingredient.price);
-                                insertCommand.Parameters.AddWithValue("@status", ingredient.status);
-                                insertCommand.Parameters.AddWithValue("@type", ingredient.type);
-                                insertCommand.Parameters.AddWithValue("@createdAt", ingredient.CreatedAt);
-                                insertCommand.Parameters.AddWithValue("@last_updated_by", ingredient.lastUpdatedBy);
-                                insertCommand.Parameters.AddWithValue("@last_updated_at", ingredient.lastUpdatedAt);
-                                insertCommand.Parameters.AddWithValue("@measurements", ingredient.measurements);
+                                insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
+                                insertCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
+                                insertCommand.Parameters.AddWithValue("@price", ingredientDto.price);
+                                insertCommand.Parameters.AddWithValue("@status", ingredientDto.status);
+                                insertCommand.Parameters.AddWithValue("@type", ingredientDto.type);
+                                insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow); // Assuming the current date time for createdAt
+                                insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                                insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                                insertCommand.Parameters.AddWithValue("@measurements", ingredientDto.measurements);
 
                                 insertCommand.ExecuteNonQuery();
                             }
@@ -109,6 +106,7 @@ namespace CRUDFI.Controllers
                 return BadRequest(ModelState);
             }
         }
+
 
 
         [HttpGet]
@@ -241,12 +239,22 @@ namespace CRUDFI.Controllers
 
         [HttpPatch("{id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public IActionResult UpdateIngredient(int id, [FromBody] IngriDTP updatedIngredient, string username)
+        public IActionResult UpdateIngredient(int id, [FromBody] IngriDTP updatedIngredient)
         {
+
             try
             {
                 // Retrieve the existing ingredient from the database
                 Ingri existingIngredient = GetIngredientFromDatabase(id);
+
+                // Extract the username from the token
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
 
                 if (existingIngredient == null)
                 {
