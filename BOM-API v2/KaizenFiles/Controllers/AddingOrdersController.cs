@@ -538,6 +538,60 @@ namespace CRUDFI.Controllers
             return validOrderTypes.Contains(type.ToLower());
         }
 
+        [HttpPatch("updatePrice")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> UpdateOrderPrice([FromQuery] string orderIdHex, [FromQuery] decimal newPrice)
+        {
+            try
+            {
+                // Ensure the user is authorized
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Fetch the user ID of the user performing the update
+                byte[] lastUpdatedBy = await GetUserIdByUsername(username);
+                if (lastUpdatedBy == null)
+                {
+                    return Unauthorized("User ID not found");
+                }
+
+                // Convert the hexadecimal orderId to byte array
+                byte[] orderId = FromHexString(orderIdHex);
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // Update the price of the order in the database
+                    string sqlUpdate = "UPDATE orders SET price = @newPrice, last_updated_by = @lastUpdatedBy, last_updated_at = @lastUpdatedAt WHERE OrderId = @orderId";
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@newPrice", newPrice);
+                        updateCommand.Parameters.AddWithValue("@orderId", orderId);
+                        updateCommand.Parameters.AddWithValue("@lastUpdatedBy", lastUpdatedBy);
+                        updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
+
+                        int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound("Order not found");
+                        }
+                    }
+                }
+
+                return Ok("Order price updated successfully");
+            }
+            catch (Exception ex)
+            {
+                // Log and return an error message if an exception occurs
+                _logger.LogError(ex, "An error occurred while updating the order price");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
 
 
         [HttpPatch("confirmation")]
