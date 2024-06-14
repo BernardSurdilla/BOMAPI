@@ -308,6 +308,48 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpDelete]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public IActionResult DeleteIngredient([FromQuery] int id)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    connection.Open();
+
+                    // Check if the ingredient exists
+                    string sqlCheck = "SELECT COUNT(*) FROM Item WHERE id = @id";
+                    using (var checkCommand = new MySqlCommand(sqlCheck, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@id", id);
+                        int ingredientCount = Convert.ToInt32(checkCommand.ExecuteScalar());
+
+                        if (ingredientCount == 0)
+                        {
+                            return NotFound("Ingredient not found");
+                        }
+                    }
+
+                    // Delete the ingredient
+                    string sqlDelete = "DELETE FROM Item WHERE id = @id";
+                    using (var deleteCommand = new MySqlCommand(sqlDelete, connection))
+                    {
+                        deleteCommand.Parameters.AddWithValue("@id", id);
+                        deleteCommand.ExecuteNonQuery();
+                    }
+                }
+
+                return Ok("Ingredient deleted successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while deleting the ingredient");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+
         private byte[] FetchUserId(string username)
         {
             try
