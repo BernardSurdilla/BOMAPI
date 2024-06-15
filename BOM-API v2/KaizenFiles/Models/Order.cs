@@ -18,7 +18,7 @@ namespace CRUDFI.Models
 
         public bool isActive { get; set; }
 
-        public decimal price { get; set; }
+        public double price { get; set; }
 
         public string type { get; set; } = "";
 
@@ -43,7 +43,7 @@ namespace CRUDFI.Models
     public class OrderDTO
     {
         public string OrderName { get; set; } = "";
-        public decimal Price { get; set; }
+        public double Price { get; set; }
         public int Quantity { get; set; }
     }
     public class forSales
