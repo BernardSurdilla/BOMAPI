@@ -49,6 +49,25 @@ namespace CRUDFI.Controllers
                     return Unauthorized("User ID not found");
                 }
 
+                // Determine the status based on quantity
+                string status;
+                if (ingredientDto.quantity < 50)
+                {
+                    status = "critical";
+                }
+                else if (ingredientDto.quantity >= 50)
+                {
+                    status = "mid";
+                }
+                else if (ingredientDto.quantity >= 100)
+                {
+                    status = "good";
+                }
+                else
+                {
+                    status = "normal"; // Default status if none of the conditions are met
+                }
+
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     connection.Open();
@@ -84,7 +103,7 @@ namespace CRUDFI.Controllers
                                 insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
                                 insertCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
                                 insertCommand.Parameters.AddWithValue("@price", ingredientDto.price);
-                                insertCommand.Parameters.AddWithValue("@status", ingredientDto.status);
+                                insertCommand.Parameters.AddWithValue("@status", status); // Use the calculated status
                                 insertCommand.Parameters.AddWithValue("@type", ingredientDto.type);
                                 insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow); // Assuming the current date time for createdAt
                                 insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
@@ -108,19 +127,32 @@ namespace CRUDFI.Controllers
         }
 
 
-
-        [HttpGet]
+        [HttpGet("all")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetAllIngredients()
         {
             try
             {
-                IEnumerable<Ingri> ingredients = GetAllIngredientsFromDatabase();
+                List<Ingri> ingredients = GetAllIngredientsFromDatabase();
 
                 if (ingredients == null || !ingredients.Any())
                     return NotFound();
 
-                return Ok(ingredients);
+                // Map Ingri entities to IngriDTP DTOs
+                var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
+                {
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
+
+                return Ok(ingredientsDto);
             }
             catch (Exception ex)
             {
@@ -128,6 +160,82 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
+        [HttpGet("active")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public IActionResult GetActiveIngredients()
+        {
+            try
+            {
+                List<Ingri> activeIngredients = GetActiveIngredientsFromDatabase();
+
+                if (activeIngredients == null || !activeIngredients.Any())
+                    return NotFound("No active ingredients found");
+
+                // Map Ingri entities to IngriDTP DTOs
+                var ingredientsDto = activeIngredients.Select(ingredient => new IngriDTP
+                {
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
+
+                return Ok(ingredientsDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching active ingredients");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+        private List<Ingri> GetActiveIngredientsFromDatabase()
+        {
+            List<Ingri> activeIngredients = new List<Ingri>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                connection.Open();
+
+                string sql = "SELECT * FROM Item WHERE isActive = @isActive";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@isActive", true);
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            Ingri ingredient = new Ingri
+                            {
+                                Id = Convert.ToInt32(reader["id"]),
+                                itemName = reader["item_name"].ToString(),
+                                quantity = Convert.ToInt32(reader["quantity"]),
+                                price = Convert.ToDecimal(reader["price"]),
+                                status = reader["status"].ToString(),
+                                type = reader["type"].ToString(),
+                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
+                                measurements = reader["measurements"].ToString(),
+                                isActive = Convert.ToBoolean(reader["isActive"])
+                            };
+
+                            activeIngredients.Add(ingredient);
+                        }
+                    }
+                }
+            }
+
+            return activeIngredients;
+        }
+
 
         [HttpGet("{id}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
@@ -183,12 +291,26 @@ namespace CRUDFI.Controllers
         {
             try
             {
-                List<Ingri> ingredient = GetIngredientsFromDatabaseByName(name);
+                List<Ingri> ingredients = GetIngredientsFromDatabaseByName(name);
 
-                if (ingredient == null)
+                if (ingredients == null || !ingredients.Any())
                     return NotFound();
 
-                return Ok(ingredient);
+                // Map Ingri entities to IngriDTP DTOs
+                var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
+                {
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
+
+                return Ok(ingredientsDto);
             }
             catch (Exception ex)
             {
@@ -197,25 +319,41 @@ namespace CRUDFI.Controllers
             }
         }
 
+
         [HttpGet("bystatus/{status}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientsByStatus(string status)
         {
             try
             {
-                List<Ingri> ingredient = GetIngredientsFromDatabaseByStatus(status);
+                List<Ingri> ingredients = GetIngredientsFromDatabaseByStatus(status);
 
-                if (ingredient == null)
+                if (ingredients == null || !ingredients.Any())
                     return NotFound();
 
-                return Ok(ingredient);
+                // Map Ingri entities to IngriDTP DTOs
+                var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
+                {
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
+
+                return Ok(ingredientsDto);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while fetching ingredient by status");
+                _logger.LogError(ex, "An error occurred while fetching ingredients by status");
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
 
         [HttpGet("bytype/{type}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
@@ -225,10 +363,24 @@ namespace CRUDFI.Controllers
             {
                 List<Ingri> ingredients = GetIngredientsFromDatabaseByType(type);
 
-                if (ingredients.Count == 0)
+                if (ingredients == null || !ingredients.Any())
                     return NotFound();
 
-                return Ok(ingredients);
+                // Map Ingri entities to IngriDTP DTOs
+                var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
+                {
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
+
+                return Ok(ingredientsDto);
             }
             catch (Exception ex)
             {
@@ -237,11 +389,11 @@ namespace CRUDFI.Controllers
             }
         }
 
+
         [HttpPatch("{id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public IActionResult UpdateIngredient(int id, [FromBody] IngriDTP updatedIngredient)
+        public IActionResult UpdateIngredient(int id, [FromBody] IngriDTO updatedIngredient)
         {
-
             try
             {
                 // Retrieve the existing ingredient from the database
@@ -255,13 +407,12 @@ namespace CRUDFI.Controllers
                     return Unauthorized("User is not authorized");
                 }
 
-
                 if (existingIngredient == null)
                 {
                     return NotFound();
                 }
 
-                // Map properties from IngriDTP to Ingri
+                // Map properties from IngriDTO to Ingri
                 if (!string.IsNullOrEmpty(updatedIngredient.itemName))
                 {
                     existingIngredient.itemName = updatedIngredient.itemName;
@@ -279,10 +430,6 @@ namespace CRUDFI.Controllers
                 {
                     existingIngredient.price = updatedIngredient.price;
                 }
-                if (!string.IsNullOrEmpty(updatedIngredient.status))
-                {
-                    existingIngredient.status = updatedIngredient.status;
-                }
                 if (!string.IsNullOrEmpty(updatedIngredient.type))
                 {
                     existingIngredient.type = updatedIngredient.type;
@@ -290,6 +437,24 @@ namespace CRUDFI.Controllers
                 if (!string.IsNullOrEmpty(updatedIngredient.measurements))
                 {
                     existingIngredient.measurements = updatedIngredient.measurements;
+                }
+
+                // Set the status based on the quantity
+                if (existingIngredient.quantity < 30)
+                {
+                    existingIngredient.status = "critical";
+                }
+                else if (existingIngredient.quantity == 50)
+                {
+                    existingIngredient.status = "mid";
+                }
+                else if (existingIngredient.quantity > 100)
+                {
+                    existingIngredient.status = "good";
+                }
+                else
+                {
+                    existingIngredient.status = "normal"; // Default status for quantities between 30 and 100
                 }
 
                 // Set the last updated fields
@@ -331,22 +496,110 @@ namespace CRUDFI.Controllers
                         }
                     }
 
-                    // Delete the ingredient
-                    string sqlDelete = "DELETE FROM Item WHERE id = @id";
-                    using (var deleteCommand = new MySqlCommand(sqlDelete, connection))
+                    // Set isActive to false instead of deleting
+                    string sqlUpdate = "UPDATE Item SET isActive = @isActive WHERE id = @id";
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
-                        deleteCommand.Parameters.AddWithValue("@id", id);
-                        deleteCommand.ExecuteNonQuery();
+                        updateCommand.Parameters.AddWithValue("@id", id);
+                        updateCommand.Parameters.AddWithValue("@isActive", false);
+                        updateCommand.ExecuteNonQuery();
                     }
                 }
 
-                return Ok("Ingredient deleted successfully");
+                return Ok("Ingredient status updated to inactive successfully");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while deleting the ingredient");
+                _logger.LogError(ex, "An error occurred while updating the ingredient status");
                 return StatusCode(500, "An error occurred while processing the request");
             }
+        }
+
+        [HttpGet("inactive")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public IActionResult GetInactiveIngredients()
+        {
+            try
+            {
+                List<Ingri> ingredients = GetInactiveIngredientsFromDatabase();
+
+                if (ingredients == null || !ingredients.Any())
+                {
+                    return NotFound("No inactive ingredients found");
+                }
+
+                // Map Ingri entities to IngriDTP DTOs
+                var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
+                {
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
+
+                return Ok(ingredientsDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching inactive ingredients");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+
+        private List<Ingri> GetInactiveIngredientsFromDatabase()
+        {
+            List<Ingri> ingredients = new List<Ingri>();
+
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    connection.Open();
+
+                    string sql = "SELECT * FROM Item WHERE isActive = @isActive";
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@isActive", false);
+
+                        using (var reader = command.ExecuteReader())
+                        {
+                            while (reader.Read())
+                            {
+                                Ingri ingredient = new Ingri
+                                {
+                                    Id = Convert.ToInt32(reader["id"]),
+                                    itemName = reader["item_name"].ToString(),
+                                    quantity = Convert.ToInt32(reader["quantity"]),
+                                    price = Convert.ToDecimal(reader["price"]),
+                                    status = reader["status"].ToString(),
+                                    type = reader["type"].ToString(),
+                                    CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                    lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                    lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
+                                    measurements = reader["measurements"].ToString(),
+                                    isActive = Convert.ToBoolean(reader["isActive"]) // Ensure this matches your database type
+                                };
+
+                                ingredients.Add(ingredient);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log or handle the exception as needed
+                _logger.LogError(ex, "An error occurred while fetching inactive ingredients from the database");
+                throw; // Optionally rethrow the exception or handle it gracefully
+            }
+
+            return ingredients;
         }
 
 
