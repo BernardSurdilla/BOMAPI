@@ -87,32 +87,10 @@ namespace BOM_API_v2.Controllers
 
             foreach (Designs currentDesign in  current_design_records)
             {
-                GetDesign newResponseEntry = new GetDesign();
-
-                newResponseEntry.design_id = currentDesign.design_id;
-                newResponseEntry.display_name = currentDesign.display_name;
-                newResponseEntry.design_picture_url = currentDesign.display_picture_url;
-                newResponseEntry.cake_description = currentDesign.cake_description;
-                newResponseEntry.design_tags = new List<GetDesignTag>();
-
-                List<DesignTagsForCakes> cakeTags = await _databaseContext.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == currentDesign.design_id && x.DesignTags.isActive == true).ToListAsync();
-                DesignImage? image;
-                try { image = await _databaseContext.DesignImage.Where(x => x.isActive == true && x.design_id == currentDesign.design_id).FirstAsync(); }
-                catch { image = null; }
-
-                foreach (DesignTagsForCakes currentTag in cakeTags)
-                {
-                    if (currentTag.DesignTags != null)
-                    {
-                        newResponseEntry.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
-                    }
-                }
-                if (image != null) { newResponseEntry.display_picture_data = image.picture_data; }
-                else { newResponseEntry.display_picture_data = null; };
+                GetDesign newResponseEntry = await CreateGetDesignResponseFromDbRow(currentDesign);
 
                 response.Add(newResponseEntry);
             }
-
 
             await _actionLogger.LogAction(User, "GET", "All Design");
             return response;
@@ -194,6 +172,8 @@ namespace BOM_API_v2.Controllers
             try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
             catch (Exception e) { return new GetDesign(); }
 
+            GetDesign response = await CreateGetDesignResponseFromDbRow(selectedDesign);
+            /*
             List<DesignTagsForCakes> tagsForCurrentCake = await _databaseContext.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id.SequenceEqual(selectedDesign.design_id)).ToListAsync();
 
             DesignImage? currentDesignImage = null;
@@ -220,7 +200,7 @@ namespace BOM_API_v2.Controllers
                     response.design_tags.Add(new GetDesignTag { design_tag_id = referencedTag.design_tag_id, design_tag_name = referencedTag.design_tag_name});
                 }
             }
-
+            */
             await _actionLogger.LogAction(User, "GET", "Design " + decodedId);
             return response;
         }
@@ -236,6 +216,34 @@ namespace BOM_API_v2.Controllers
             response.design_tag_name = selectedTag.design_tag_name;
 
             await _actionLogger.LogAction(User, "GET", "Design tag " + selectedTag.design_tag_id);
+            return response;
+        }
+        
+        private async Task<GetDesign> CreateGetDesignResponseFromDbRow(Designs data)
+        {
+            GetDesign response = new GetDesign();
+
+            response.design_id = data.design_id;
+            response.display_name = data.display_name;
+            response.design_picture_url = data.display_picture_url;
+            response.cake_description = data.cake_description;
+            response.design_tags = new List<GetDesignTag>();
+
+            List<DesignTagsForCakes> cakeTags = await _databaseContext.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == data.design_id && x.DesignTags.isActive == true).ToListAsync();
+            DesignImage? image;
+            try { image = await _databaseContext.DesignImage.Where(x => x.isActive == true && x.design_id == data.design_id).FirstAsync(); }
+            catch { image = null; }
+
+            foreach (DesignTagsForCakes currentTag in cakeTags)
+            {
+                if (currentTag.DesignTags != null)
+                {
+                    response.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
+                }
+            }
+            if (image != null) { response.display_picture_data = image.picture_data; }
+            else { response.display_picture_data = null; };
+
             return response;
         }
 
@@ -306,6 +314,44 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add new tag " + newTags.design_tag_name.ToString());
             return Ok(new {message = "Tag " + newTags.design_tag_id + " created"});
         }
+        [HttpPost("{designId}/tags")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string designId)
+        {
+            Designs? selectedDesign;
+            string decodedId = designId;
+            byte[]? byteArrEncodedId = null;
+
+            try
+            {
+                decodedId = Uri.UnescapeDataString(designId);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
+
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            catch (Exception e) { return NotFound(new {message = "Design id not found"}); }
+
+            if (input == null) { return BadRequest(new { message = "Input is null" }); }
+            if (input.design_tag_ids.IsNullOrEmpty()) { return BadRequest(new { message = "No tag ids in the input body" }); }
+
+            foreach (Guid tagId in input.design_tag_ids)
+            {
+                DesignTags referencedTag;
+                try { referencedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == tagId).FirstAsync(); }
+                catch (InvalidOperationException e) { return BadRequest(new { message = "The tag with the id " + tagId + " does not exist" }); }
+                catch (Exception e) { return StatusCode(500, new { message = e.GetType().ToString() }); }
+
+                DesignTagsForCakes newDesignTag = new DesignTagsForCakes();
+                newDesignTag.isActive = true;
+                newDesignTag.design_tags_for_cake_id = new Guid();
+                newDesignTag.design_id = selectedDesign.design_id;
+                newDesignTag.design_tag_id = referencedTag.design_tag_id;
+                _databaseContext.DesignTagsForCakes.Add(newDesignTag);
+            }
+            await _databaseContext.SaveChangesAsync();
+            return Ok(new {message = "Tags inserted to " + selectedDesign.design_id.ToString()});
+        }
 
         [HttpPatch("{designId}/")]
         [Authorize(Roles = UserRoles.Admin)]
@@ -373,6 +419,7 @@ namespace BOM_API_v2.Controllers
             _actionLogger.LogAction(User, "PATCH", "Update design tag " + selectedDesignTag.design_tag_id);
             return Ok(new { message = "Design " + selectedDesignTag.design_tag_id + " updated" });
         }
+        
 
         [HttpDelete("{designId}/")]
         [Authorize(Roles = UserRoles.Admin)]
