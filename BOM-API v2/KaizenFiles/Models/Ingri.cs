@@ -45,11 +45,8 @@
 
         public decimal price { get; set; }
 
-        public string status { get; set; } = "";
-
         public string type { get; set; } = "";
 
-        public string username { get; set; } = "";
     }
 
     public class IngriDTP
@@ -60,12 +57,16 @@
 
         public string measurements { get; set; } = "";
 
-
         public decimal price { get; set; }
 
         public string status { get; set; } = "";
 
         public string type { get; set; } = "";
 
+        public DateTime CreatedAt { get; set; }
+
+        public byte[]? lastUpdatedBy { get; set; }
+
+        public DateTime lastUpdatedAt { get; set; }
     }
 }
