@@ -28,7 +28,7 @@ namespace CRUDFI.Controllers
 
         [HttpPost]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size)
+        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string type)
         {
             try
             {
@@ -61,7 +61,7 @@ namespace CRUDFI.Controllers
                     orderName = orderDto.OrderName,
                     price = orderDto.Price,
                     quantity = orderDto.Quantity,
-                    // Assign other properties from orderDto as needed
+                    type = type,
                     size = size,
                     flavor = flavor,
                     isActive = false
@@ -215,7 +215,7 @@ namespace CRUDFI.Controllers
                                     orderName = reader.GetString(reader.GetOrdinal("orderName")),
                                     customerId = reader.GetGuid(reader.GetOrdinal("customerId")),
                                     designId = (byte[])reader["DesignId"],
-                                    price = reader.GetDecimal(reader.GetOrdinal("price")),
+                                    price = reader.GetDouble(reader.GetOrdinal("price")),
                                     type = reader.GetString(reader.GetOrdinal("type")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     status = reader.GetString(reader.GetOrdinal("Status")),
@@ -337,7 +337,7 @@ namespace CRUDFI.Controllers
                                 employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId")) ? (Guid?)null : reader.GetGuid(reader.GetOrdinal("EmployeeId")),
                                 orderName = reader.GetString(reader.GetOrdinal("orderName")),
                                 isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                price = reader.GetDecimal(reader.GetOrdinal("price")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
                                 type = reader.GetString(reader.GetOrdinal("type")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 status = reader.GetString(reader.GetOrdinal("Status")),
@@ -394,7 +394,7 @@ namespace CRUDFI.Controllers
                                     Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
                                     customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
                                     orderName = reader.GetString(reader.GetOrdinal("orderName")),
-                                    price = reader.GetDecimal(reader.GetOrdinal("price")),
+                                    price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     status = reader.GetString(reader.GetOrdinal("Status")),
                                     CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
@@ -499,7 +499,7 @@ namespace CRUDFI.Controllers
                                     Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
                                     customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
                                     orderName = reader.GetString(reader.GetOrdinal("orderName")),
-                                    price = reader.GetDecimal(reader.GetOrdinal("price")),
+                                    price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     status = reader.GetString(reader.GetOrdinal("Status")),
                                     CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
@@ -536,6 +536,136 @@ namespace CRUDFI.Controllers
 
             // Check if the provided type exists in the valid order types list
             return validOrderTypes.Contains(type.ToLower());
+        }
+
+        [HttpGet("inactive")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)] // Adjust authorization as needed
+        public async Task<IActionResult> GetInactiveOrders()
+        {
+            try
+            {
+                List<Order> orders = await GetInactiveOrdersFromDatabase();
+
+                if (orders == null || orders.Count == 0)
+                    return NotFound("No inactive orders found");
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching inactive orders");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+        private async Task<List<Order>> GetInactiveOrdersFromDatabase()
+        {
+            List<Order> orders = new List<Order>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT * FROM orders WHERE isActive = @isActive";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@isActive", false);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            orders.Add(new Order
+                            {
+                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
+                                customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
+                                employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId")) ? Guid.Empty : reader.GetGuid(reader.GetOrdinal("EmployeeId")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                status = reader.GetString(reader.GetOrdinal("Status")),
+                                designId = reader["DesignId"] as byte[],
+                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
+                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
+                                isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                            });
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
+        [HttpGet("active")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)] // Adjust authorization as needed
+        public async Task<IActionResult> GetActiveOrdersFromDatabase()
+        {
+            try
+            {
+                List<Order> orders = await GetOnlyActiveOrdersFromDatabase();
+
+                if (orders == null || orders.Count == 0)
+                    return NotFound("No active orders found");
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching inactive orders");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+        private async Task<List<Order>> GetOnlyActiveOrdersFromDatabase()
+        {
+            List<Order> orders = new List<Order>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT * FROM orders WHERE isActive = @isActive";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@isActive", true);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            orders.Add(new Order
+                            {
+                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
+                                customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
+                                employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId")) ? Guid.Empty : reader.GetGuid(reader.GetOrdinal("EmployeeId")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                status = reader.GetString(reader.GetOrdinal("Status")),
+                                designId = reader["DesignId"] as byte[],
+                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
+                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
+                                isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                            });
+                        }
+                    }
+                }
+            }
+
+            return orders;
         }
 
         [HttpPatch("updatePrice")]
@@ -1128,7 +1258,7 @@ namespace CRUDFI.Controllers
                                 status = reader.GetString(reader.GetOrdinal("Status")),
                                 designId = reader["DesignId"] as byte[],
                                 orderName = reader.GetString(reader.GetOrdinal("orderName")),
-                                price = reader.GetDecimal(reader.GetOrdinal("price")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
@@ -1136,7 +1266,8 @@ namespace CRUDFI.Controllers
                                 isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
                                 Description = reader.GetString(reader.GetOrdinal("Description")),
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                size = reader.GetString(reader.GetOrdinal("Size"))
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
                             });
                         }
                     }
