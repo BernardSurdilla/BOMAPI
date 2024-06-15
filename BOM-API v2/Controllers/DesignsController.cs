@@ -93,7 +93,7 @@ namespace BOM_API_v2.Controllers
                 newResponseEntry.display_name = currentDesign.display_name;
                 newResponseEntry.design_picture_url = currentDesign.display_picture_url;
                 newResponseEntry.cake_description = currentDesign.cake_description;
-                newResponseEntry.design_tags = new List<string>();
+                newResponseEntry.design_tags = new List<GetDesignTag>();
 
                 List<DesignTagsForCakes> cakeTags = await _databaseContext.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == currentDesign.design_id && x.DesignTags.isActive == true).ToListAsync();
                 DesignImage? image;
@@ -104,7 +104,7 @@ namespace BOM_API_v2.Controllers
                 {
                     if (currentTag.DesignTags != null)
                     {
-                        newResponseEntry.design_tags.Add(currentTag.DesignTags.design_tag_name);
+                        newResponseEntry.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
                     }
                 }
                 if (image != null) { newResponseEntry.display_picture_data = image.picture_data; }
@@ -204,7 +204,7 @@ namespace BOM_API_v2.Controllers
             response.design_id = selectedDesign.design_id;
             response.display_name = selectedDesign.display_name;
             response.cake_description = selectedDesign.cake_description;
-            response.design_tags = new List<string>();
+            response.design_tags = new List<GetDesignTag>();
 
             if (currentDesignImage != null) { response.display_picture_data = currentDesignImage.picture_data; }
             else { response.display_picture_data = null; }
@@ -217,7 +217,7 @@ namespace BOM_API_v2.Controllers
                 
                 if (referencedTag != null)
                 {
-                    response.design_tags.Add(referencedTag.design_tag_name);
+                    response.design_tags.Add(new GetDesignTag { design_tag_id = referencedTag.design_tag_id, design_tag_name = referencedTag.design_tag_name});
                 }
             }
 

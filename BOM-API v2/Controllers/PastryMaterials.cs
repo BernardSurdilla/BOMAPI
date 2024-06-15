@@ -774,7 +774,7 @@ namespace BOM_API_v2.Controllers
                 if (inventoryItemQuantityUnit.Equals("Count")) { referencedInventoryItem.quantity = referencedInventoryItem.quantity - Convert.ToInt32(currentInventorySubtractorInfo.Amount); }
                 else
                 {
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - Convert.ToInt32(UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements));
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
                 }
 
                 _kaizenTables.Item.Update(referencedInventoryItem);
