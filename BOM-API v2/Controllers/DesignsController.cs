@@ -12,6 +12,8 @@ using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using System.Diagnostics;
 using BOM_API_v2.Services;
+using System.Linq;
+using System.Text;
 
 
 namespace BOM_API_v2.Controllers
@@ -217,6 +219,64 @@ namespace BOM_API_v2.Controllers
 
             await _actionLogger.LogAction(User, "GET", "Design tag " + selectedTag.design_tag_id);
             return response;
+        }
+        [HttpGet("with_tags/{*tags}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<List<GetDesign>> GetDesignsWithTag([FromRoute]string tags )
+        {
+            List<GetDesign> response = new List<GetDesign>();
+            string decodedIds = tags;
+
+            try
+            {
+                decodedIds = Uri.UnescapeDataString(decodedIds);
+            }
+            catch(Exception e) { return(response); }
+
+            string[] design_ids = decodedIds.Split("/");
+
+            List<List<string>> designIdWithTags = new List<List<string>>();
+            foreach (string design_id in design_ids)
+            {
+                DesignTags? currentTag;
+                try { currentTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id.ToString() == design_id).FirstAsync(); }
+                catch (Exception e) { return new List<GetDesign>(); }
+
+                List<DesignTagsForCakes> tagsForCakes = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_tag_id == currentTag.design_tag_id).ToListAsync();
+                List<string> designIdsWithCurrentTag = new List<string>();
+                foreach (DesignTagsForCakes designTagsForCakes in tagsForCakes)
+                {
+                    designIdsWithCurrentTag.Add(Convert.ToBase64String(designTagsForCakes.design_id));
+                }
+                designIdWithTags.Add(designIdsWithCurrentTag);
+            }
+
+            List<string>? cakeIdList = null;
+            foreach (List<string> currentIdList in designIdWithTags)
+            {
+                if (cakeIdList == null)
+                {
+                    cakeIdList = currentIdList;
+                }
+                else
+                {
+                    cakeIdList = cakeIdList.Intersect(currentIdList).ToList();
+                }
+            }
+
+            foreach (string currentCakeId in cakeIdList)
+            {
+                Designs? selectedDesign = null;
+                byte[] encodedId = Convert.FromBase64String(currentCakeId);
+                try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(encodedId)).FirstAsync(); }
+                catch (Exception e) { continue; }
+
+                response.Add(await CreateGetDesignResponseFromDbRow(selectedDesign));
+            }
+
+            await _actionLogger.LogAction(User, "GET", "All Design with specific tags ");
+            return response;
+
         }
         
         private async Task<GetDesign> CreateGetDesignResponseFromDbRow(Designs data)
