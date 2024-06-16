@@ -110,6 +110,100 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpPost("cart")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)] 
+        public async Task<IActionResult> CreateCartOrder([FromQuery] string orderName,[FromQuery] double price,[FromQuery] int quantity,[FromQuery] string designName,[FromQuery] string description,[FromQuery] string flavor,[FromQuery] string size)
+        {
+            try
+            {
+                // Extract the customerUsername from the token
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the customer's ID using the extracted username
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                // Get the design's ID using the provided design name
+                byte[] designId = await GetDesignIdByDesignName(designName);
+                if (designId == null || designId.Length == 0)
+                {
+                    return BadRequest("Design not found");
+                }
+
+                // Generate a new Guid for the Order's Id
+                var order = new Order
+                {
+                    Id = Guid.NewGuid(),
+                    orderName = orderName,
+                    price = price,
+                    quantity = quantity,
+                    type = "cart", // Automatically set the type to "cart"
+                    size = size,
+                    flavor = flavor,
+                    isActive = false
+                };
+
+                // Set isActive to false for all orders created
+
+                // Set the status to pending
+                order.status = "Pending";
+
+                // Set the pickup date and time to null
+                order.PickupDateTime = null;
+
+                order.Description = description;
+
+                // Insert the order into the database
+                await InsertCart(order, customerId, designId, flavor, size);
+
+                return Ok(); // Return 200 OK if the order is successfully created
+            }
+            catch (Exception ex)
+            {
+                // Log and return an error message if an exception occurs
+                _logger.LogError(ex, "An error occurred while creating the order");
+                return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
+            }
+        }
+
+        private async Task InsertCart(Order order, byte[] customerId, byte[] designId, string flavor, string size)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size) 
+               VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@designId", designId);
+                    command.Parameters.AddWithValue("@status", order.status);
+                    command.Parameters.AddWithValue("@order_name", order.orderName);
+                    command.Parameters.AddWithValue("@price", order.price);
+                    command.Parameters.AddWithValue("@quantity", order.quantity);
+                    command.Parameters.AddWithValue("@type", order.type);
+                    command.Parameters.AddWithValue("@isActive", order.isActive);
+                    command.Parameters.AddWithValue("@pickupDateTime", DBNull.Value); // Set to null
+                    command.Parameters.AddWithValue("@Description", order.Description);
+                    command.Parameters.AddWithValue("@Flavor", flavor);
+                    command.Parameters.AddWithValue("@Size", size);
+
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+
         private async Task<byte[]> GetUserIdByAllUsername(string username)
         {
             using (var connection = new MySqlConnection(connectionstring))
@@ -842,6 +936,91 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred while processing the request to update order status for '{orderId}'.");
             }
         }
+
+        [HttpPatch("updateorder")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> PatchOrderTypeAndPickupDate(
+     [FromQuery] string orderId,
+     [FromQuery] string type,
+     [FromQuery] string pickupTime)
+        {
+            try
+            {
+                // Convert the orderId from string to byte array
+                byte[] orderIdBytes = FromHexString(orderId);
+
+                // Validate type
+                if (!type.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
+                    !type.Equals("rush", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
+                }
+
+                // Parse the pickup time string to DateTime
+                if (!DateTime.TryParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
+                {
+                    return BadRequest("Invalid pickup time format.");
+                }
+
+                // Fetch the count of confirmed orders
+                int confirmedOrderCount = await GetConfirmedOrderCount();
+
+                // Determine the pickup date based on order type and confirmed orders count
+                DateTime pickupDate;
+                if (confirmedOrderCount < 5)
+                {
+                    pickupDate = type == "rush" ? DateTime.Today.AddDays(3) : DateTime.Today.AddDays(7);
+                }
+                else
+                {
+                    pickupDate = type == "rush" ? DateTime.Today.AddDays(4) : DateTime.Today.AddDays(8);
+                }
+
+                // Combine the pickup date and parsed time into a single DateTime object
+                DateTime pickupDateTime = new DateTime(pickupDate.Year, pickupDate.Month, pickupDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+
+                // Update the type and pickup date in the database
+                await UpdateOrderTypeAndPickupDate(orderIdBytes, type, pickupDateTime);
+
+                return Ok($"Order with ID '{orderId}' has been successfully updated with type '{type}' and pickup date '{pickupDateTime.ToString("yyyy-MM-dd HH:mm")}'.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while processing the request to update order with ID '{orderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to update order with ID '{orderId}'.");
+            }
+        }
+
+        private async Task UpdateOrderTypeAndPickupDate(byte[] orderId, string type, DateTime pickupDateTime)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"UPDATE orders 
+                           SET type = @type,
+                               PickupDateTime = @pickupDateTime
+                           WHERE OrderId = @orderId";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@type", type);
+                        command.Parameters.AddWithValue("@pickupDateTime", pickupDateTime);
+                        command.Parameters.AddWithValue("@orderId", orderId);
+
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while updating type and pickup date for order with ID '{BitConverter.ToString(orderId)}'.");
+                throw;
+            }
+        }
+
 
 
         private async Task UpdateSalesTable(byte[] orderIdBytes)
