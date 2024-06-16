@@ -109,7 +109,7 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class GetPastryMaterial
     {
-        [Required][MaxLength(16)] public byte[] design_id;
+        [Required] public string design_id { get; set; }
         [Required][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public DateTime date_added { get; set; }
@@ -123,7 +123,7 @@ namespace BillOfMaterialsAPI.Schemas
         public GetPastryMaterial() { }
         public GetPastryMaterial(PastryMaterials pastryMaterials, List<GetPastryMaterialIngredients> ingredients)
         {
-            this.design_id = pastryMaterials.design_id;
+            this.design_id = Convert.ToBase64String(pastryMaterials.design_id);
             this.pastry_material_id = pastryMaterials.pastry_material_id;
             this.date_added = pastryMaterials.date_added;
             this.last_modified_date = pastryMaterials.last_modified_date;
