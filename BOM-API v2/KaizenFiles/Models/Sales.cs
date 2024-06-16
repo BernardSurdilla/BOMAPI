@@ -2,6 +2,7 @@
 {
     public class Sales
     {
+        public int Id { get; set; }
         public string Name { get; set; } // order name
         public int Number { get; set; } // contact number
         public string Email { get; set; }
