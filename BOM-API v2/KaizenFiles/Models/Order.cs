@@ -32,7 +32,7 @@ namespace CRUDFI.Models
 
         public DateTime? lastUpdatedAt { get; set; } //when was confirmed or not,, picked up or not
 
-        public DateTime PickupDateTime { get; set; }
+        public DateTime? PickupDateTime { get; set; }
 
         public string Description { get; set; }
 
