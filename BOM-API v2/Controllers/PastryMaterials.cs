@@ -669,6 +669,8 @@ namespace BOM_API_v2.Controllers
         {
             GetPastryMaterial response = new GetPastryMaterial();
             response.design_id = Convert.ToBase64String(data.design_id);
+            try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.design_name = selectedDesign.display_name; }
+            catch (Exception e) { response.design_name = "N/A"; }
             response.pastry_material_id = data.pastry_material_id;
             response.date_added = data.date_added;
             response.last_modified_date = data.last_modified_date;
