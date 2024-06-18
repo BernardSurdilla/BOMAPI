@@ -48,6 +48,7 @@ namespace CRUDFI.Models
     }
     public class forSales
     {
+        public Guid saleId { get; set; }
         public string name { get; set; }
         public string email { get; set; }
         public double cost { get; set; }

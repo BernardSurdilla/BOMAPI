@@ -36,7 +36,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT Name, Contact, Email, Cost, Total, Date FROM sales";
+                    string sql = "SELECT Id, Name, Contact, Email, Cost, Total, Date FROM sales";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -46,12 +46,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 Sales sale = new Sales
                                 {
-                                    Name = reader["Name"].ToString(),
-                                    Number = Convert.ToInt32(reader["Contact"]),
-                                    Email = reader["Email"].ToString(),
-                                    Cost = Convert.ToDouble(reader["Cost"]),
-                                    Total = Convert.ToInt32(reader["Total"]),
-                                    Date = Convert.ToDateTime(reader["Date"])
+                                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    Name = reader.GetString(reader.GetOrdinal("Name")),
+                                    Number = reader.GetInt32(reader.GetOrdinal("Contact")),
+                                    Email = reader.GetString(reader.GetOrdinal("Email")),
+                                    Cost = reader.GetDouble(reader.GetOrdinal("Cost")),
+                                    Total = reader.GetInt32(reader.GetOrdinal("Total")),
+                                    Date = reader.GetDateTime(reader.GetOrdinal("Date"))
                                 };
                                 salesList.Add(sale);
                             }
