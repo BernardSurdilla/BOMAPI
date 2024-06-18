@@ -28,7 +28,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public IActionResult CreateIngredient([FromBody] IngriDTO ingredientDto)
         {
             try
@@ -392,7 +392,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("{id}")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public IActionResult UpdateIngredient(int id, [FromBody] IngriDTO updatedIngredient)
         {
             try

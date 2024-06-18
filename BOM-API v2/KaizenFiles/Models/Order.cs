@@ -10,6 +10,10 @@ namespace CRUDFI.Models
 
         public Guid customerId { get; set; }
 
+        public string customerName { get; set; } = string.Empty;
+
+        public string employeeName { get; set; } = string.Empty;
+
         public byte[]? designId { get; set; } = null;
 
         public Guid? employeeId { get; set; }
