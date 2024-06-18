@@ -840,6 +840,85 @@ namespace CRUDFI.Controllers
             return orders;
         }
 
+        [HttpGet("cart")]
+        [Authorize(Roles = UserRoles.Customer)]
+        public async Task<IActionResult> GetCartOrdersForUser()
+        {
+            try
+            {
+                // Extract the customerUsername from the token
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Retrieve the orders of type 'cart' for the logged-in user
+                List<Order> cartOrders = await GetCartOrdersFromDatabase(customerUsername);
+
+                if (cartOrders.Count == 0)
+                {
+                    return NotFound("No cart orders found for the user.");
+                }
+
+                return Ok(cartOrders);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving cart orders for user");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<List<Order>> GetCartOrdersFromDatabase(string customerUsername)
+        {
+            List<Order> orders = new List<Order>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT * FROM orders WHERE type = 'cart' AND customerId = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            Guid employeeId = Guid.Empty; // Default value for employeeId
+
+                            if (!reader.IsDBNull(reader.GetOrdinal("EmployeeId")))
+                            {
+                                // If the EmployeeId column is not null, get its value
+                                employeeId = reader.GetGuid(reader.GetOrdinal("EmployeeId"));
+                            }
+
+                            orders.Add(new Order
+                            {
+                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                designId = reader["DesignId"] as byte[],
+                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                            });
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
+
         [HttpPatch("updatePrice")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderPrice([FromQuery] string orderIdHex, [FromQuery] decimal newPrice)
