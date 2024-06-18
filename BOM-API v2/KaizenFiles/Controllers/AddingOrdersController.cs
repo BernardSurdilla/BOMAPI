@@ -47,6 +47,9 @@ namespace CRUDFI.Controllers
                     return BadRequest("Customer not found");
                 }
 
+                // Get the customer's name
+                string customerName = await GetCustomerNameById(customerId);
+
                 // Get the design's ID using the provided design name
                 byte[] designId = await GetDesignIdByDesignName(designName);
                 if (designId == null || designId.Length == 0)
@@ -64,7 +67,8 @@ namespace CRUDFI.Controllers
                     type = type,
                     size = size,
                     flavor = flavor,
-                    isActive = false
+                    isActive = false,
+                    customerName = customerName // Set the customerName
                 };
 
                 // Set isActive to false for all orders created
@@ -110,9 +114,26 @@ namespace CRUDFI.Controllers
             }
         }
 
+        private async Task<string> GetCustomerNameById(byte[] customerId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT CustomerName FROM users WHERE UserId = @userId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@userId", customerId);
+
+                    return (string)await command.ExecuteScalarAsync();
+                }
+            }
+        }
+
         [HttpPost("cart")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)] 
-        public async Task<IActionResult> CreateCartOrder([FromQuery] string orderName,[FromQuery] double price,[FromQuery] int quantity,[FromQuery] string designName,[FromQuery] string description,[FromQuery] string flavor,[FromQuery] string size)
+        [Authorize(Roles = UserRoles.Customer)]
+        public async Task<IActionResult> CreateCartOrder([FromQuery] string orderName, [FromQuery] double price, [FromQuery] int quantity, [FromQuery] string designName, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size)
         {
             try
             {
@@ -151,8 +172,6 @@ namespace CRUDFI.Controllers
                     isActive = false
                 };
 
-                // Set isActive to false for all orders created
-
                 // Set the status to pending
                 order.status = "Pending";
 
@@ -162,7 +181,7 @@ namespace CRUDFI.Controllers
                 order.Description = description;
 
                 // Insert the order into the database
-                await InsertCart(order, customerId, designId, flavor, size);
+                await InsertCart(order, customerId, designId, customerUsername, flavor, size);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -174,14 +193,16 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task InsertCart(Order order, byte[] customerId, byte[] designId, string flavor, string size)
+        private async Task InsertCart(Order order, byte[] customerId, byte[] designId, string customerName, string flavor, string size)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size) 
-               VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size)";
+                string sql = @"INSERT INTO orders 
+            (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName) 
+            VALUES 
+            (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @customerName)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -197,11 +218,13 @@ namespace CRUDFI.Controllers
                     command.Parameters.AddWithValue("@Description", order.Description);
                     command.Parameters.AddWithValue("@Flavor", flavor);
                     command.Parameters.AddWithValue("@Size", size);
+                    command.Parameters.AddWithValue("@customerName", customerName); // Add customer name
 
                     await command.ExecuteNonQueryAsync();
                 }
             }
         }
+
 
 
         private async Task<byte[]> GetUserIdByAllUsername(string username)
@@ -254,7 +277,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllOrders()
         {
             try
@@ -273,6 +296,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("byId/{orderIdHex}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
         {
             try
@@ -352,7 +376,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bytype/{type}")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public IActionResult GetOrdersByType(string type)
         {
             try
@@ -417,7 +441,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("byemployeeusername")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByUsername([FromQuery] string username)
         {
             try
@@ -531,7 +555,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bycustomerusername/{customerUsername}")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername)
         {
             try
@@ -629,7 +653,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("bytype/{type}/{username}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
             try
@@ -840,6 +864,85 @@ namespace CRUDFI.Controllers
             return orders;
         }
 
+        [HttpGet("cart")]
+        [Authorize(Roles = UserRoles.Customer)]
+        public async Task<IActionResult> GetCartOrdersForUser()
+        {
+            try
+            {
+                // Extract the customerUsername from the token
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Retrieve the orders of type 'cart' for the logged-in user
+                List<Order> cartOrders = await GetCartOrdersFromDatabase(customerUsername);
+
+                if (cartOrders.Count == 0)
+                {
+                    return NotFound("No cart orders found for the user.");
+                }
+
+                return Ok(cartOrders);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving cart orders for user");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<List<Order>> GetCartOrdersFromDatabase(string customerUsername)
+        {
+            List<Order> orders = new List<Order>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT * FROM orders WHERE type = 'cart' AND customerId = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            Guid employeeId = Guid.Empty; // Default value for employeeId
+
+                            if (!reader.IsDBNull(reader.GetOrdinal("EmployeeId")))
+                            {
+                                // If the EmployeeId column is not null, get its value
+                                employeeId = reader.GetGuid(reader.GetOrdinal("EmployeeId"));
+                            }
+
+                            orders.Add(new Order
+                            {
+                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                designId = reader["DesignId"] as byte[],
+                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                            });
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
+
         [HttpPatch("updatePrice")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderPrice([FromQuery] string orderIdHex, [FromQuery] decimal newPrice)
@@ -897,7 +1000,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("confirmation")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," +  UserRoles.Customer)]
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderIdHex, [FromQuery] string action)
         {
             byte[] orderId = null;
@@ -974,7 +1077,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("orderstatus")]
-        [Authorize(Roles = UserRoles.Admin)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
             try
@@ -1266,8 +1369,8 @@ namespace CRUDFI.Controllers
                     return NotFound($"Employee with username '{employeeUsername}' not found. Please try another name.");
                 }
 
-                // Update the order with the employee ID
-                await UpdateOrderEmployeeId(orderIdBytes, employeeId);
+                // Update the order with the employee ID and employee name
+                await UpdateOrderEmployeeId(orderIdBytes, employeeId, employeeUsername);
 
                 return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{orderId}'.");
             }
@@ -1277,6 +1380,7 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
             }
         }
+
 
         private async Task<bool> CheckOrderExists(byte[] orderIdBytes)
         {
@@ -1322,50 +1426,23 @@ namespace CRUDFI.Controllers
 
 
 
-        private async Task UpdateOrderEmployeeId(byte[] orderId, byte[] employeeId)
+        private async Task UpdateOrderEmployeeId(byte[] orderId, byte[] employeeId, string employeeUsername)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET EmployeeId = @employeeId WHERE OrderId = @orderId";
+                string sql = "UPDATE orders SET EmployeeId = @employeeId, EmployeeName = @employeeName WHERE OrderId = @orderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@employeeId", employeeId);
+                    command.Parameters.AddWithValue("@employeeName", employeeUsername); // Insert employeeUsername
                     command.Parameters.AddWithValue("@orderId", orderId);
                     await command.ExecuteNonQueryAsync();
                 }
             }
         }
-
-
-
-        private async Task<byte[]> GetOrderIdByOrderName(string orderName)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT OrderId FROM orders WHERE orderName = @orderName";
-
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@orderName", orderName);
-                    var result = await command.ExecuteScalarAsync();
-
-                    if (result != null && result != DBNull.Value)
-                    {
-                        return (byte[])result;
-                    }
-                    else
-                    {
-                        return null; // Order not found
-                    }
-                }
-            }
-        }
-
 
         private async Task<bool> GetOrderStatus(byte[] orderId)
         {
@@ -1475,6 +1552,7 @@ namespace CRUDFI.Controllers
                     command.Parameters.AddWithValue("@Description", order.Description);
                     command.Parameters.AddWithValue("@Flavor", flavor);
                     command.Parameters.AddWithValue("@Size", size);
+                    command.Parameters.AddWithValue("@CustomerName", order.customerName); // Add customerName parameter
 
                     await command.ExecuteNonQueryAsync();
                 }
