@@ -141,6 +141,7 @@ namespace CRUDFI.Controllers
                 // Map Ingri entities to IngriDTP DTOs
                 var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
                 {
+                    Id = ingredient.Id,
                     itemName = ingredient.itemName,
                     quantity = ingredient.quantity,
                     measurements = ingredient.measurements,

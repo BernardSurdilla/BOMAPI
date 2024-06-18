@@ -51,6 +51,7 @@
 
     public class IngriDTP
     {
+        public int Id { get; set; }
         public string itemName { get; set; } = "";
 
         public int quantity { get; set; }
