@@ -457,9 +457,28 @@ namespace BOM_API_v2.Controllers
                     await _databaseContext.DesignTagsForCakes.AddAsync(newTagConnection);
                 }
             }
+            if (input.display_picture_data != null)
+            {
+                DesignImage? designImage = null;
+                try { designImage = await _databaseContext.DesignImage.Where(x => x.isActive == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
+                catch { }
+                if (designImage == null)
+                {
+                    designImage = new DesignImage();
+                    designImage.design_id = byteArrEncodedId;
+                    designImage.design_picture_id = new Guid();
+                    designImage.picture_data = input.display_picture_data;
+                    designImage.isActive = true;
+                    _databaseContext.DesignImage.Add(designImage);
+                }
+                else
+                {
+                    designImage.picture_data = input.display_picture_data;
+                    _databaseContext.DesignImage.Update(designImage);
+                }
+            }
 
             await _databaseContext.SaveChangesAsync();
-            
 
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
             return Ok(new { message = "Design " + designId.ToString() + " updated" });
