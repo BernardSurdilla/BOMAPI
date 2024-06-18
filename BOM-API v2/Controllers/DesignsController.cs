@@ -575,5 +575,38 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Tags for " + foundEntry.design_id);
             return Ok(new { message = "Tags removed successfully" });
         }
+
+        [HttpDelete("{designId}/tags/{tag_id}")]
+        public async Task<IActionResult> RemoveDesignTagById([FromRoute] string designId, [FromRoute] Guid tag_id)
+        {
+            string decodedId = designId;
+            byte[]? byteArrEncodedId = null;
+
+            try
+            {
+                decodedId = Uri.UnescapeDataString(designId);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return BadRequest(new { message = "Invalid format in the designId value in route" }); }
+
+            Designs? foundEntry = null;
+            try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            catch (InvalidOperationException e) { return NotFound(new { message = "Design with the specified id not found" }); }
+
+            List<DesignTagsForCakes> currentTags = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_id == foundEntry.design_id).ToListAsync();
+
+            DesignTagsForCakes? currentDesignTag = null;
+            try
+            {
+                currentDesignTag = currentTags.Where(x => x.design_tag_id == tag_id).First();
+                currentDesignTag.isActive = false;
+                _databaseContext.DesignTagsForCakes.Update(currentDesignTag);
+                await _databaseContext.SaveChangesAsync();
+                return Ok(new { message = "Tag deleted" });
+
+            }
+            catch (Exception e) { return NotFound(new { message = "Tag does not exist in the design" }); }
+
+        }
     }
 }
