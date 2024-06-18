@@ -272,6 +272,84 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpGet("byId/{orderIdHex}")]
+        public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
+        {
+            try
+            {
+                byte[] orderId = FromHexString(orderIdHex);
+
+                // Fetch the specific order from the database
+                Order order = await GetOrderByIdFromDatabase(orderId);
+
+                if (order == null)
+                {
+                    return NotFound($"Order with orderId {orderIdHex} not found.");
+                }
+
+                return Ok(order);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving order by orderId {orderIdHex}");
+                return StatusCode(500, $"An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<Order> GetOrderByIdFromDatabase(byte[] orderId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT * FROM orders WHERE OrderId = @orderId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            Guid employeeId = Guid.Empty; // Default value for employeeId
+
+                            if (!reader.IsDBNull(reader.GetOrdinal("EmployeeId")))
+                            {
+                                // If the EmployeeId column is not null, get its value
+                                employeeId = reader.GetGuid(reader.GetOrdinal("EmployeeId"));
+                            }
+
+                            return new Order
+                            {
+                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
+                                customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
+                                employeeId = employeeId,
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                status = reader.GetString(reader.GetOrdinal("Status")),
+                                designId = reader["DesignId"] as byte[],
+                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
+                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
+                                isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                            };
+                        }
+                        else
+                        {
+                            return null; // Order not found
+                        }
+                    }
+                }
+            }
+        }
+
 
         [HttpGet("bytype/{type}")]
         [Authorize(Roles = UserRoles.Admin)]
