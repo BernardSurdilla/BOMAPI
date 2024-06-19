@@ -4,7 +4,7 @@
     {
         public int Id { get; set; }
         public string Name { get; set; } // order name
-        public int Number { get; set; } // contact number
+        public string Number { get; set; } // contact number
         public string Email { get; set; }
         public double Cost { get; set; }
         public int Total { get; set; }

@@ -120,7 +120,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT CustomerName FROM users WHERE UserId = @userId";
+                string sql = "SELECT DisplayName FROM users WHERE UserId = @userId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {

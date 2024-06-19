@@ -7,7 +7,7 @@
         public string itemName { get; set; } = "";
 
 
-        public int quantity { get; set; }
+        public double quantity { get; set; }
 
         public string measurements { get; set; } = "";
 
@@ -39,7 +39,7 @@
 
         public string itemName { get; set; } = "";
 
-        public int quantity { get; set; }
+        public double quantity { get; set; }
 
         public string measurements { get; set; } = "";
 
@@ -55,7 +55,7 @@
 
         public string itemName { get; set; } = "";
 
-        public int quantity { get; set; }
+        public double quantity { get; set; }
 
         public string measurements { get; set; } = "";
 

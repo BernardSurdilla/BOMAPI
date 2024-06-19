@@ -48,7 +48,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 {
                                     Id = reader.GetInt32(reader.GetOrdinal("Id")),
                                     Name = reader.GetString(reader.GetOrdinal("Name")),
-                                    Number = reader.GetInt32(reader.GetOrdinal("Contact")),
+                                    Number = reader.GetString(reader.GetOrdinal("Contact")),
                                     Email = reader.GetString(reader.GetOrdinal("Email")),
                                     Cost = reader.GetDouble(reader.GetOrdinal("Cost")),
                                     Total = reader.GetInt32(reader.GetOrdinal("Total")),
