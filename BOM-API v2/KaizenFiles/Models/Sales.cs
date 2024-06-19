@@ -10,5 +10,15 @@
         public int Total { get; set; }
         public DateTime Date { get; set; }
     }
+    public class SalesSum
+    {
+        public string Name { get; set; }
+        public int Total { get; set; }
+    }
+
+    public class Totals
+    {
+        public int Total { get; set; }
+    }
 
 }
