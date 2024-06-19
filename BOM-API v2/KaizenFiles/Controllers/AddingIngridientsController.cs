@@ -137,7 +137,17 @@ namespace CRUDFI.Controllers
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
-                    await connection.OpenAsync();
+                    Id = ingredient.Id,
+                    itemName = ingredient.itemName,
+                    quantity = ingredient.quantity,
+                    measurements = ingredient.measurements,
+                    price = ingredient.price,
+                    status = ingredient.status,
+                    type = ingredient.type,
+                    CreatedAt = ingredient.CreatedAt,
+                    lastUpdatedBy = ingredient.lastUpdatedBy,
+                    lastUpdatedAt = ingredient.lastUpdatedAt
+                }).ToList();
 
                     string sql = "SELECT * FROM Item"; // Adjust SQL query as per your database schema
 

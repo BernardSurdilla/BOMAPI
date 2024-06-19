@@ -67,4 +67,8 @@ namespace BillOfMaterialsAPI.Schemas
     {
         public string design_tag_name { get; set; }
     }
+    public class PostDesignTags
+    {
+        [Required] public List<Guid> design_tag_ids { get; set; }
+    }
 }

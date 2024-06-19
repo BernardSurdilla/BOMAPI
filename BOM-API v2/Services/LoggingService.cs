@@ -20,7 +20,7 @@ namespace BillOfMaterialsAPI.Services
 
         public async Task<int> LogAction(ClaimsPrincipal user, string transaction_type, string transaction_description)
         {
-
+            return 1;
             //
             // NOTE: The UserManager.GetUserAsync() finds the claim with the type 
             // ClaimTypes.NameIdentifier, gets the value in it, and uses it to find the user.

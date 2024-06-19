@@ -170,142 +170,7 @@ namespace BOM_API_v2.Controllers
             List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMat.pastry_material_id).ToListAsync();
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
 
-            List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
-
-            double calculatedCost = 0.0;
-
-            foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
-            {
-                GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
-
-                //Check if the measurement unit in the ingredient record is valid
-                //If not found, skip current ingredient
-                string? amountQuantityType = null;
-                string? amountUnitMeasurement = null;
-
-                bool isAmountMeasurementValid = false;
-                foreach (string unitQuantity in validMeasurementUnits.Keys)
-                {
-                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
-
-                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(ifcm.amount_measurement));
-
-                    if (currentMeasurement == null) { continue; }
-                    else
-                    {
-                        isAmountMeasurementValid = true;
-                        amountQuantityType = unitQuantity;
-                        amountUnitMeasurement = currentMeasurement;
-                    }
-                }
-                if (isAmountMeasurementValid == false)
-                {
-                    return new GetPastryMaterial(); //This should return something to identify the error
-                }
-
-                switch (ifcm.ingredient_type)
-                {
-                    case IngredientType.InventoryItem:
-                        {
-                            //!!!UNTESTED!!!
-                            Item? currentInventoryItemI = null;
-                            try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(ifcm.item_id)).FirstAsync(); }
-                            catch { continue; }
-                            if (currentInventoryItemI == null) { continue; }
-
-                            newSubIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
-                            newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
-
-                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
-
-                            double convertedAmountI = 0.0;
-                            double calculatedAmountI = 0.0;
-                            if (amountQuantityType != "Count")
-                            {
-                                convertedAmountI = UnitConverter.ConvertByName(ifcm.amount, amountQuantityType, amountUnitMeasurement, currentInventoryItemI.measurements);
-                                calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
-                            }
-                            else
-                            {
-                                convertedAmountI = ifcm.amount;
-                                calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
-                            }
-
-                            calculatedCost += calculatedAmountI;
-
-                            break;
-                        }
-                    case IngredientType.Material:
-                        {
-                            Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == ifcm.item_id && x.isActive == true).FirstAsync();
-                            if (currentPastryMat == null) { continue; }
-
-                            newSubIngredientListEntry.item_id = currentReferencedMaterial.material_id;
-                            newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
-
-                            List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
-
-                            if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
-                            {
-                                List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
-
-                                foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
-                                {
-                                    SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients();
-                                    newEntryMaterialIngredientsEntry.material_ingredient_id = materialIngredients.material_ingredient_id;
-                                    newEntryMaterialIngredientsEntry.material_id = materialIngredients.material_id;
-                                    newEntryMaterialIngredientsEntry.item_id = materialIngredients.item_id;
-                                    newEntryMaterialIngredientsEntry.amount = materialIngredients.amount;
-                                    newEntryMaterialIngredientsEntry.amount_measurement = materialIngredients.amount_measurement;
-                                    newEntryMaterialIngredientsEntry.date_added = materialIngredients.date_added;
-                                    newEntryMaterialIngredientsEntry.last_modified_date = materialIngredients.last_modified_date;
-
-                                    newEntryMaterialIngredientsEntry.ingredient_type = materialIngredients.ingredient_type;
-                                    switch (newEntryMaterialIngredientsEntry.ingredient_type)
-                                    {
-                                        case IngredientType.InventoryItem:
-                                            Item? currentInventoryItemI = null;
-                                            try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(newEntryMaterialIngredientsEntry.item_id)).FirstAsync(); }
-                                            catch { continue; }
-                                            if (currentInventoryItemI == null) { continue; }
-
-                                            newEntryMaterialIngredientsEntry.item_name = currentInventoryItemI.item_name;
-                                            break;
-                                        case IngredientType.Material:
-                                            Materials? currentReferencedSubMaterial = null;
-                                            try { currentReferencedSubMaterial = await _context.Materials.Where(x => x.isActive == true && x.material_id == materialIngredients.material_id).FirstAsync(); }
-                                            catch { continue; }
-
-                                            newEntryMaterialIngredientsEntry.item_name = currentReferencedSubMaterial.material_name;
-                                            break;
-                                    }
-                                    newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
-                                }
-                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
-                            }
-                            else
-                            {
-                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
-                            }
-
-                            calculatedCost += await _cakePriceCalculator.CalculateSubMaterialCost(ifcm);
-                            break;
-                        }
-                }
-
-                newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
-                newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
-                newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
-                newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
-                newSubIngredientListEntry.amount = ifcm.amount;
-                newSubIngredientListEntry.date_added = ifcm.date_added;
-                newSubIngredientListEntry.last_modified_date = ifcm.last_modified_date;
-
-                subIngredientList.Add(newSubIngredientListEntry);
-            }
-
-            GetPastryMaterial response = new GetPastryMaterial(currentPastryMat, subIngredientList);
-            response.cost_estimate = calculatedCost;
+            GetPastryMaterial response = await CreatePastryMaterialResponseFromDBRow(currentPastryMat);
 
             await _actionLogger.LogAction(User, "GET", "Pastry Material " + currentPastryMat.pastry_material_id);
             return response;
@@ -774,7 +639,7 @@ namespace BOM_API_v2.Controllers
                 if (inventoryItemQuantityUnit.Equals("Count")) { referencedInventoryItem.quantity = referencedInventoryItem.quantity - Convert.ToInt32(currentInventorySubtractorInfo.Amount); }
                 else
                 {
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - Convert.ToInt32(UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements));
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
                 }
 
                 _kaizenTables.Item.Update(referencedInventoryItem);
@@ -803,7 +668,9 @@ namespace BOM_API_v2.Controllers
         private async Task<GetPastryMaterial> CreatePastryMaterialResponseFromDBRow(PastryMaterials data)
         {
             GetPastryMaterial response = new GetPastryMaterial();
-            response.design_id = data.design_id;
+            response.design_id = Convert.ToBase64String(data.design_id);
+            try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.design_name = selectedDesign.display_name; }
+            catch (Exception e) { response.design_name = "N/A"; }
             response.pastry_material_id = data.pastry_material_id;
             response.date_added = data.date_added;
             response.last_modified_date = data.last_modified_date;

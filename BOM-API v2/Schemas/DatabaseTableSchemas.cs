@@ -161,7 +161,7 @@ namespace BillOfMaterialsAPI.Schemas
     {
         [Required][Key] public int id { get; set; }
         [MaxLength(50)] public string item_name { get; set; }
-        public int quantity { get; set; }
+        public double quantity { get; set; }
         public double price { get; set; }
         [MaxLength(50)] public string status { get; set; }
         [MaxLength(20)] public string type { get; set; }
