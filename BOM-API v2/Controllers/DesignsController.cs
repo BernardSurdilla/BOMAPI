@@ -283,7 +283,7 @@ namespace BOM_API_v2.Controllers
         {
             List<GetDesignWithoutPastryMaterial> response = new List<GetDesignWithoutPastryMaterial>();
 
-            List<Designs> dbResp = await _databaseContext.Designs.Where(x => _databaseContext.PastryMaterials.Where(x=> x.isActive == true).Select(x => x.design_id).Contains(x.design_id) == false).Select(x => new Designs { design_id = x.design_id, display_name = x.display_name}).ToListAsync();
+            List<Designs> dbResp = await _databaseContext.Designs.Where(x => x.isActive == true && _databaseContext.PastryMaterials.Where(x=> x.isActive == true).Select(x => x.design_id).Contains(x.design_id) == false).Select(x => new Designs { design_id = x.design_id, display_name = x.display_name}).ToListAsync();
             foreach (Designs design in dbResp)
             {
                 GetDesignWithoutPastryMaterial newResponseRow = new GetDesignWithoutPastryMaterial();
