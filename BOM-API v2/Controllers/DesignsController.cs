@@ -513,8 +513,8 @@ namespace BOM_API_v2.Controllers
             selectedDesignTag.design_tag_name = input.design_tag_name;
             await _databaseContext.SaveChangesAsync();
 
-            _actionLogger.LogAction(User, "PATCH", "Update design tag " + selectedDesignTag.design_tag_id);
-            return Ok(new { message = "Design " + selectedDesignTag.design_tag_id + " updated" });
+            await _actionLogger.LogAction(User, "PATCH", "Update design tag " + selectedDesignTag.design_tag_id);
+            return Ok(new { message = "Design tag " + selectedDesignTag.design_tag_id + " updated" });
         }
         
 
