@@ -204,6 +204,11 @@ namespace BillOfMaterialsAPI.Schemas
 
         public List<GetDesignTag>? design_tags { get; set; }
     }
+    public class GetDesignWithoutPastryMaterial
+    {
+        [Required] public byte[] design_id { get; set; }
+        [Required] public string display_name { get; set; }
+    }
     /*
     public class SubGetDesignTags
     {

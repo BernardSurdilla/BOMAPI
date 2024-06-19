@@ -155,7 +155,6 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "All Design tags");
             return response;
         }
-
         [HttpGet("{designId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<GetDesign> GetSpecificDesign([FromRoute]string designId)
@@ -278,7 +277,25 @@ namespace BOM_API_v2.Controllers
             return response;
 
         }
-        
+        [HttpGet("without_pastry_material")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<List<GetDesignWithoutPastryMaterial>> GetDesignsWithoutPastryMaterial()
+        {
+            List<GetDesignWithoutPastryMaterial> response = new List<GetDesignWithoutPastryMaterial>();
+
+            List<Designs> dbResp = await _databaseContext.Designs.Where(x => _databaseContext.PastryMaterials.Where(x=> x.isActive == true).Select(x => x.design_id).Contains(x.design_id) == false).Select(x => new Designs { design_id = x.design_id, display_name = x.display_name}).ToListAsync();
+            foreach (Designs design in dbResp)
+            {
+                GetDesignWithoutPastryMaterial newResponseRow = new GetDesignWithoutPastryMaterial();
+                newResponseRow.display_name = design.display_name;
+                newResponseRow.design_id = design.design_id;
+                response.Add(newResponseRow);
+            }
+                
+            return response;
+        }
+
+
         private async Task<GetDesign> CreateGetDesignResponseFromDbRow(Designs data)
         {
             GetDesign response = new GetDesign();
