@@ -14,6 +14,7 @@ using System.Diagnostics;
 using BOM_API_v2.Services;
 using System.Linq;
 using System.Text;
+using Microsoft.EntityFrameworkCore.Internal;
 
 
 namespace BOM_API_v2.Controllers
@@ -301,6 +302,9 @@ namespace BOM_API_v2.Controllers
         public async Task<List<GetDesignWithPastryMaterial>> GetDesignsWithPastryMaterial()
         {
             List<GetDesignWithPastryMaterial> response = new List<GetDesignWithPastryMaterial>();
+
+            //var dbResp = await _databaseContext.Designs.Where(x => x.isActive == true).LeftJoin()
+
             return response;
             /*
 

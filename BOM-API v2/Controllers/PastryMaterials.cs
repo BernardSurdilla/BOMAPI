@@ -636,12 +636,11 @@ namespace BOM_API_v2.Controllers
                 if (isInventoryItemMeasurementValid == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" }); }
                 if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType }); }
 
-                if (inventoryItemQuantityUnit.Equals("Count")) { referencedInventoryItem.quantity = referencedInventoryItem.quantity - Convert.ToInt32(currentInventorySubtractorInfo.Amount); }
+                if (inventoryItemQuantityUnit.Equals("Count")) { referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount; }
                 else
                 {
                     referencedInventoryItem.quantity = referencedInventoryItem.quantity - UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
                 }
-
                 _kaizenTables.Item.Update(referencedInventoryItem);
             }
 
