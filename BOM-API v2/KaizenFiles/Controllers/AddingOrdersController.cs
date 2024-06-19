@@ -233,7 +233,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (1, 3, 4)";
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (1,2, 3, 4)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -538,17 +538,30 @@ namespace CRUDFI.Controllers
 
         [HttpGet("byemployeeusername")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetOrdersByUsername([FromQuery] string username)
+        public async Task<IActionResult> GetOrdersByUsername()
         {
             try
             {
-                // Retrieve the binary UserId from the users table
-                byte[] userIdBytes = await GetUserIdByUsername(username);
+                // Extract the EmployeeUsername from the token
+                var EmployeeUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
+                if (string.IsNullOrEmpty(EmployeeUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the Employee's ID using the extracted username
+                byte[] employeeId = await GetUserIdByAllUsername(EmployeeUsername);
+                if (employeeId == null || employeeId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                // Retrieve the binary UserId from the users table
+                byte[] userIdBytes = await GetUserIdByUsername(EmployeeUsername);
                 if (userIdBytes == null)
                 {
-                    // If user not found or not of type 2 or 3, return appropriate message
-                    return NotFound($"Employee with username '{username}' not found or does not have the required type.");
+                    return NotFound($"User with username '{EmployeeUsername}' not found.");
                 }
 
                 // Fetch orders with EmployeeId matching the retrieved UserId
@@ -556,15 +569,16 @@ namespace CRUDFI.Controllers
 
                 if (orders.Count == 0)
                 {
-                    return NotFound($"No orders found for the employee with username '{username}'.");
+                    return NotFound($"No orders found for the user with username '{EmployeeUsername}'.");
                 }
 
                 return Ok(orders);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while fetching orders for username '{username}'");
-                return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while fetching orders for username '{username}': {ex.Message}");
+                var EmployeeUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+                _logger.LogError(ex, $"An error occurred while fetching orders for username '{EmployeeUsername}'");
+                return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while fetching orders for username '{EmployeeUsername}': {ex.Message}");
             }
         }
 
@@ -626,7 +640,6 @@ namespace CRUDFI.Controllers
                                 Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
                                 customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
                                 designId = reader.IsDBNull(reader.GetOrdinal("DesignId")) ? null : reader["DesignId"] as byte[],
-                                employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId")) ? (Guid?)null : reader.GetGuid(reader.GetOrdinal("EmployeeId")),
                                 orderName = reader.GetString(reader.GetOrdinal("orderName")),
                                 isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
                                 price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -634,13 +647,10 @@ namespace CRUDFI.Controllers
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 status = reader.GetString(reader.GetOrdinal("Status")),
                                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
-                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
                                 Description = reader.GetString(reader.GetOrdinal("Description")),
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
                                 customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
 
                             });
                         }
@@ -1234,8 +1244,8 @@ namespace CRUDFI.Controllers
 
 
         [HttpPatch("orderstatus")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> PatchOrderStatus(string orderId, string action)
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
+        public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
             try
             {
