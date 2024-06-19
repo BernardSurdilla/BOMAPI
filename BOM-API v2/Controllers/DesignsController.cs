@@ -277,6 +277,7 @@ namespace BOM_API_v2.Controllers
             return response;
 
         }
+
         [HttpGet("without_pastry_material")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetDesignWithoutPastryMaterial>> GetDesignsWithoutPastryMaterial()
@@ -295,7 +296,25 @@ namespace BOM_API_v2.Controllers
             return response;
         }
 
+        [HttpGet("with_pastry_material")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<List<GetDesignWithPastryMaterial>> GetDesignsWithPastryMaterial()
+        {
+            List<GetDesignWithPastryMaterial> response = new List<GetDesignWithPastryMaterial>();
+            return response;
+            /*
 
+            List<Designs> dbResp = await _databaseContext.Designs.Where(x => x.isActive == true && _databaseContext.PastryMaterials.Where(x => x.isActive == true).Select(x => x.design_id).Contains(x.design_id) == true).Select(x => new Designs { design_id = x.design_id, display_name = x.display_name }).ToListAsync();
+            foreach (Designs design in dbResp)
+            {
+                GetDesignWithoutPastryMaterial newResponseRow = new GetDesignWithoutPastryMaterial();
+                newResponseRow.display_name = design.display_name;
+                newResponseRow.design_id = design.design_id;
+                response.Add(newResponseRow);
+            }
+
+            */
+        }
         private async Task<GetDesign> CreateGetDesignResponseFromDbRow(Designs data)
         {
             GetDesign response = new GetDesign();
