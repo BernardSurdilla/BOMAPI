@@ -451,6 +451,7 @@ namespace BOM_API_v2.Controllers
 
             _databaseContext.Designs.Update(foundEntry);
             foundEntry.display_name = input.display_name;
+            foundEntry.cake_description = input.cake_description;
             foundEntry.display_picture_url = input.display_picture_url;
 
             List<DesignTagsForCakes> allDesignTagsForCakes = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_id == foundEntry.design_id).ToListAsync();
