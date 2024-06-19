@@ -36,8 +36,8 @@
     }
     public class IngriDTO
     {
-        public string itemName { get; set; } = "";
 
+        public string itemName { get; set; } = "";
 
         public int quantity { get; set; }
 
@@ -52,6 +52,7 @@
     public class IngriDTP
     {
         public int Id { get; set; }
+
         public string itemName { get; set; } = "";
 
         public int quantity { get; set; }
@@ -69,5 +70,7 @@
         public byte[]? lastUpdatedBy { get; set; }
 
         public DateTime lastUpdatedAt { get; set; }
+
+        public bool isActive { get; set; }
     }
 }
