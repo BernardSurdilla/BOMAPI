@@ -151,7 +151,7 @@ namespace CRUDFI.Controllers
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
                                     itemName = reader["item_name"].ToString(),
-                                    quantity = Convert.ToInt32(reader["quantity"]),
+                                    quantity = Convert.ToDouble(reader["quantity"]),
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
@@ -235,7 +235,7 @@ namespace CRUDFI.Controllers
                             {
                                 Id = Convert.ToInt32(reader["id"]),
                                 itemName = reader["item_name"].ToString(),
-                                quantity = Convert.ToInt32(reader["quantity"]),
+                                quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
@@ -279,7 +279,7 @@ namespace CRUDFI.Controllers
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
                                     itemName = reader["item_name"].ToString(),
-                                    Quantity = Convert.ToInt32(reader["quantity"]),
+                                    Quantity = Convert.ToDouble(reader["quantity"]),
                                     Price = Convert.ToDecimal(reader["price"]),
                                     Status = reader["status"].ToString(),
                                     CreatedAt = Convert.ToDateTime(reader["createdAt"]),
@@ -637,7 +637,7 @@ namespace CRUDFI.Controllers
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
                                     itemName = reader["item_name"].ToString(),
-                                    quantity = Convert.ToInt32(reader["quantity"]),
+                                    quantity = Convert.ToDouble(reader["quantity"]),
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
@@ -719,7 +719,7 @@ namespace CRUDFI.Controllers
                             {
                                 Id = Convert.ToInt32(reader["id"]),
                                 itemName = reader["item_name"].ToString(),
-                                quantity = Convert.ToInt32(reader["quantity"]),
+                                quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
@@ -760,7 +760,7 @@ namespace CRUDFI.Controllers
                             {
                                 Id = Convert.ToInt32(reader["id"]),
                                 itemName = reader["item_name"].ToString(),
-                                quantity = Convert.ToInt32(reader["quantity"]),
+                                quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
@@ -801,7 +801,7 @@ namespace CRUDFI.Controllers
                             {
                                 Id = Convert.ToInt32(reader["id"]),
                                 itemName = reader["item_name"].ToString(),
-                                quantity = Convert.ToInt32(reader["quantity"]),
+                                quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
@@ -840,7 +840,7 @@ namespace CRUDFI.Controllers
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("id")),
                                 itemName = reader["item_name"].ToString(),
-                                quantity = Convert.ToInt32(reader["quantity"]),
+                                quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
