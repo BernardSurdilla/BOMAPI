@@ -60,7 +60,7 @@ namespace CRUDFI.Models
         public string name { get; set; }
         public string email { get; set; }
         public double cost { get; set; }
-        public int contact { get; set; }
+        public string contact { get; set; }
         public int total { get; set; }
         public DateTime date { get; set; }
     }

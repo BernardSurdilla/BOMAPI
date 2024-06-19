@@ -1235,7 +1235,7 @@ namespace CRUDFI.Controllers
 
         [HttpPatch("orderstatus")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
+        public async Task<IActionResult> PatchOrderStatus(string orderId, string action)
         {
             try
             {
@@ -1251,29 +1251,7 @@ namespace CRUDFI.Controllers
                 }
                 else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Retrieve order details from the orders table
-                    var forSalesDetails = await GetOrderDetails(orderIdBinary);
-
-                    if (forSalesDetails != null)
-                    {
-                        var existingTotal = await GetExistingTotal(forSalesDetails.name);
-
-                        if (existingTotal.HasValue)
-                        {
-                            // If the orderName already exists, update the Total
-                            await UpdateTotalInSalesTable(forSalesDetails.name, existingTotal.Value + forSalesDetails.total);
-                        }
-                        else
-                        {
-                            // If the orderName doesn't exist, insert a new record
-                            await InsertIntoSalesTable(forSalesDetails);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogError($"No details found for order with ID '{orderIdBinary}'");
-                        return NotFound($"No details found for order with ID '{orderId}'");
-                    }
+                    await ProcessOrderCompletion(orderIdBinary);
 
                     // Update the status in the database
                     await UpdateOrderStatus(orderIdBinary, false); // Set isActive to false
@@ -1293,6 +1271,141 @@ namespace CRUDFI.Controllers
             {
                 _logger.LogError(ex, $"An error occurred while processing the request to update order status for '{orderId}'.");
                 return StatusCode(500, $"An error occurred while processing the request to update order status for '{orderId}'.");
+            }
+        }
+
+        private async Task ProcessOrderCompletion(string orderIdBinary)
+        {
+            try
+            {
+                // Retrieve order details and insert into sales table
+                var forSalesDetails = await GetOrderDetailsAndInsertIntoSales(orderIdBinary);
+
+                if (forSalesDetails != null)
+                {
+                    _logger.LogInformation($"Order details inserted into sales table: {forSalesDetails.name}");
+                }
+                else
+                {
+                    _logger.LogWarning($"No details found for order with ID '{orderIdBinary}'");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while processing order completion for '{orderIdBinary}'.");
+                throw; // Re-throw the exception to propagate it to the calling method
+            }
+        }
+
+        private async Task<forSales> GetOrderDetailsAndInsertIntoSales(string orderIdBytes)
+        {
+            try
+            {
+                // Retrieve order details from the orders table
+                var forSalesDetails = await GetOrderDetails(orderIdBytes);
+
+                // If order details found, insert into the sales table
+                if (forSalesDetails != null)
+                {
+                    var existingTotal = await GetExistingTotal(forSalesDetails.name);
+
+                    if (existingTotal.HasValue)
+                    {
+                        // If the orderName already exists, update the Total
+                        await UpdateTotalInSalesTable(forSalesDetails.name, existingTotal.Value + forSalesDetails.total);
+                    }
+                    else
+                    {
+                        // If the orderName doesn't exist, insert a new record
+                        await InsertIntoSalesTable(forSalesDetails);
+                    }
+
+                    return forSalesDetails;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while retrieving order details and inserting into sales table for '{orderIdBytes}'.");
+                throw; // Re-throw the exception to propagate it to the calling method
+            }
+        }
+
+        private async Task<forSales> GetOrderDetails(string orderIdBytes)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = @"SELECT o.orderName, o.price, o.EmployeeId, o.CreatedAt, o.quantity, 
+                                    u.Contact, u.Email 
+                                    FROM orders o
+                                    JOIN users u ON o.EmployeeId = u.UserId
+                                    WHERE o.OrderId = UNHEX(@orderId)";
+                    command.Parameters.AddWithValue("@orderId", orderIdBytes);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (reader.Read())
+                        {
+                            var name = reader.GetString("orderName");
+                            var cost = reader.GetDouble("price");
+                            var contact = reader.GetString("Contact").Trim(); // Adjust for CHAR(10)
+                            var email = reader.GetString("Email");
+                            var date = reader.GetDateTime("CreatedAt");
+                            var total = reader.GetInt32("quantity");
+
+                            // Debugging output using Debug.WriteLine
+                            Debug.WriteLine($"Order Details:");
+                            Debug.WriteLine($"  Name: {name}");
+                            Debug.WriteLine($"  Cost: {cost}");
+                            Debug.WriteLine($"  Contact: {contact}");
+                            Debug.WriteLine($"  Email: {email}");
+                            Debug.WriteLine($"  Date: {date}");
+                            Debug.WriteLine($"  Total: {total}");
+
+                            return new forSales
+                            {
+                                name = name,
+                                cost = cost,
+                                contact = contact,
+                                email = email,
+                                date = date,
+                                total = total
+                            };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+
+        private async Task InsertIntoSalesTable(forSales forSalesDetails)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = connection.CreateCommand())
+                {
+                    // Adjust column names based on your actual schema
+                    command.CommandText = @"INSERT INTO sales (Name, Cost, Date, Contact, Email, Total) 
+                                    VALUES (@name, @cost, @date, @contact, @email, @total)";
+                    command.Parameters.AddWithValue("@name", forSalesDetails.name);
+                    command.Parameters.AddWithValue("@cost", forSalesDetails.cost);
+                    command.Parameters.AddWithValue("@date", forSalesDetails.date);
+                    command.Parameters.AddWithValue("@contact", forSalesDetails.contact);
+                    command.Parameters.AddWithValue("@email", forSalesDetails.email);
+                    command.Parameters.AddWithValue("@total", forSalesDetails.total);
+
+                    await command.ExecuteNonQueryAsync();
+                }
             }
         }
 
@@ -1372,82 +1485,6 @@ namespace CRUDFI.Controllers
         }
 
 
-
-        private async Task UpdateSalesTable(string orderIdBinary)
-        {
-            // Retrieve order details from the orders table
-            var forSalesDetails = await GetOrderDetails(orderIdBinary);
-
-            // If order details found, update the sales table
-            if (forSalesDetails != null)
-            {
-                var existingTotal = await GetExistingTotal(forSalesDetails.name);
-
-                if (existingTotal.HasValue)
-                {
-                    // If the orderName already exists, update the Total
-                    await UpdateTotalInSalesTable(forSalesDetails.name, existingTotal.Value + forSalesDetails.total);
-                }
-                else
-                {
-                    // If the orderName doesn't exist, insert a new record
-                    await InsertIntoSalesTable(forSalesDetails);
-                }
-            }
-            else
-            {
-                _logger.LogError($"No details found for order with ID '{orderIdBinary}'");
-            }
-        }
-
-
-        private async Task<forSales> GetOrderDetails(string orderIdBytes)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText = @"SELECT o.orderName, o.price, o.EmployeeId, o.CreatedAt, o.quantity, 
-                                    u.Contact, u.Email 
-                                    FROM orders o
-                                    JOIN users u ON o.EmployeeId = u.UserId
-                                    WHERE o.OrderId = UNHEX(@orderId)";
-                    command.Parameters.AddWithValue("@orderId", orderIdBytes);
-
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        if (reader.Read())
-                        {
-                            // Retrieve data using GetInt32 for Contact and quantity directly
-                            string orderName = reader.GetString("orderName");
-                            double price = reader.GetDouble("price");
-                            int contact = reader.GetInt32("Contact");
-                            string email = reader.GetString("Email");
-                            DateTime createdAt = reader.GetDateTime("CreatedAt");
-                            int quantity = reader.GetInt32("quantity");
-
-                            return new forSales
-                            {
-                                name = orderName,
-                                cost = price,
-                                contact = contact,
-                                email = email,
-                                date = createdAt,
-                                total = quantity
-                            };
-                        }
-                    }
-                }
-            }
-
-            return null; // Return null if no data is found for the given orderIdBytes
-        }
-
-
-
-
         private async Task<int?> GetExistingTotal(string orderName)
         {
             using (var connection = new MySqlConnection(connectionstring))
@@ -1477,29 +1514,6 @@ namespace CRUDFI.Controllers
                 {
                     command.Parameters.AddWithValue("@newTotal", newTotal);
                     command.Parameters.AddWithValue("@orderName", orderName);
-
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
-        }
-
-
-        private async Task InsertIntoSalesTable(forSales forSalesDetails)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                using (var command = connection.CreateCommand())
-                {
-                    command.CommandText = @"INSERT INTO sales (Name, Cost, Date, Contact, Email, Total) 
-                                    VALUES (@name, @cost, @date, @contact, @email, @total)";
-                    command.Parameters.AddWithValue("@name", forSalesDetails.name);
-                    command.Parameters.AddWithValue("@cost", forSalesDetails.cost);
-                    command.Parameters.AddWithValue("@date", forSalesDetails.date);
-                    command.Parameters.AddWithValue("@contact", forSalesDetails.contact);
-                    command.Parameters.AddWithValue("@email", forSalesDetails.email);
-                    command.Parameters.AddWithValue("@total", forSalesDetails.total);
 
                     await command.ExecuteNonQueryAsync();
                 }
