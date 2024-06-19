@@ -6,7 +6,7 @@ namespace CRUDFI.Models
     public class Order
     {
 
-        public Guid Id { get; set; }
+        public Guid Id { get; set; } 
 
         public Guid customerId { get; set; }
 

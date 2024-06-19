@@ -127,19 +127,15 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("all")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult GetAllIngredients()
+        [HttpGet]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetAllIngredients()
         {
             try
             {
-                List<Ingri> ingredients = GetAllIngredientsFromDatabase();
+                List<IngriDTP> ingredientsDtoList = new List<IngriDTP>();
 
-                if (ingredients == null || !ingredients.Any())
-                    return NotFound();
-
-                // Map Ingri entities to IngriDTP DTOs
-                var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
+                using (var connection = new MySqlConnection(connectionstring))
                 {
                     Id = ingredient.Id,
                     itemName = ingredient.itemName,
@@ -153,14 +149,45 @@ namespace CRUDFI.Controllers
                     lastUpdatedAt = ingredient.lastUpdatedAt
                 }).ToList();
 
-                return Ok(ingredientsDto);
+                    string sql = "SELECT * FROM Item"; // Adjust SQL query as per your database schema
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                IngriDTP ingredientDto = new IngriDTP
+                                {
+                                    Id = Convert.ToInt32(reader["id"]),
+                                    itemName = reader["item_name"].ToString(),
+                                    quantity = Convert.ToInt32(reader["quantity"]),
+                                    price = Convert.ToDecimal(reader["price"]),
+                                    status = reader["status"].ToString(),
+                                    type = reader["type"].ToString(),
+                                    CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                    lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                    lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
+                                    measurements = reader["measurements"].ToString(),
+                                    isActive = Convert.ToInt32(reader["quantity"]) > 0 // Determine isActive based on quantity
+                                };
+
+                                ingredientsDtoList.Add(ingredientDto);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(ingredientsDtoList);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while fetching all ingredients");
-                return StatusCode(500, "An error occurred while processing the request");
+                _logger.LogError(ex, "An error occurred while fetching all ingredients.");
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while fetching ingredients data.");
             }
         }
+
+
 
         [HttpGet("active")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
@@ -517,6 +544,49 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpPut("restore{id}")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public IActionResult ReactivateIngredient(int id)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    connection.Open();
+
+                    // Check if the ingredient exists
+                    string sqlCheck = "SELECT COUNT(*) FROM Item WHERE Id = @id";
+                    using (var checkCommand = new MySqlCommand(sqlCheck, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@id", id);
+                        int ingredientCount = Convert.ToInt32(checkCommand.ExecuteScalar());
+
+                        if (ingredientCount == 0)
+                        {
+                            return NotFound("Ingredient not found");
+                        }
+                    }
+
+                    // Reactivate the ingredient by setting isActive to true
+                    string sqlUpdate = "UPDATE Item SET isActive = @isActive WHERE Id = @id";
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@id", id);
+                        updateCommand.Parameters.AddWithValue("@isActive", true); // Reactivate the ingredient
+                        updateCommand.ExecuteNonQuery();
+                    }
+                }
+
+                return Ok($"Ingredient with ID {id} has been successfully reactivated.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while reactivating ingredient with ID {id}.");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+
         [HttpGet("inactive")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetInactiveIngredients()
@@ -635,47 +705,6 @@ namespace CRUDFI.Controllers
                 _logger.LogError(ex, $"Error fetching UserId for username: {username}");
                 throw; // Re-throw the exception for the caller to handle
             }
-        }
-
-
-
-        private List<Ingri> GetAllIngredientsFromDatabase()
-        {
-            List<Ingri> ingredients = new List<Ingri>();
-
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                connection.Open();
-
-                string sql = "SELECT * FROM Item";
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    using (var reader = command.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            Ingri ingredient = new Ingri
-                            {
-                                Id = Convert.ToInt32(reader["id"]),
-                                itemName = reader["item_name"].ToString(),
-                                quantity = Convert.ToInt32(reader["quantity"]),
-                                price = Convert.ToDecimal(reader["price"]),
-                                status = reader["status"].ToString(),
-                                type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
-                                lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
-                                measurements = reader["measurements"].ToString(),
-                                isActive = Convert.ToInt32(reader["quantity"]) > 0 // Determine isActive based on quantity
-                            };
-
-                            ingredients.Add(ingredient);
-                        }
-                    }
-                }
-            }
-
-            return ingredients;
         }
 
 
@@ -819,7 +848,7 @@ namespace CRUDFI.Controllers
                         {
                             return new Ingri
                             {
-                                Id = Convert.ToInt32(reader["id"]),
+                                Id = reader.GetInt32(reader.GetOrdinal("id")),
                                 itemName = reader["item_name"].ToString(),
                                 quantity = Convert.ToInt32(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
