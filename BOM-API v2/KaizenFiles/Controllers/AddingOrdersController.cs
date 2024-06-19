@@ -295,6 +295,40 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpGet("total-orders")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetTotalQuantities()
+        {
+            try
+            {
+                TotalOrders totalQuantities = new TotalOrders();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = "SELECT SUM(quantity) AS TotalQuantity FROM orders WHERE isActive = TRUE";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        var result = await command.ExecuteScalarAsync();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            totalQuantities.Total = Convert.ToInt32(result);
+                        }
+                    }
+                }
+
+                return Ok(totalQuantities);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while summing the quantities.");
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while summing the quantities.");
+            }
+        }
+
+
         [HttpGet("byId/{orderIdHex}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
@@ -363,6 +397,9 @@ namespace CRUDFI.Controllers
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
                                 PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                             };
                         }
                         else
@@ -420,7 +457,10 @@ namespace CRUDFI.Controllers
                                     employeeId = employeeId,
                                     Description = reader.GetString(reader.GetOrdinal("Description")),
                                     flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                    size = reader.GetString(reader.GetOrdinal("Size"))
+                                    size = reader.GetString(reader.GetOrdinal("Size")),
+                                    customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                                 });
                             }
                         }
@@ -542,7 +582,10 @@ namespace CRUDFI.Controllers
                                 lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
                                 Description = reader.GetString(reader.GetOrdinal("Description")),
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                size = reader.GetString(reader.GetOrdinal("Size"))
+                                size = reader.GetString(reader.GetOrdinal("Size")),
+                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                             });
                         }
                     }
@@ -598,7 +641,10 @@ namespace CRUDFI.Controllers
                                     isActive = reader["isActive"] != DBNull.Value ? reader.GetBoolean(reader.GetOrdinal("isActive")) : false,
                                     Description = reader.GetString(reader.GetOrdinal("Description")),
                                     flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                    size = reader.GetString(reader.GetOrdinal("Size"))
+                                    size = reader.GetString(reader.GetOrdinal("Size")),
+                                    customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                                 });
                             }
                         }
@@ -703,7 +749,10 @@ namespace CRUDFI.Controllers
                                     isActive = reader["isActive"] != DBNull.Value ? reader.GetBoolean(reader.GetOrdinal("isActive")) : false,
                                     Description = reader.GetString(reader.GetOrdinal("Description")),
                                     flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                    size = reader.GetString(reader.GetOrdinal("Size"))
+                                    size = reader.GetString(reader.GetOrdinal("Size")),
+                                    customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                                 });
                             }
                         }
@@ -735,7 +784,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("inactive")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)] // Adjust authorization as needed
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)] // Adjust authorization as needed
         public async Task<IActionResult> GetInactiveOrders()
         {
             try
@@ -762,7 +811,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT * FROM orders WHERE isActive = @isActive";
+                string sql = "SELECT * FROM orders WHERE isActive = @isActive AND type IN ('normal', 'rush')";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@isActive", false);
@@ -790,6 +839,9 @@ namespace CRUDFI.Controllers
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
                                 PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                             });
                         }
                     }
@@ -855,6 +907,9 @@ namespace CRUDFI.Controllers
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
                                 PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                             });
                         }
                     }
@@ -933,6 +988,9 @@ namespace CRUDFI.Controllers
                                 Description = reader.GetString(reader.GetOrdinal("Description")),
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
+                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                             });
                         }
                     }
@@ -1568,7 +1626,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT * FROM orders";
+                string sql = "SELECT * FROM orders WHERE type IN ('normal', 'rush')";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1603,6 +1661,9 @@ namespace CRUDFI.Controllers
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
                                 PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
+                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
+
                             });
                         }
                     }
