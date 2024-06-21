@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using MySql.Data.MySqlClient;
+using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 
@@ -156,7 +157,7 @@ namespace CRUDFI.Controllers
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
                                     CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                    lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                    lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
                                     isActive = Convert.ToInt32(reader["quantity"]) > 0 // Determine isActive based on quantity
@@ -240,7 +241,7 @@ namespace CRUDFI.Controllers
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
                                 CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
                                 isActive = Convert.ToBoolean(reader["isActive"])
@@ -304,9 +305,9 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpGet("byname/{name}")]
+        [HttpGet("byname")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult GetIngredientByName(string name)
+        public IActionResult GetIngredientByName([FromQuery] string name)
         {
             try
             {
@@ -411,12 +412,17 @@ namespace CRUDFI.Controllers
 
         [HttpPatch("{id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public IActionResult UpdateIngredient(int id, [FromBody] IngriDTO updatedIngredient)
+        public async Task<IActionResult> UpdateIngredient(int id, [FromBody] IngriDTO updatedIngredient)
         {
             try
             {
                 // Retrieve the existing ingredient from the database
                 Ingri existingIngredient = GetIngredientFromDatabase(id);
+
+                if (existingIngredient == null)
+                {
+                    return NotFound();
+                }
 
                 // Extract the username from the token
                 var username = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -426,9 +432,11 @@ namespace CRUDFI.Controllers
                     return Unauthorized("User is not authorized");
                 }
 
-                if (existingIngredient == null)
+                // Get the last updated by user
+                string lastUpdatedBy = await GetLastupdater(username);
+                if (lastUpdatedBy == null)
                 {
-                    return NotFound();
+                    return Unauthorized("Username not found");
                 }
 
                 // Map properties from IngriDTO to Ingri
@@ -477,7 +485,7 @@ namespace CRUDFI.Controllers
                 }
 
                 // Set the last updated fields
-                existingIngredient.lastUpdatedBy = FetchUserId(username);
+                existingIngredient.lastUpdatedBy = lastUpdatedBy;
                 existingIngredient.lastUpdatedAt = DateTime.UtcNow;
 
                 // Update the ingredient in the database
@@ -491,6 +499,7 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
 
         [HttpDelete]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
@@ -642,7 +651,7 @@ namespace CRUDFI.Controllers
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
                                     CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                    lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                    lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
                                     isActive = Convert.ToBoolean(reader["isActive"]) // Ensure this matches your database type
@@ -664,6 +673,36 @@ namespace CRUDFI.Controllers
             return ingredients;
         }
 
+        private async Task<string> GetLastupdater(string username)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT Username FROM users WHERE Username = @username AND Type IN(3,4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@username", username);
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        // Return the binary value directly
+                        string user = (string)result;
+
+                        // Debug.WriteLine to display the value of userIdBytes
+                        Debug.WriteLine($"username: '{username}'");
+
+                        return user;
+                    }
+                    else
+                    {
+                        return null; // Employee not found or not of type 2 or 3
+                    }
+                }
+            }
+        }
 
         private byte[] FetchUserId(string username)
         {
@@ -724,7 +763,7 @@ namespace CRUDFI.Controllers
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
                                 CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
                                 isActive = Convert.ToInt32(reader["quantity"]) > 0
@@ -765,7 +804,7 @@ namespace CRUDFI.Controllers
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
                                 CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
                                 isActive = Convert.ToInt32(reader["quantity"]) > 0
@@ -806,7 +845,7 @@ namespace CRUDFI.Controllers
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
                                 CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
                                 isActive = Convert.ToInt32(reader["quantity"]) > 0
@@ -845,7 +884,7 @@ namespace CRUDFI.Controllers
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
                                 CreatedAt = Convert.ToDateTime(reader["createdAt"]),
-                                lastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? (byte[])reader["last_updated_by"] : null,
+                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
                                 isActive = Convert.ToInt32(reader["quantity"]) > 0

@@ -32,30 +32,14 @@ namespace CRUDFI.Controllers
         {
             try
             {
-                // Extract the customerUsername from the token
-                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
-
-                if (string.IsNullOrEmpty(customerUsername))
-                {
-                    return Unauthorized("User is not authorized");
-                }
-
-                // Get the customer's ID using the extracted username
-                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
-                if (customerId == null || customerId.Length == 0)
-                {
-                    return BadRequest("Customer not found");
-                }
-
-                // Get the customer's name
-                string customerName = await GetCustomerNameById(customerId);
-
                 // Get the design's ID using the provided design name
                 byte[] designId = await GetDesignIdByDesignName(designName);
                 if (designId == null || designId.Length == 0)
                 {
                     return BadRequest("Design not found");
                 }
+
+                string designame = await getDesignName(designName);
 
                 // Generate a new Guid for the Order's Id
                 var order = new Order
@@ -64,11 +48,12 @@ namespace CRUDFI.Controllers
                     orderName = orderDto.OrderName,
                     price = orderDto.Price,
                     quantity = orderDto.Quantity,
+                    designName = designame,
                     type = type,
                     size = size,
                     flavor = flavor,
                     isActive = false,
-                    customerName = customerName // Set the customerName
+                    customerName = orderDto.customerName
                 };
 
                 // Set isActive to false for all orders created
@@ -102,7 +87,7 @@ namespace CRUDFI.Controllers
                 order.Description = description;
 
                 // Insert the order into the database
-                await InsertOrder(order, customerId, designId, flavor, size);
+                await InsertOrder(order, designId, flavor, size);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -158,13 +143,14 @@ namespace CRUDFI.Controllers
                 {
                     return BadRequest("Design not found");
                 }
-
+                string designame = await getDesignName(designName);
                 // Generate a new Guid for the Order's Id
                 var order = new Order
                 {
                     Id = Guid.NewGuid(),
                     orderName = orderName,
                     price = price,
+                    designName = designName,
                     quantity = quantity,
                     type = "cart", // Automatically set the type to "cart"
                     size = size,
@@ -200,9 +186,9 @@ namespace CRUDFI.Controllers
                 await connection.OpenAsync();
 
                 string sql = @"INSERT INTO orders 
-            (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName) 
+            (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName. DesignName) 
             VALUES 
-            (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @customerName)";
+            (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @customerName, @DesignName)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -219,6 +205,7 @@ namespace CRUDFI.Controllers
                     command.Parameters.AddWithValue("@Flavor", flavor);
                     command.Parameters.AddWithValue("@Size", size);
                     command.Parameters.AddWithValue("@customerName", customerName); // Add customer name
+                    command.Parameters.AddWithValue("@DesignName", order.designName);
 
                     await command.ExecuteNonQueryAsync();
                 }
@@ -276,6 +263,7 @@ namespace CRUDFI.Controllers
         }
 
 
+
         [HttpGet]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllOrders()
@@ -288,7 +276,7 @@ namespace CRUDFI.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT OrderId, CustomerId, EmployeeId, CreatedAt, Status, HEX(DesignId) as DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName, EmployeeName FROM orders WHERE type IN ('normal', 'rush')";
+                    string sql = "SELECT OrderId, CustomerId, EmployeeId, CreatedAt, Status, HEX(DesignId) as DesignId, orderName, DesignName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName, EmployeeName FROM orders WHERE type IN ('normal', 'rush')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -304,6 +292,13 @@ namespace CRUDFI.Controllers
                                     employeeId = reader.GetGuid(reader.GetOrdinal("EmployeeId"));
                                 }
 
+                                Guid customerId = Guid.Empty;
+
+                                if (!reader.IsDBNull(reader.GetOrdinal("CustomerId")))
+                                {
+                                    customerId = reader.GetGuid(reader.GetOrdinal("CustomerId"));
+                                }
+
                                 // Read OrderId as byte array
                                 byte[] orderIdBytes = new byte[16];
                                 reader.GetBytes(reader.GetOrdinal("OrderId"), 0, orderIdBytes, 0, 16);
@@ -314,11 +309,12 @@ namespace CRUDFI.Controllers
                                 orders.Add(new Order
                                 {
                                     Id = orderId,
-                                    customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
+                                    customerId = customerId,
                                     employeeId = employeeId,
                                     CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                                     status = reader.GetString(reader.GetOrdinal("Status")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
+                                    designName = reader.GetString(reader.GetOrdinal("DesignName")),
                                     orderName = reader.GetString(reader.GetOrdinal("orderName")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -349,6 +345,75 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpGet("{orderId}/elements")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
+        public async Task<IActionResult> GetOrderElements(string orderId)
+        {
+            try
+            {
+                // Convert the orderId from GUID string to binary(16) format without '0x' prefix
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                List<ElementDTOS> elements = await GetOrderElementsFromDatabase(orderIdBinary);
+
+                if (elements == null || elements.Count == 0)
+                {
+                    return NotFound($"Order with ID '{orderId}' not found or has no elements.");
+                }
+
+                var orderElementsDto = new OrderElementsDTO
+                {
+                    Elements = elements
+                };
+
+                return Ok(orderElementsDto);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving elements for order with ID '{orderId}'");
+                return StatusCode(500, $"An error occurred while processing the request to retrieve elements for order with ID '{orderId}'.");
+            }
+        }
+
+
+        private async Task<List<ElementDTOS>> GetOrderElementsFromDatabase(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT i.Id AS ElementId, i.Item_name AS ElementName, i.price AS PricePerUnit, i.quantity " +
+                             "FROM orders o " +
+                             "JOIN order_elements oe ON o.OrderId = oe.OrderId " +
+                             "JOIN Item i ON oe.ElementId = i.Id " +
+                             "WHERE o.OrderId = UNHEX(@orderId) AND i.type = 'element'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        List<ElementDTOS> elements = new List<ElementDTOS>();
+
+                        while (await reader.ReadAsync())
+                        {
+                            ElementDTOS element = new ElementDTOS
+                            {
+                                ElementId = Convert.ToInt32(reader["ElementId"]),
+                                ElementName = reader["ElementName"].ToString(),
+                                PricePerUnit = Convert.ToDecimal(reader["PricePerUnit"]),
+                                Quantity = Convert.ToInt32(reader["Quantity"])
+                            };
+
+                            elements.Add(element);
+                        }
+
+                        return elements;
+                    }
+                }
+            }
+        }
 
 
         [HttpGet("total-orders")]
@@ -391,10 +456,11 @@ namespace CRUDFI.Controllers
         {
             try
             {
-                byte[] orderId = FromHexString(orderIdHex);
+                // Convert the hex string to a binary(16) formatted string
+                string binary16OrderId = ConvertGuidToBinary16(orderIdHex).ToLower();
 
                 // Fetch the specific order from the database
-                Order order = await GetOrderByIdFromDatabase(orderId);
+                Order order = await GetOrderByIdFromDatabase(binary16OrderId);
 
                 if (order == null)
                 {
@@ -410,13 +476,13 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task<Order> GetOrderByIdFromDatabase(byte[] orderId)
+        private async Task<Order> GetOrderByIdFromDatabase(string orderId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT * FROM orders WHERE OrderId = @orderId";
+                string sql = "SELECT * FROM orders WHERE OrderId = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -441,20 +507,15 @@ namespace CRUDFI.Controllers
                                 employeeId = employeeId,
                                 CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                                 status = reader.GetString(reader.GetOrdinal("Status")),
-                                designId = reader["DesignId"] as byte[],
+                                designName = reader.GetString(reader.GetOrdinal("DesignName")),
                                 orderName = reader.GetString(reader.GetOrdinal("orderName")),
                                 price = reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
-                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
                                 type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
-                                isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
                                 Description = reader.GetString(reader.GetOrdinal("Description")),
                                 flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                 size = reader.GetString(reader.GetOrdinal("Size")),
                                 PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
 
                             };
                         }
@@ -582,6 +643,36 @@ namespace CRUDFI.Controllers
             }
         }
 
+        private async Task<string> GetLastupdater(string username)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT Username FROM users WHERE Username = @username AND Type IN(3,4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@username", username);
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        // Return the binary value directly
+                        string user = (string)result;
+
+                        // Debug.WriteLine to display the value of userIdBytes
+                        Debug.WriteLine($"username: '{username}'");
+
+                        return user;
+                    }
+                    else
+                    {
+                        return null; // Employee not found or not of type 2 or 3
+                    }
+                }
+            }
+        }
 
         private async Task<byte[]> GetUserIdByUsername(string username)
         {
@@ -1081,10 +1172,10 @@ namespace CRUDFI.Controllers
                 }
 
                 // Fetch the user ID of the user performing the update
-                byte[] lastUpdatedBy = await GetUserIdByUsername(username);
+                string lastUpdatedBy = await GetLastupdater(username);
                 if (lastUpdatedBy == null)
                 {
-                    return Unauthorized("User ID not found");
+                    return Unauthorized("Username not found");
                 }
 
                 // Convert the hexadecimal orderId to binary(16) format with '0x' prefix for MySQL UNHEX function
@@ -1134,6 +1225,8 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
+
 
         private string ConvertGuidToBinary16(string guidString)
         {
@@ -1423,10 +1516,7 @@ namespace CRUDFI.Controllers
 
         [HttpPatch("updateorder")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> PatchOrderTypeAndPickupDate(
-    [FromQuery] string orderId,
-    [FromQuery] string type,
-    [FromQuery] string pickupTime)
+        public async Task<IActionResult> PatchOrderTypeAndPickupDate([FromQuery] string orderId, [FromQuery] string type, [FromQuery] string pickupTime)
         {
             try
             {
@@ -1556,7 +1646,117 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpPatch("updateOrderElements")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> PatchOrderElements([FromQuery] string orderId, [FromBody] OrderElementsUpdateDTO elementsUpdate)
+        {
+            try
+            {
+                // Convert the orderId from GUID string to binary(16) format without '0x' prefix
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
 
+                // Fetch the order from the database to ensure it exists
+                Order order = await GetOrderByIdFromDatabase(orderIdBinary);
+                if (order == null)
+                {
+                    return NotFound($"Order with orderId {orderId} not found.");
+                }
+
+                // Process additions and removals
+                await UpdateOrderElements(orderIdBinary, elementsUpdate);
+
+                return Ok($"Order with ID '{orderId}' has been successfully updated.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while processing the request to update elements for order with ID '{orderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to update elements for order with ID '{orderId}'.");
+            }
+        }
+
+        private async Task UpdateOrderElements(string orderIdBinary, OrderElementsUpdateDTO elementsUpdate)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var transaction = await connection.BeginTransactionAsync())
+                {
+                    try
+                    {
+                        // Add new elements
+                        if (elementsUpdate.ElementsToAdd != null && elementsUpdate.ElementsToAdd.Any())
+                        {
+                            foreach (var element in elementsUpdate.ElementsToAdd)
+                            {
+                                // Fetch the item ID from the item name
+                                int itemId = await GetItemIdByName(connection, transaction, element.Name);
+                                if (itemId == 0)
+                                {
+                                    throw new Exception($"Item with name '{element.Name}' not found.");
+                                }
+
+                                string sqlInsert = "INSERT INTO order_elements (OrderId, Id, quantity) VALUES (UNHEX(@orderId), @itemId, @quantity)";
+                                using (var command = new MySqlCommand(sqlInsert, connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                    command.Parameters.AddWithValue("@itemId", itemId);
+                                    command.Parameters.AddWithValue("@quantity", element.Quantity);
+                                    await command.ExecuteNonQueryAsync();
+                                }
+                            }
+                        }
+
+                        // Remove elements
+                        if (elementsUpdate.ElementsToRemove != null && elementsUpdate.ElementsToRemove.Any())
+                        {
+                            foreach (var elementName in elementsUpdate.ElementsToRemove)
+                            {
+                                // Fetch the item ID from the item name
+                                int itemId = await GetItemIdByName(connection, transaction, elementName);
+                                if (itemId == 0)
+                                {
+                                    throw new Exception($"Item with name '{elementName}' not found.");
+                                }
+
+                                string sqlDelete = "DELETE FROM order_elements WHERE OrderId = UNHEX(@orderId) AND Id = @itemId";
+                                using (var command = new MySqlCommand(sqlDelete, connection, transaction))
+                                {
+                                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                    command.Parameters.AddWithValue("@itemId", itemId);
+                                    await command.ExecuteNonQueryAsync();
+                                }
+                            }
+                        }
+
+                        await transaction.CommitAsync();
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync();
+                        throw;
+                    }
+                }
+            }
+        }
+
+        private async Task<int> GetItemIdByName(MySqlConnection connection, MySqlTransaction transaction, string itemName)
+        {
+            string sql = "SELECT Id FROM items WHERE Name = @name";
+            using (var command = new MySqlCommand(sql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@name", itemName);
+                var result = await command.ExecuteScalarAsync();
+                if (result != null && result != DBNull.Value)
+                {
+                    return Convert.ToInt32(result);
+                }
+                else
+                {
+                    return 0; // Item not found
+                }
+            }
+        }
 
 
         [HttpPatch("assignemployee")]
@@ -1716,7 +1916,28 @@ namespace CRUDFI.Controllers
             }
         }
 
+        private async Task<string> getDesignName(string design)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
 
+                string designQuery = "SELECT DisplayName FROM designs WHERE DisplayName = @displayName";
+                using(var designcommand = new MySqlCommand(designQuery, connection))
+                {
+                    designcommand.Parameters.AddWithValue("@displayName", design);
+                    object result = await designcommand.ExecuteScalarAsync();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        return (string)result;
+                    }
+                    else
+                    {
+                        return null; // Design not found
+                    }
+                }
+            }
+        }
 
         private async Task<byte[]> GetDesignIdByDesignName(string designName)
         {
@@ -1741,18 +1962,18 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order, byte[] customerId, byte[] designId, string flavor, string size)
+        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size) 
-                       VALUES (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size)";
+                string sql = @"INSERT INTO orders (OrderId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, DesignName) 
+                       VALUES (UNHEX(REPLACE(UUID(), '-', '')), NULL, @CustomerName, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @DesignName)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@CustomerName", order.customerName);
                     command.Parameters.AddWithValue("@designId", designId);
                     command.Parameters.AddWithValue("@status", order.status);
                     command.Parameters.AddWithValue("@order_name", order.orderName);
@@ -1764,7 +1985,7 @@ namespace CRUDFI.Controllers
                     command.Parameters.AddWithValue("@Description", order.Description);
                     command.Parameters.AddWithValue("@Flavor", flavor);
                     command.Parameters.AddWithValue("@Size", size);
-                    command.Parameters.AddWithValue("@CustomerName", order.customerName); // Add customerName parameter
+                    command.Parameters.AddWithValue("@DesignName", order.designName);
 
                     await command.ExecuteNonQueryAsync();
                 }

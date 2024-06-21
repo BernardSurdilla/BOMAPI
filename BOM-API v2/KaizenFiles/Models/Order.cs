@@ -8,11 +8,13 @@ namespace CRUDFI.Models
 
         public Guid Id { get; set; } 
 
-        public Guid customerId { get; set; }
+        public Guid? customerId { get; set; }
 
         public string customerName { get; set; } = string.Empty;
 
         public string employeeName { get; set; } = string.Empty;
+
+        public string designName {  get; set; } = string.Empty;
 
         public byte[]? designId { get; set; } = null;
 
@@ -47,6 +49,7 @@ namespace CRUDFI.Models
     public class OrderDTO
     {
         public string OrderName { get; set; } = "";
+        public string customerName { get; set; } = string.Empty;
         public double Price { get; set; }
         public int Quantity { get; set; }
     }
@@ -63,6 +66,27 @@ namespace CRUDFI.Models
         public string contact { get; set; }
         public int total { get; set; }
         public DateTime date { get; set; }
+    }
+    public class OrderElementsUpdateDTO
+    {
+        public List<ElementDTO> ElementsToAdd { get; set; }
+        public List<string> ElementsToRemove { get; set; }
+    }
+    public class ElementDTO
+    {
+        public string Name { get; set; }
+        public int Quantity { get; set; }
+    }
+    public class OrderElementsDTO
+    {
+        public List<ElementDTOS> Elements { get; set; }
+    }
+    public class ElementDTOS
+    {
+        public int ElementId { get; set; }
+        public string ElementName { get; set; }
+        public decimal PricePerUnit { get; set; }
+        public int Quantity { get; set; }
     }
 
 }
