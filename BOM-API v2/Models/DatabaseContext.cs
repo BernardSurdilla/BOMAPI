@@ -9,10 +9,14 @@ namespace BillOfMaterialsAPI.Models
         {
 
         }
+        public DbSet<PastryMaterials> PastryMaterials { get; set; }
         public DbSet<Ingredients> Ingredients { get; set; }
+
+        public DbSet<PastryMaterialSubVariants> PastryMaterialSubVariants { get; set; }
+        public DbSet<PastryMaterialSubVariantIngredients> PastryMaterialSubVariantIngredients { get; set; }
+
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
-        public DbSet<PastryMaterials> PastryMaterials { get; set; }
 
         public DbSet<Designs> Designs { get; set; }
         public DbSet<DesignTags> DesignTags { get; set; }

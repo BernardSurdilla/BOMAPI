@@ -112,6 +112,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public string design_id { get; set; }
         [Required] public string design_name { get; set;  }
         [Required][MaxLength(26)] public string pastry_material_id { get; set; }
+        public string main_variant_name { get; set; }
 
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
@@ -119,6 +120,7 @@ namespace BillOfMaterialsAPI.Schemas
         public double cost_estimate { get; set; }
 
         public List<GetPastryMaterialIngredients> ingredients { get; set; }
+        public List<GetPastryMaterialSubVariant>? sub_variants { get; set; }
 
         public static GetPastryMaterial DefaultResponse() { return new GetPastryMaterial(); }
         public GetPastryMaterial() { }
@@ -131,7 +133,6 @@ namespace BillOfMaterialsAPI.Schemas
             this.ingredients = ingredients;
         }
     }
-
     public class GetPastryMaterialIngredients
     {
         [Required] public string ingredient_id { get; set; }
@@ -148,8 +149,41 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
-        [Required] public List<SubGetMaterialIngredients> material_ingredients { get; set; }
+        public List<SubGetMaterialIngredients>? material_ingredients { get; set; }
 
+    }
+    public class GetPastryMaterialSubVariant
+    {
+        [Required][Key][MaxLength(26)] public string pastry_material_sub_variant_id { get; set; }
+        [Required][MaxLength(26)] public string pastry_material_id { get; set; }
+
+        public string sub_variant_name { get; set; }
+        public double cost_estimate { get; set; }
+
+        public List<SubGetPastryMaterialSubVariantIngredients> sub_variant_ingredients { get; set; }
+
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+    }
+    public class SubGetPastryMaterialSubVariantIngredients
+    {
+        [Required][Key][MaxLength(25)] public string pastry_material_sub_variant_ingredient_id { get; set; }
+        [Required][ForeignKey("PastryMaterialSubVariant")] public string pastry_material_sub_variant_id { get; set; }
+        //Which item in the inventory this ingredient pertains to
+        [Required][MaxLength(25)] public string item_id { get; set; }
+        [Required] public string item_name { get; set; }
+
+        //What kind of ingredient is this
+        //If wether it is from the inventory or a material
+        //Dictates where the API should look up the id in the item_id column
+        [Required][MaxLength(3)] public string ingredient_type { get; set; }
+
+        [Required] public double amount { get; set; }
+        [Required][MaxLength(15)] public string amount_measurement { get; set; }
+        public List<SubGetMaterialIngredients>? material_ingredients { get; set; }
+
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
     }
 
     //BOM Data analysis

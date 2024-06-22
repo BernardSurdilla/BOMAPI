@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Text;
 using UnitsNet;
 using BOM_API_v2.Services;
+using System.Runtime.CompilerServices;
 
 namespace BOM_API_v2.Controllers
 {
@@ -343,6 +344,181 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Data inserted to the database." });
 
         }
+        [HttpPost("{pastry_material_id}/sub_variants")]
+        public async Task<IActionResult> AddNewPastryMaterialSubVariant(string pastry_material_id, PostPastryMaterialSubVariant entry)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try
+            { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+
+            //Ingredient Verification
+            foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry.sub_variant_ingredients)
+            {
+                switch (subVariantIngredient.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        //!!!UNTESTED!!!
+                        Item? currentInventoryItemI = null;
+                        try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subVariantIngredient.item_id)).FirstAsync(); }
+
+                        catch (FormatException exF) { return BadRequest(new { message = "Invalid id format for " + subVariantIngredient.item_id + ", must be a value that can be parsed as an integer." }); }
+                        catch (InvalidOperationException exO) { return NotFound(new { message = "The id " + subVariantIngredient.item_id + " does not exist in the inventory" }); }
+
+                        if (currentInventoryItemI == null) { return NotFound(new { message = "Item " + subVariantIngredient.item_id + " is not found in the inventory." }); }
+                        if (ValidUnits.IsSameQuantityUnit(currentInventoryItemI.measurements, subVariantIngredient.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the inventory item id " + currentInventoryItemI.id + " does not have the same quantity unit as the referred inventory item" }); }
+
+                        break;
+                    case IngredientType.Material:
+                        //Check if item id exists on the 'Materials' table
+                        //or in the inventory
+                        Materials? currentReferredMaterial = null;
+                        try { currentReferredMaterial = await _context.Materials.Where(x => x.isActive == true && x.material_id == subVariantIngredient.item_id).FirstAsync(); }
+                        catch { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + subVariantIngredient.item_id }); }
+                        //Add additional code here for inventory id checking
+                        if (currentReferredMaterial == null) { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + subVariantIngredient.item_id }); }
+                        if (ValidUnits.IsSameQuantityUnit(currentReferredMaterial.amount_measurement, subVariantIngredient.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the material item id " + currentReferredMaterial.material_id + " does not have the same quantity unit as the referred material" }); }
+                        break;
+                    default:
+                        return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
+                }
+            }
+
+            DateTime currentTime = DateTime.Now;
+            string lastPastryMaterialSubVariantId = "";
+
+            try { PastryMaterialSubVariants x = await _context.PastryMaterialSubVariants.OrderByDescending(x => x.pastry_material_sub_variant_id).FirstAsync(); lastPastryMaterialSubVariantId = x.pastry_material_sub_variant_id; }
+            catch (Exception ex)
+            {
+                string newPastryMaterialSubVariantId = IdFormat.pastryMaterialSubVariantIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialSubVariantId += "0"; }
+                lastPastryMaterialSubVariantId = newPastryMaterialSubVariantId;
+            }
+            string newPastryId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIdFormat, IdFormat.idNumLength, lastPastryMaterialSubVariantId);
+            lastPastryMaterialSubVariantId = newPastryId;
+
+            PastryMaterialSubVariants newSubMaterialDbEntry = new PastryMaterialSubVariants();
+            newSubMaterialDbEntry.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
+            newSubMaterialDbEntry.pastry_material_id = pastry_material_id;
+            newSubMaterialDbEntry.sub_variant_name = entry.sub_variant_name;
+            newSubMaterialDbEntry.date_added = currentTime;
+            newSubMaterialDbEntry.last_modified_date = currentTime;
+            newSubMaterialDbEntry.isActive = true;
+
+            await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
+            await _context.SaveChangesAsync();
+
+            string lastSubVariantIngredientId = "";
+            try { PastryMaterialSubVariantIngredients x = await _context.PastryMaterialSubVariantIngredients.OrderByDescending(x => x.pastry_material_sub_variant_ingredient_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_ingredient_id; }
+            catch (Exception ex)
+            {
+                string newSubVariantIngredientId = IdFormat.pastryMaterialSubVariantIngredientIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantIngredientId += "0"; }
+                lastSubVariantIngredientId = newSubVariantIngredientId;
+            }
+
+            foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry.sub_variant_ingredients)
+            {
+                PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
+                string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIngredientIdFormat, IdFormat.idNumLength, lastSubVariantIngredientId);
+                lastSubVariantIngredientId = newId;
+
+                Debug.WriteLine(lastPastryMaterialSubVariantId);
+                newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = lastSubVariantIngredientId;
+                newSubVariantIngredient.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
+
+                newSubVariantIngredient.date_added = currentTime;
+                newSubVariantIngredient.last_modified_date = currentTime;
+                newSubVariantIngredient.isActive = true;
+
+                newSubVariantIngredient.item_id = subVariantIngredient.item_id;
+                newSubVariantIngredient.ingredient_type = subVariantIngredient.ingredient_type;
+                newSubVariantIngredient.amount = subVariantIngredient.amount;
+                newSubVariantIngredient.amount_measurement = subVariantIngredient.amount_measurement;
+
+                await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
+            }
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "POST", "Add Sub variant " + lastPastryMaterialSubVariantId + " for " + pastry_material_id);
+            return Ok(new { message = "New sub variant for " + pastry_material_id + " added" });
+        }
+        [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
+        public async Task<IActionResult> AddNewPastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients entry)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); }; 
+
+                
+            PastryMaterialSubVariants? currentPastryMaterialSubVariant = null;
+            try { currentPastryMaterialSubVariant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material sub variant with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material sub variant with the specified id found." }); };
+
+            switch (entry.ingredient_type)
+            {
+                case IngredientType.InventoryItem:
+                    //!!!UNTESTED!!!
+                    Item? currentInventoryItemI = null;
+                    try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(entry.item_id)).FirstAsync(); }
+
+                    catch (FormatException exF) { return BadRequest(new { message = "Invalid id format for " + entry.item_id + ", must be a value that can be parsed as an integer." }); }
+                    catch (InvalidOperationException exO) { return NotFound(new { message = "The id " + entry.item_id + " does not exist in the inventory" }); }
+
+                    if (currentInventoryItemI == null) { return NotFound(new { message = "Item " + entry.item_id + " is not found in the inventory." }); }
+                    if (ValidUnits.IsSameQuantityUnit(currentInventoryItemI.measurements, entry.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the inventory item id " + currentInventoryItemI.id + " does not have the same quantity unit as the referred inventory item" }); }
+
+                    break;
+                case IngredientType.Material:
+                    //Check if item id exists on the 'Materials' table
+                    //or in the inventory
+                    Materials? currentReferredMaterial = null;
+                    try { currentReferredMaterial = await _context.Materials.Where(x => x.isActive == true && x.material_id == entry.item_id).FirstAsync(); }
+                    catch { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + entry.item_id }); }
+                    //Add additional code here for inventory id checking
+                    if (currentReferredMaterial == null) { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + entry.item_id }); }
+                    if (ValidUnits.IsSameQuantityUnit(currentReferredMaterial.amount_measurement, entry.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the material item id " + currentReferredMaterial.material_id + " does not have the same quantity unit as the referred material" }); }
+                    break;
+                default:
+                    return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
+            }
+
+            string lastSubVariantIngredientId = "";
+            try { PastryMaterialSubVariantIngredients x = await _context.PastryMaterialSubVariantIngredients.OrderByDescending(x => x.pastry_material_sub_variant_ingredient_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_ingredient_id; }
+            catch (Exception ex)
+            {
+                string newSubVariantIngredientId = IdFormat.pastryMaterialSubVariantIngredientIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantIngredientId += "0"; }
+                lastSubVariantIngredientId = newSubVariantIngredientId;
+            }
+            PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
+            string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIngredientIdFormat, IdFormat.idNumLength, lastSubVariantIngredientId);
+            lastSubVariantIngredientId = newId;
+
+            DateTime currentTime = DateTime.Now;
+
+            PastryMaterialSubVariantIngredients newSubVariantIngredientEntry = new PastryMaterialSubVariantIngredients();
+            newSubVariantIngredientEntry.pastry_material_sub_variant_ingredient_id = lastSubVariantIngredientId;
+            newSubVariantIngredientEntry.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
+
+            newSubVariantIngredientEntry.item_id = entry.item_id;
+            newSubVariantIngredientEntry.ingredient_type = entry.ingredient_type;
+            newSubVariantIngredientEntry.amount = entry.amount;
+            newSubVariantIngredientEntry.amount_measurement = entry.amount_measurement;
+
+            newSubVariantIngredientEntry.date_added = currentTime;
+            newSubVariantIngredientEntry.last_modified_date = currentTime;
+            newSubVariantIngredientEntry.isActive = true;
+
+            await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredientEntry);
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "POST", "Add Sub variant ingredient for " + pastry_material_sub_variant_id + " of " + pastry_material_id);
+            return Ok(new { message = "New sub variant ingredient for " + pastry_material_sub_variant_id + " added" });
+        }
 
         //PATCH
         [HttpPatch("{pastry_material_id}")]
@@ -670,16 +846,18 @@ namespace BOM_API_v2.Controllers
             response.design_id = Convert.ToBase64String(data.design_id);
             try { Designs? selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.design_name = selectedDesign.display_name; }
             catch (Exception e) { response.design_name = "N/A"; }
+
             response.pastry_material_id = data.pastry_material_id;
             response.date_added = data.date_added;
             response.last_modified_date = data.last_modified_date;
+            response.main_variant_name = data.main_variant_name;
 
             List<GetPastryMaterialIngredients> responsePastryMaterialList = new List<GetPastryMaterialIngredients>();
+            List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
-
             foreach (Ingredients currentIngredient in currentPastryMaterialIngredients)
             {
                 GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
@@ -893,7 +1071,240 @@ namespace BOM_API_v2.Controllers
                 }
                 responsePastryMaterialList.Add(newSubIngredientListEntry);
             }
+
+            List<PastryMaterialSubVariants> currentPastryMaterialSubVariants = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            foreach (PastryMaterialSubVariants currentSubVariant in currentPastryMaterialSubVariants)
+            {
+                GetPastryMaterialSubVariant newSubVariantListRow = new GetPastryMaterialSubVariant();
+                newSubVariantListRow.pastry_material_id = currentSubVariant.pastry_material_id;
+                newSubVariantListRow.pastry_material_sub_variant_id = currentSubVariant.pastry_material_sub_variant_id;
+                newSubVariantListRow.sub_variant_name = currentSubVariant.sub_variant_name;
+                newSubVariantListRow.date_added = currentSubVariant.date_added;
+                newSubVariantListRow.last_modified_date = currentSubVariant.last_modified_date;
+
+                double estimatedCostSubVariant = calculatedCost;
+
+                List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await _context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+                List<SubGetPastryMaterialSubVariantIngredients> currentSubVariantIngredientList = new List<SubGetPastryMaterialSubVariantIngredients>();
+
+                foreach (PastryMaterialSubVariantIngredients currentSubVariantIngredient in currentSubVariantIngredients)
+                {
+                    SubGetPastryMaterialSubVariantIngredients newSubVariantIngredientListEntry = new SubGetPastryMaterialSubVariantIngredients();
+                    newSubVariantIngredientListEntry.pastry_material_sub_variant_id = currentSubVariantIngredient.pastry_material_sub_variant_id;
+                    newSubVariantIngredientListEntry.pastry_material_sub_variant_ingredient_id = currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id;
+
+                    newSubVariantIngredientListEntry.date_added = currentSubVariantIngredient.date_added;
+                    newSubVariantIngredientListEntry.last_modified_date = currentSubVariantIngredient.last_modified_date;
+
+                    newSubVariantIngredientListEntry.ingredient_type = currentSubVariantIngredient.ingredient_type;
+                    newSubVariantIngredientListEntry.amount_measurement = currentSubVariantIngredient.amount_measurement;
+                    newSubVariantIngredientListEntry.amount = currentSubVariantIngredient.amount;
+                    //Check if the measurement unit in the ingredient record is valid
+                    //If not found, skip current ingredient
+                    string? amountQuantityType = null;
+                    string? amountUnitMeasurement = null;
+
+                    bool isAmountMeasurementValid = false;
+                    foreach (string unitQuantity in validMeasurementUnits.Keys)
+                    {
+                        List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                        string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(currentSubVariantIngredient.amount_measurement));
+
+                        if (currentMeasurement == null) { continue; }
+                        else
+                        {
+                            isAmountMeasurementValid = true;
+                            amountQuantityType = unitQuantity;
+                            amountUnitMeasurement = currentMeasurement;
+                        }
+                    }
+                    if (isAmountMeasurementValid == false)
+                    {
+                        throw new InvalidOperationException("The sub pastry material ingredient of " + currentSubVariant.pastry_material_sub_variant_id + " has an ingredient with an invalid measurement unit: " + currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id);
+                    }
+
+                    switch (currentSubVariantIngredient.ingredient_type)
+                    {
+                        case IngredientType.InventoryItem:
+                            {
+                                Item? currentInventoryItemI = null;
+                                try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(currentSubVariantIngredient.item_id)).FirstAsync(); }
+                                catch { continue; }
+                                if (currentInventoryItemI == null) { continue; }
+
+                                newSubVariantIngredientListEntry.item_name = currentInventoryItemI.item_name;
+                                newSubVariantIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
+
+                                double convertedAmountI = 0.0;
+                                double calculatedAmountI = 0.0;
+                                if (amountQuantityType != "Count")
+                                {
+                                    convertedAmountI = UnitConverter.ConvertByName(currentSubVariantIngredient.amount, amountQuantityType, amountUnitMeasurement, currentInventoryItemI.measurements);
+                                    calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
+                                }
+                                else
+                                {
+                                    convertedAmountI = currentSubVariantIngredient.amount;
+                                    calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
+                                }
+                                estimatedCostSubVariant += calculatedAmountI;
+                                break;
+                            }
+                        case IngredientType.Material:
+                            {
+                                Materials? currentReferencedMaterial = await _context.Materials.Where(x => x.material_id == currentSubVariantIngredient.item_id && x.isActive == true).FirstAsync();
+                                if (currentReferencedMaterial == null) { continue; }
+
+                                newSubVariantIngredientListEntry.item_name = currentReferencedMaterial.material_name;
+                                newSubVariantIngredientListEntry.item_id = currentReferencedMaterial.material_id;
+
+                                List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == currentSubVariantIngredient.item_id).ToListAsync();
+
+                                if (!currentMaterialReferencedIngredients.IsNullOrEmpty())
+                                {
+                                    List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
+
+                                    foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                    {
+                                        SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients();
+
+                                        switch (materialIngredients.ingredient_type)
+                                        {
+                                            case IngredientType.InventoryItem:
+                                                Item? currentSubMaterialReferencedInventoryItem = null;
+                                                try { currentSubMaterialReferencedInventoryItem = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                                                catch { continue; }
+                                                if (currentSubMaterialReferencedInventoryItem == null) { continue; }
+                                                else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; }
+                                                break;
+                                            case IngredientType.Material:
+                                                Materials? currentSubMaterialReferencedMaterial = await _context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.isActive == true).FirstAsync();
+                                                if (currentSubMaterialReferencedMaterial == null) { continue; }
+                                                else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedMaterial.material_name; }
+                                                break;
+                                        }
+                                        newEntryMaterialIngredientsEntry.material_id = materialIngredients.material_id;
+                                        newEntryMaterialIngredientsEntry.material_ingredient_id = materialIngredients.material_ingredient_id;
+                                        newEntryMaterialIngredientsEntry.item_id = materialIngredients.item_id;
+                                        newEntryMaterialIngredientsEntry.ingredient_type = materialIngredients.ingredient_type;
+                                        newEntryMaterialIngredientsEntry.amount = materialIngredients.amount;
+                                        newEntryMaterialIngredientsEntry.amount_measurement = materialIngredients.amount_measurement;
+                                        newEntryMaterialIngredientsEntry.date_added = materialIngredients.date_added;
+                                        newEntryMaterialIngredientsEntry.last_modified_date = materialIngredients.last_modified_date;
+
+                                        newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
+                                    }
+                                    newSubVariantIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                }
+                                else
+                                {
+                                    newSubVariantIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                }
+                                //Price calculation code
+                                //Get all ingredient for currently referenced material
+                                List<MaterialIngredients> subIngredientsForcurrentSubVariantIngredient = currentMaterialReferencedIngredients.Where(x => x.ingredient_type == IngredientType.InventoryItem).ToList();
+                                double currentSubIngredientCostMultiplier = amountUnitMeasurement.Equals(currentReferencedMaterial.amount_measurement) ? currentReferencedMaterial.amount / currentSubVariantIngredient.amount : currentReferencedMaterial.amount / UnitConverter.ConvertByName(currentSubVariantIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedMaterial.amount_measurement);
+                                foreach (MaterialIngredients subIng in subIngredientsForcurrentSubVariantIngredient)
+                                {
+                                    Item? currentReferencedIngredientM = null;
+                                    try { currentReferencedIngredientM = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
+                                    catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+
+                                    double currentRefItemPrice = currentReferencedIngredientM.price;
+                                    double ingredientCost = currentReferencedIngredientM.measurements == subIng.amount_measurement ? (currentRefItemPrice * currentSubVariantIngredient.amount) * currentSubIngredientCostMultiplier : (currentRefItemPrice * UnitConverter.ConvertByName(currentSubVariantIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+
+                                    estimatedCostSubVariant += ingredientCost;
+                                }
+
+                                //Get All material types of ingredient of the current ingredient
+                                List<MaterialIngredients> subMaterials = currentMaterialReferencedIngredients.Where(x => x.ingredient_type == IngredientType.Material).ToList();
+                                int subMaterialIngLoopIndex = 0;
+                                bool isLoopingThroughSubMaterials = true;
+
+                                while (isLoopingThroughSubMaterials)
+                                {
+                                    MaterialIngredients currentSubMaterial;
+                                    try { currentSubMaterial = subMaterials[subMaterialIngLoopIndex]; }
+                                    catch (Exception e) { isLoopingThroughSubMaterials = false; break; }
+
+                                    Materials currentReferencedMaterialForSub = await _context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
+
+                                    string refMatMeasurement = currentReferencedMaterialForSub.amount_measurement;
+                                    double refMatAmount = currentReferencedMaterialForSub.amount;
+
+                                    string subMatMeasurement = currentSubMaterial.amount_measurement;
+                                    double subMatAmount = currentSubMaterial.amount;
+
+                                    string measurementQuantity = "";
+
+                                    foreach (string unitQuantity in validMeasurementUnits.Keys)
+                                    {
+                                        List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                                        string? currentSubMatMeasurement = currentQuantityUnits.Find(x => x.Equals(subMatMeasurement));
+                                        string? currentRefMatMeasurement = currentQuantityUnits.Find(x => x.Equals(refMatMeasurement));
+
+                                        if (currentSubMatMeasurement != null && currentRefMatMeasurement != null) { measurementQuantity = unitQuantity; }
+                                        else { continue; }
+                                    }
+
+                                    double costMultiplier = refMatMeasurement == subMatMeasurement ? refMatAmount / subMatAmount : refMatAmount / UnitConverter.ConvertByName(subMatAmount, measurementQuantity, subMatMeasurement, refMatMeasurement);
+
+                                    List<MaterialIngredients> subMaterialIngredients = await _context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
+                                    foreach (MaterialIngredients subMaterialIngredientsRow in subMaterialIngredients)
+                                    {
+                                        switch (subMaterialIngredientsRow.ingredient_type)
+                                        {
+                                            case IngredientType.InventoryItem:
+                                                Item? refItemForSubMatIng = null;
+                                                try { refItemForSubMatIng = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
+                                                catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+
+                                                string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
+                                                double subMatIngRowAmount = subMaterialIngredientsRow.amount;
+
+                                                string refItemMeasurement = refItemForSubMatIng.measurements;
+                                                double refItemPrice = refItemForSubMatIng.price;
+
+                                                string refItemQuantityUnit = "";
+                                                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                                                {
+                                                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                                                    string? currentSubMatMeasurement = currentQuantityUnits.Find(x => x.Equals(subMatIngRowMeasurement));
+                                                    string? currentRefMatMeasurement = currentQuantityUnits.Find(x => x.Equals(refItemMeasurement));
+
+                                                    if (currentSubMatMeasurement != null && currentRefMatMeasurement != null) { refItemQuantityUnit = unitQuantity; }
+                                                    else { continue; }
+                                                }
+
+                                                double currentSubMaterialIngredientPrice = refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? (refItemPrice * subMatIngRowAmount) * costMultiplier : (refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+
+                                                estimatedCostSubVariant += currentSubMaterialIngredientPrice;
+                                                break;
+                                            case IngredientType.Material:
+                                                subMaterials.Add(subMaterialIngredientsRow);
+                                                break;
+                                        }
+                                    }
+                                    subMaterialIngLoopIndex += 1;
+
+                                    break;
+                                }
+                                break;
+                            }
+                    }
+                    currentSubVariantIngredientList.Add(newSubVariantIngredientListEntry);
+                }
+                newSubVariantListRow.cost_estimate = estimatedCostSubVariant;
+                newSubVariantListRow.sub_variant_ingredients = currentSubVariantIngredientList;
+
+                responsePastryMaterialSubVariants.Add(newSubVariantListRow);
+            }
+
             response.ingredients = responsePastryMaterialList;
+            response.sub_variants = responsePastryMaterialSubVariants;
             response.cost_estimate = calculatedCost;
             return response;
         }

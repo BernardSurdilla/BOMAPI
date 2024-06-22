@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -44,6 +45,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class PostPastryMaterial
     {
         [Required] public byte[] design_id { get; set; }
+        [Required] public string main_variant_name { get; set; }
         [Required] public List<PostIngredients> ingredients { get; set; }
     }
     public class PostIngredients
@@ -55,6 +57,21 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
+    public class PostPastryMaterialSubVariant
+    {
+        [Required] public string sub_variant_name { get; set; }
+        [Required] public List<PostPastryMaterialSubVariantIngredients> sub_variant_ingredients { get; set; }
+    }
+    public class PostPastryMaterialSubVariantIngredients
+    {
+        //Which item in the inventory this ingredient pertains to
+        [Required][MaxLength(25)] public string item_id { get; set; }
+        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+
+        [Required] public double amount { get; set; }
+        [Required][MaxLength(15)] public string amount_measurement { get; set; }
+    }
+
     public class PostDesign
     {
         [MaxLength(50)] public string display_name { get; set; }

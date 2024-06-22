@@ -5,6 +5,28 @@ using System.Runtime.InteropServices;
 
 namespace BillOfMaterialsAPI.Schemas
 {
+    
+    public static class IngredientType
+    {
+        public const string Material = "MAT";
+        public const string InventoryItem = "INV";
+    }
+
+    //Table for the components of a cake (or any pastry)
+    [PrimaryKey("pastry_material_id")]
+    public class PastryMaterials
+    {
+        [Required][ForeignKey("Designs")][MaxLength(16)] public byte[] design_id;
+        [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
+
+        [Required] public string main_variant_name { get; set; }
+
+        [Required] public bool isActive { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+
+        public Designs Designs { get; set; }
+    }
     [PrimaryKey("ingredient_id")]
     public class Ingredients
     {
@@ -30,27 +52,42 @@ namespace BillOfMaterialsAPI.Schemas
         public PastryMaterials PastryMaterials { get; set; }
 
     }
-    public static class IngredientType
+    [PrimaryKey("pastry_material_sub_variant_id")]
+    public class PastryMaterialSubVariants
     {
-        public const string Material = "MAT";
-        public const string InventoryItem = "INV";
-    }
+        [Required][Key][MaxLength(26)] public string pastry_material_sub_variant_id { get; set; }
+        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
 
-    //Table for the components of a cake (or any pastry)
-    [PrimaryKey("pastry_material_id")]
-    public class PastryMaterials
-    {
-        [Required][ForeignKey("Designs")][MaxLength(16)] public byte[] design_id;
-        [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
+        [Required] public string sub_variant_name { get; set; }
 
         [Required] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
-        public Designs Designs { get; set; }
+
+        public PastryMaterials PastryMaterials { get; set; }
     }
-    public class SubPastryMaterials_materials_column
+    [PrimaryKey("pastry_material_sub_variant_ingredient_id")]
+    public class PastryMaterialSubVariantIngredients
     {
-        [Required][MaxLength(25)] public string mat_ing_id { get; set; }
+        [Required][Key][MaxLength(25)] public string pastry_material_sub_variant_ingredient_id { get; set; }
+
+        [Required][ForeignKey("PastryMaterialSubVariants")] public string pastry_material_sub_variant_id { get; set; }
+        //Which item in the inventory this ingredient pertains to
+        [Required][MaxLength(25)] public string item_id { get; set; }
+
+        //What kind of ingredient is this
+        //If wether it is from the inventory or a material
+        //Dictates where the API should look up the id in the item_id column
+        [Required][MaxLength(3)][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+
+        [Required] public double amount { get; set; }
+        [Required][MaxLength(15)] public string amount_measurement { get; set; }
+
+        [Required] public bool isActive { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+
+        public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
     }
 
     //Pastry ingredients that is made from a combination of 2 or more items
@@ -167,7 +204,7 @@ namespace BillOfMaterialsAPI.Schemas
         [MaxLength(20)] public string type { get; set; }
         public bool isActive { get; set; }
         [Column("createdAt")] public DateTime created_at { get; set; }
-        [MaxLength(50)] public byte[]? last_updated_by { get; set; }
+        [MaxLength(50)] public string? last_updated_by { get; set; }
         public DateTime last_updated_at { get; set; }
 
         public string measurements { get; set; }

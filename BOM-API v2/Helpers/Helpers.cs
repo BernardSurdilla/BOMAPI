@@ -5,8 +5,10 @@ namespace BillOfMaterialsAPI.Helpers
     {
         public static string materialIdFormat = "MID";
         public static string materialIngredientIdFormat = "MIID";
-        public static string ingredientIdFormat = "IID";
         public static string pastryMaterialIdFormat = "PMID";
+        public static string ingredientIdFormat = "IID";
+        public static string pastryMaterialSubVariantIdFormat = "SVID";
+        public static string pastryMaterialSubVariantIngredientIdFormat = "SVIID";
         public static string logsIdFormat = "LOG";
         public static int idNumLength = 12;
 
