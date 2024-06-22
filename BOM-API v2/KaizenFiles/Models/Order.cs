@@ -8,11 +8,13 @@ namespace CRUDFI.Models
 
         public Guid Id { get; set; }
 
-        public Guid customerId { get; set; }
+        public Guid? customerId { get; set; }
 
         public string customerName { get; set; } = string.Empty;
 
         public string employeeName { get; set; } = string.Empty;
+
+        public string designName {  get; set; } = string.Empty;
 
         public byte[]? designId { get; set; } = null;
 
@@ -47,6 +49,7 @@ namespace CRUDFI.Models
     public class OrderDTO
     {
         public string OrderName { get; set; } = "";
+        public string customerName { get; set; } = string.Empty;
         public double Price { get; set; }
         public int Quantity { get; set; }
     }
@@ -63,6 +66,65 @@ namespace CRUDFI.Models
         public string contact { get; set; }
         public int total { get; set; }
         public DateTime date { get; set; }
+    }
+    public class DesignAddOnsUpdateDTO
+    {
+        public List<AddOnDTO> AddOnsToAdd { get; set; }
+        public List<string> AddOnsToRemove { get; set; }
+    }
+
+    public class AddOnDTO
+    {
+        public string Name { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public class DesignAddOnsDTO
+    {
+        public List<AddOnDTOS> AddOns { get; set; }
+    }
+
+    public class AddOnDTOS
+    {
+        public int AddOnId { get; set; }
+        public string AddOnName { get; set; }
+        public double PricePerUnit { get; set; }
+        public int Quantity { get; set; }
+    }
+    public class AddOnDPOS
+    {
+        public int DesignAddOnId { get; set; }  
+        public DateTime DateAdded {  get; set; }
+        public DateTime? LastModifiedDate { get; set; }
+        public int AddOnId { get; set; }
+        public string AddOnName { get; set; }
+        public double PricePerUnit { get; set; }
+        public int Quantity { get; set; }
+        public bool IsActive { get; set; }
+    }
+    public class AddOnDSOS
+    {
+        public string AddOnName { get; set; }
+        public double PricePerUnit { get; set; }
+    }
+    public class AddOns
+    {
+        public int addOnsId { get; set; }
+        public string name { get; set; }
+        public double pricePerUnit { get; set; }
+        public int quantity { get; set; }
+        public double size { get; set; }
+        public DateTime DateAdded { get; set; }
+        public DateTime? LastModifiedDate { get; set; }
+        public bool IsActive { get; set; }
+    }
+    public class AddOnDetails
+    {
+        public string name { get; set; }
+        public double pricePerUnit { get; set; }
+        public int quantity { get; set; }
+        public double size { get; set; }
+
     }
 
 }

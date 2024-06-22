@@ -25,7 +25,7 @@
 
         public string username { get; set; } = "";
 
-        public byte[]? lastUpdatedBy { get; set; } 
+        public string? lastUpdatedBy { get; set; } 
 
         public DateTime lastUpdatedAt { get; set; }
     }
@@ -67,7 +67,7 @@
 
         public DateTime CreatedAt { get; set; }
 
-        public byte[]? lastUpdatedBy { get; set; }
+        public string? lastUpdatedBy { get; set; }
 
         public DateTime lastUpdatedAt { get; set; }
 
