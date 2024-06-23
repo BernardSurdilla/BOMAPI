@@ -47,6 +47,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public byte[] design_id { get; set; }
         [Required] public string main_variant_name { get; set; }
         [Required] public List<PostIngredients> ingredients { get; set; }
+        public List<PostPastryMaterialSubVariant>? sub_variants { get; set; }
     }
     public class PostIngredients
     {
