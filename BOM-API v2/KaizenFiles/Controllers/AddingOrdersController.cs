@@ -1431,7 +1431,6 @@ namespace CRUDFI.Controllers
         }
 
 
-
         [HttpPatch("confirmation")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderIdHex, [FromQuery] string action)
@@ -1461,11 +1460,54 @@ namespace CRUDFI.Controllers
                     // Get the current order status
                     bool isActive = await GetOrderStatus(orderIdBinary);
 
+                    // Retrieve the DesignId as a Base64 string
+                    string designIdBase64 = await GetDesignIdByOrderId(orderIdBinary);
+
+                    if (string.IsNullOrEmpty(designIdBase64))
+                    {
+                        return NotFound($"No DesignId found for order with ID '{orderIdHex}'.");
+                    }
+
+                    // Convert Base64 string to binary (hex string)
+                    string designIdHex = ConvertBase64ToBinary16(designIdBase64).ToLower();
+
+                    // Retrieve DesignAddOnId, AddOnName, and Quantity from DesignAddOns table
+                    string sqlGetDesignAddOns = @"SELECT DesignAddOnId, AddOnName, Quantity
+                                          FROM DesignAddOns
+                                          WHERE DesignId = UNHEX(@designId)";
+                    List<(int DesignAddOnId, string AddOnName, int Quantity)> designAddOnsList = new List<(int, string, int)>();
+                    using (var getDesignAddOnsCommand = new MySqlCommand(sqlGetDesignAddOns, connection))
+                    {
+                        getDesignAddOnsCommand.Parameters.AddWithValue("@designId", designIdHex);
+                        using (var reader = await getDesignAddOnsCommand.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                int designAddOnId = reader.GetInt32(0);
+                                string addOnName = reader.GetString(1);
+                                int quantity = reader.GetInt32(2);
+                                designAddOnsList.Add((designAddOnId, addOnName, quantity));
+                            }
+                        }
+                    }
+
                     // Update the order status based on the action
                     if (action.Equals("confirm", StringComparison.OrdinalIgnoreCase))
                     {
                         if (!isActive)
                         {
+                            // Update AddOns quantities for each DesignAddOn entry
+                            foreach (var (DesignAddOnId, AddOnName, Quantity) in designAddOnsList)
+                            {
+                                string sqlUpdateAddOns = "UPDATE AddOns SET quantity = quantity - @Quantity WHERE name = @AddOnName";
+                                using (var updateAddOnsCommand = new MySqlCommand(sqlUpdateAddOns, connection))
+                                {
+                                    updateAddOnsCommand.Parameters.AddWithValue("@Quantity", Quantity);
+                                    updateAddOnsCommand.Parameters.AddWithValue("@AddOnName", AddOnName);
+                                    await updateAddOnsCommand.ExecuteNonQueryAsync();
+                                }
+                            }
+
                             // Set isActive to true
                             await UpdateOrderStatus(orderIdBinary, true);
                             await UpdateStatus(orderIdBinary, "confirmed");
