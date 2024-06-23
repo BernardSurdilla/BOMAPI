@@ -163,7 +163,6 @@ namespace BOM_API_v2.Controllers
             Designs? selectedDesign;
             string decodedId = designId;
             byte[]? byteArrEncodedId = null;
-
             try
             {
                 decodedId = Uri.UnescapeDataString(designId);
@@ -171,7 +170,7 @@ namespace BOM_API_v2.Controllers
             }
             catch { return new GetDesign(); }
 
-            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
             catch (Exception e) { return new GetDesign(); }
 
             GetDesign response = await CreateGetDesignResponseFromDbRow(selectedDesign);

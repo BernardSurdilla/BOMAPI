@@ -249,13 +249,6 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public string display_name { get; set; }
         [Required] public string pastry_material_id { get; set; }
     }
-    /*
-    public class SubGetDesignTags
-    {
-        //public Guid design_tag_id;
-        public string design_tag_name;
-    }
-    */
     public class SubGetDesignImage
     {
         public Guid design_picture_id { get; set; }
@@ -269,5 +262,17 @@ namespace BillOfMaterialsAPI.Schemas
     public class GetTag
     {
         public string design_tag_name { get; set; }
+    }
+
+    //UI Helpers
+    public class GetDesignInfo
+    {
+        public string pastry_material_id { get; set; }
+        public List<SubGetVariants> variants { get; set; }
+    }
+    public class SubGetVariants
+    {
+        public string variant_name { get; set; }
+        public double cost_estimate { get; set; }
     }
 }

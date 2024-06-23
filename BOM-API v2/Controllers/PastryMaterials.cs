@@ -876,8 +876,6 @@ namespace BOM_API_v2.Controllers
         //
         // INVENTORY ACTIONS
         //
-
-        //!!!UNTESTED!!!
         [HttpPost("{pastry_material_id}/subtract_recipe_ingredients_on_inventory/{variant_name}")]
         public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_name)
         {
