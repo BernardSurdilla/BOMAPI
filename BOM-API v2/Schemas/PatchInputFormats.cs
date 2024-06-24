@@ -38,4 +38,11 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
     }
+    public class PatchDesignAddOns
+    {
+        [Required] public int add_ons_id { get; set; }
+        [Required][MaxLength(50)] public string add_on_name { get; set; }
+        [Required] public int quantity { get; set; }
+        [Required] public double price { get; set; }
+    }
 }
