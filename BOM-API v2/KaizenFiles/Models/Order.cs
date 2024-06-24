@@ -106,6 +106,7 @@ namespace CRUDFI.Models
     {
         public string AddOnName { get; set; }
         public double PricePerUnit { get; set; }
+        public int AddOnId { get; set; }
     }
     public class AddOns
     {
@@ -126,5 +127,36 @@ namespace CRUDFI.Models
         public double size { get; set; }
 
     }
+    public class ManageAddOnsRequest
+    {
+        public List<ManageAddOnAction> Actions { get; set; }
+    }
 
+    public class ManageAddOnAction
+    {
+        public string ActionType { get; set; } // 'setquantity' or other actions
+        public string AddOnName { get; set; } // Not needed if addOnName is passed as a query parameter
+        public int Quantity { get; set; }
+    }
+
+    public class OrderAddOn
+    {
+        public int AddOnId { get; set; }
+        public string AddOnName { get; set; }
+        public int Quantity { get; set; }
+        public double Price { get; set; }
+    }
+
+    public class DesignAddOn
+    {
+        public int DesignAddOnId { get; set; }
+        public string AddOnName { get; set; }
+        public int Quantity { get; set; }
+        public double Price { get; set; }
+    }
+    public class AddNewAddOnRequest
+    {
+        public string AddOnName { get; set; }
+        public int Quantity { get; set; }
+    }
 }
