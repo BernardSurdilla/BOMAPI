@@ -18,7 +18,7 @@ namespace BOM_API_v2.Controllers
 {
     [ApiController]
     [Route("BOM/pastry_materials")]
-    [Authorize(Roles = UserRoles.Admin)]
+    [Authorize]
     public class PastryMaterialController : ControllerBase
     {
         private readonly DatabaseContext _context;
@@ -30,6 +30,7 @@ namespace BOM_API_v2.Controllers
 
         //GET
         [HttpGet]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             List<PastryMaterials> pastryMaterials;
@@ -126,6 +127,7 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("{pastry_material_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<GetPastryMaterial> GetSpecificPastryMaterial(string pastry_material_id)
         {
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
@@ -143,6 +145,7 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpGet("{pastry_material_id}/ingredients")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetPastryMaterialIngredients>> GetAllPastryMaterialIngredient(string pastry_material_id)
         {
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
@@ -162,6 +165,7 @@ namespace BOM_API_v2.Controllers
         }
 
         [HttpGet("by_design_id/{designId}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<GetPastryMaterial> GetSpecificPastryMaterialByDesignId([FromRoute]byte[] designId)
         {
             PastryMaterials? currentPastryMat = null;
@@ -181,6 +185,7 @@ namespace BOM_API_v2.Controllers
 
         //POST
         [HttpPost]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterial(PostPastryMaterial newEntry)
         {
             byte[] designId = newEntry.design_id;
@@ -375,6 +380,7 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPost("{pastry_material_id}/ingredients")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialIngredient(string pastry_material_id, PostIngredients entry)
         {
             PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.Where(x
@@ -441,6 +447,7 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPost("{pastry_material_id}/sub_variants")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariant(string pastry_material_id, PostPastryMaterialSubVariant entry)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -542,6 +549,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "New sub variant for " + pastry_material_id + " added" });
         }
         [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients entry)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -619,6 +627,7 @@ namespace BOM_API_v2.Controllers
 
         //PATCH
         [HttpPatch("{pastry_material_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterial(string pastry_material_id, PatchPastryMaterials entry)
         {
 
@@ -645,6 +654,7 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPatch("{pastry_material_id}/{ingredient_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialIngredient(string pastry_material_id, string ingredient_id, PatchIngredients entry)
         {
             PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.Where(x
@@ -696,6 +706,7 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPatch("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariant(string pastry_material_id, string pastry_material_sub_variant_id, PatchPastryMaterialSubVariants entry)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -718,6 +729,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Sub variant updated" });
         }
         [HttpPatch("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/{pastry_material_sub_variant_ingredient_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id, PatchPastryMaterialSubVariantsIngredient entry)
         {
 
@@ -778,6 +790,7 @@ namespace BOM_API_v2.Controllers
 
         //DELETE
         [HttpDelete("{pastry_material_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterial(string pastry_material_id)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -805,6 +818,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material deleted." });
         }
         [HttpDelete("{pastry_material_id}/{ingredient_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -826,6 +840,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Ingredient deleted." });
         }
         [HttpDelete("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariant(string pastry_material_id, string pastry_material_sub_variant_id)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -847,6 +862,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Sub variant deleted" });
         }
         [HttpDelete("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/{pastry_material_sub_variant_ingredient_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -877,6 +893,7 @@ namespace BOM_API_v2.Controllers
         // INVENTORY ACTIONS
         //
         [HttpPost("{pastry_material_id}/subtract_recipe_ingredients_on_inventory/{variant_name}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_name)
         {
             PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.FindAsync(pastry_material_id);

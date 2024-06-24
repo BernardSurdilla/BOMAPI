@@ -394,7 +394,7 @@ namespace BOM_API_v2.Controllers
             if (newDesignImage != null) { await _databaseContext.DesignImage.AddAsync(newDesignImage); await _databaseContext.SaveChangesAsync(); }
 
             await _actionLogger.LogAction(User, "POST", "Add new design " + newEntryId.ToString());
-            return Ok(new { message = "Design " + newEntryId.ToString() + " added" });
+            return Ok(new { message = "Design " + newEntryId.ToString() + " added", id = newEntryId.ToString() });
         }
         [HttpPost("tags/")]
         [Authorize(Roles = UserRoles.Admin)]
@@ -524,6 +524,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design " + designId.ToString() + " updated" });
         }
         [HttpPatch("tags/{design_tag_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateTag(PostTags input, [FromRoute] Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;
@@ -568,6 +569,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design " + decodedId + " deleted" });
         }
         [HttpDelete("tags/{design_tag_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesignTag(Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;
@@ -583,6 +585,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design " + selectedDesignTag.design_tag_id + " deleted" });
         }
         [HttpDelete("{designId}/tags")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RemoveDesignTag([FromRoute]string designId, [FromBody] List<Guid> tag_ids)
         {
             string decodedId = designId;
@@ -617,6 +620,7 @@ namespace BOM_API_v2.Controllers
         }
 
         [HttpDelete("{designId}/tags/{tag_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RemoveDesignTagById([FromRoute] string designId, [FromRoute] Guid tag_id)
         {
             string decodedId = designId;
