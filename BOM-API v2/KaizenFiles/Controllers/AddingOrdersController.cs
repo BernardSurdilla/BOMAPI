@@ -9,6 +9,7 @@ using JWTAuthentication.Authentication;
 using System.Data;
 using System.Globalization;
 using System.Security.Claims;
+using BillOfMaterialsAPI.Schemas;
 
 namespace CRUDFI.Controllers
 {
@@ -26,7 +27,7 @@ namespace CRUDFI.Controllers
             _logger = logger;
         }
 
-        [HttpPost]
+        [HttpPost("manual_ordering")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string type)
         {
@@ -186,7 +187,7 @@ namespace CRUDFI.Controllers
                 await connection.OpenAsync();
 
                 string sql = @"INSERT INTO orders 
-            (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName. DesignName) 
+            (OrderId, CustomerId, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, CustomerName, DesignName) 
             VALUES 
             (UNHEX(REPLACE(UUID(), '-', '')), @customerId, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @customerName, @DesignName)";
 
@@ -345,7 +346,45 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpPost("addOn")]
+        [HttpGet("assign_employees")]
+        public async Task<IActionResult> GetEmployeesOfType2()
+        {
+            try
+            {
+                List<employee> employees = new List<employee>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"SELECT DisplayName AS Name FROM users WHERE Type = 2";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                employee employee = new employee
+                                {
+                                    name = reader.GetString("Name")
+                                };
+
+                                employees.Add(employee);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(employees);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Failed to retrieve employees: {ex.Message}");
+            }
+        }
+
+        [HttpPost("add_ons_table")]
         public async Task<IActionResult> AddAddOn([FromBody] AddOnDetails addOnDetails)
         {
             try
@@ -407,12 +446,12 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpGet("addOns")]
+        [HttpGet("add_ons_table")]
         public async Task<IActionResult> GetAllAddOns()
         {
             try
             {
-                var addOns = await GetAddOnDSOSFromDatabase();
+                var addOns = await GetAddOnDSOSFromDatabase2();
 
                 if (addOns == null || addOns.Count == 0)
                 {
@@ -428,15 +467,15 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task<List<AddOnDSOS>> GetAddOnDSOSFromDatabase()
+        private async Task<List<AddOnDS2>> GetAddOnDSOSFromDatabase2()
         {
-            List<AddOnDSOS> addOnDSOSList = new List<AddOnDSOS>();
+            List<AddOnDS2> addOnDSOSList = new List<AddOnDS2>();
 
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT name, price FROM AddOns";
+                string sql = "SELECT  name, price FROM AddOns";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -444,7 +483,7 @@ namespace CRUDFI.Controllers
                     {
                         while (await reader.ReadAsync())
                         {
-                            var addOnDSOS = new AddOnDSOS
+                            var addOnDSOS = new AddOnDS2
                             {
                                 AddOnName = reader.GetString("name"),
                                 PricePerUnit = reader.GetDouble("price")
@@ -494,7 +533,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("{orderId}/addons")]
+        [HttpGet("{orderId}/add_ons")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string orderId)
         {
@@ -568,7 +607,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT DesignAddOnId, Quantity, DateAdded, LastModifiedDate, IsActive, AddOnName, Price " +
+                string sql = "SELECT Quantity, AddOnName, Price " +
                              "FROM DesignAddOns " +
                              "WHERE DesignId = UNHEX(@designId)";
 
@@ -582,11 +621,7 @@ namespace CRUDFI.Controllers
                         {
                             var addOn = new AddOnDPOS
                             {
-                                DesignAddOnId = reader.GetInt32("DesignAddOnId"),
                                 Quantity = reader.GetInt32("Quantity"),
-                                DateAdded = reader.GetDateTime("DateAdded"),
-                                LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("LastModifiedDate")) ? (DateTime?)null : reader.GetDateTime("LastModifiedDate"),
-                                IsActive = reader.GetBoolean("IsActive"),
                                 AddOnName = reader.GetString(reader.GetOrdinal("AddOnName")),
                                 PricePerUnit = reader.GetInt32("Price"),
 
@@ -603,7 +638,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpGet("total-orders")]
+        [HttpGet("total_orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetTotalQuantities()
         {
@@ -637,7 +672,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("byId/{orderIdHex}")]
+        [HttpGet("final_order_details/{orderIdHex}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
         {
@@ -646,15 +681,15 @@ namespace CRUDFI.Controllers
                 // Convert the hex string to a binary(16) formatted string
                 string binary16OrderId = ConvertGuidToBinary16(orderIdHex).ToLower();
 
-                // Fetch the specific order from the database
-                Order order = await GetOrderByIdFromDatabase(binary16OrderId);
+                // Fetch the specific order and its addons from the database
+                FinalOrder finalOrder = await GetFinalOrderByIdFromDatabase(binary16OrderId);
 
-                if (order == null)
+                if (finalOrder == null)
                 {
                     return NotFound($"Order with orderId {orderIdHex} not found.");
                 }
 
-                return Ok(order);
+                return Ok(finalOrder);
             }
             catch (Exception ex)
             {
@@ -663,60 +698,77 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task<Order> GetOrderByIdFromDatabase(string orderId)
+        private async Task<FinalOrder> GetFinalOrderByIdFromDatabase(string orderId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT * FROM orders WHERE OrderId = UNHEX(@orderId)";
+                string orderSql = @"
+            SELECT orderName, DesignName, price, quantity, Size, Flavor, type, Description, PickupDateTime
+            FROM orders
+            WHERE OrderId = UNHEX(@orderId)";
 
-                using (var command = new MySqlCommand(sql, connection))
+                string addOnsSql = @"
+            SELECT name, quantity, Price, Total
+            FROM orderaddons
+            WHERE OrderId = UNHEX(@orderId)";
+
+                FinalOrder finalOrder = null;
+
+                using (var orderCommand = new MySqlCommand(orderSql, connection))
                 {
-                    command.Parameters.AddWithValue("@orderId", orderId);
+                    orderCommand.Parameters.AddWithValue("@orderId", orderId);
 
-                    using (var reader = await command.ExecuteReaderAsync())
+                    using (var reader = await orderCommand.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Guid employeeId = Guid.Empty; // Default value for employeeId
-
-                            if (!reader.IsDBNull(reader.GetOrdinal("EmployeeId")))
+                            finalOrder = new FinalOrder
                             {
-                                // If the EmployeeId column is not null, get its value
-                                employeeId = reader.GetGuid(reader.GetOrdinal("EmployeeId"));
-                            }
-
-                            return new Order
-                            {
-                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
-                                customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
-                                employeeId = employeeId,
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                status = reader.GetString(reader.GetOrdinal("Status")),
-                                designName = reader.GetString(reader.GetOrdinal("DesignName")),
-                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
-                                price = reader.GetDouble(reader.GetOrdinal("price")),
-                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
-                                Description = reader.GetString(reader.GetOrdinal("Description")),
-                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                size = reader.GetString(reader.GetOrdinal("Size")),
-                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-
+                                OrderName = reader.GetString("orderName"),
+                                designName = reader.GetString("DesignName"),
+                                Price = reader.GetDouble("price"),
+                                Quantity = reader.GetInt32("quantity"),
+                                Description = reader.GetString("Description"),
+                                size = reader.GetString("Size"),
+                                flavor = reader.GetString("Flavor"),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString("type"),
+                                PickupDateTime = reader.GetDateTime("PickupDateTime"),
+                                AddOns = new List<AddOnDetails2>()
                             };
-                        }
-                        else
-                        {
-                            return null; // Order not found
                         }
                     }
                 }
+
+                if (finalOrder != null)
+                {
+                    using (var addOnsCommand = new MySqlCommand(addOnsSql, connection))
+                    {
+                        addOnsCommand.Parameters.AddWithValue("@orderId", orderId);
+
+                        using (var reader = await addOnsCommand.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                finalOrder.AddOns.Add(new AddOnDetails2
+                                {
+                                    name = reader.GetString("name"),
+                                    quantity = reader.GetInt32("quantity"),
+                                    pricePerUnit = reader.GetDouble("Price"),
+                                    total = reader.GetDouble("Total") // Assuming Total is of type double as per previous context
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return finalOrder;
             }
         }
 
 
-        [HttpGet("bytype/{type}")]
+        [HttpGet("by_type/{type}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public IActionResult GetOrdersByType(string type)
         {
@@ -784,7 +836,7 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpGet("byemployeeusername")]
+        [HttpGet("by_employee_username")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByUsername()
         {
@@ -941,7 +993,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpGet("bycustomerusername/{customerUsername}")]
+        [HttpGet("by_customer_username/{customerUsername}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername)
         {
@@ -1042,7 +1094,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("bytype/{type}/{username}")]
+        [HttpGet("by_type/{type}/{username}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
@@ -1345,7 +1397,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpPatch("updatePrice")]
+        [HttpPatch("update_price")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderPrice([FromQuery] string orderIdHex, [FromQuery] decimal newPrice)
         {
@@ -1460,44 +1512,31 @@ namespace CRUDFI.Controllers
                     // Get the current order status
                     bool isActive = await GetOrderStatus(orderIdBinary);
 
-                    // Retrieve the DesignId as a Base64 string
-                    string designIdBase64 = await GetDesignIdByOrderId(orderIdBinary);
-
-                    if (string.IsNullOrEmpty(designIdBase64))
-                    {
-                        return NotFound($"No DesignId found for order with ID '{orderIdHex}'.");
-                    }
-
-                    // Convert Base64 string to binary (hex string)
-                    string designIdHex = ConvertBase64ToBinary16(designIdBase64).ToLower();
-
-                    // Retrieve DesignAddOnId, AddOnName, and Quantity from DesignAddOns table
-                    string sqlGetDesignAddOns = @"SELECT DesignAddOnId, AddOnName, Quantity
-                                          FROM DesignAddOns
-                                          WHERE DesignId = UNHEX(@designId)";
-                    List<(int DesignAddOnId, string AddOnName, int Quantity)> designAddOnsList = new List<(int, string, int)>();
-                    using (var getDesignAddOnsCommand = new MySqlCommand(sqlGetDesignAddOns, connection))
-                    {
-                        getDesignAddOnsCommand.Parameters.AddWithValue("@designId", designIdHex);
-                        using (var reader = await getDesignAddOnsCommand.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                int designAddOnId = reader.GetInt32(0);
-                                string addOnName = reader.GetString(1);
-                                int quantity = reader.GetInt32(2);
-                                designAddOnsList.Add((designAddOnId, addOnName, quantity));
-                            }
-                        }
-                    }
-
                     // Update the order status based on the action
                     if (action.Equals("confirm", StringComparison.OrdinalIgnoreCase))
                     {
                         if (!isActive)
                         {
-                            // Update AddOns quantities for each DesignAddOn entry
-                            foreach (var (DesignAddOnId, AddOnName, Quantity) in designAddOnsList)
+                            // Retrieve all add-ons for this order from orderaddons table
+                            string sqlGetOrderAddOns = @"SELECT name, quantity FROM orderaddons WHERE OrderId = UNHEX(@orderId)";
+                            List<(string AddOnName, int Quantity)> orderAddOnsList = new List<(string, int)>();
+
+                            using (var getOrderAddOnsCommand = new MySqlCommand(sqlGetOrderAddOns, connection))
+                            {
+                                getOrderAddOnsCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                using (var reader = await getOrderAddOnsCommand.ExecuteReaderAsync())
+                                {
+                                    while (await reader.ReadAsync())
+                                    {
+                                        string addOnName = reader.GetString(0);
+                                        int quantity = reader.GetInt32(1);
+                                        orderAddOnsList.Add((addOnName, quantity));
+                                    }
+                                }
+                            }
+
+                            // Update AddOns quantities for each entry in orderaddons
+                            foreach (var (AddOnName, Quantity) in orderAddOnsList)
                             {
                                 string sqlUpdateAddOns = "UPDATE AddOns SET quantity = quantity - @Quantity WHERE name = @AddOnName";
                                 using (var updateAddOnsCommand = new MySqlCommand(sqlUpdateAddOns, connection))
@@ -1547,6 +1586,7 @@ namespace CRUDFI.Controllers
             }
         }
 
+
         private byte[] FromHexString(string hexString)
         {
             // Remove the leading "0x" if present
@@ -1565,7 +1605,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpPatch("orderstatus")]
+        [HttpPatch("order_status_artist")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
         public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
@@ -1743,7 +1783,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpPatch("updateorder")]
+        [HttpPatch("update_cart_customer")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate([FromQuery] string orderId, [FromQuery] string type, [FromQuery] string pickupTime)
         {
@@ -1875,8 +1915,421 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpPatch("{orderId}/manage_add_ons")]
+        public async Task<IActionResult> ManageAddOnsByOrderId(string orderId, [FromBody] ManageAddOnsRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Starting ManageAddOnsByOrderId for orderId: {orderId}");
 
-        [HttpPatch("assignemployee")]
+                // Convert orderId to binary(16) format without '0x' prefix
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                // Fetch the Base64 representation of DesignId for the given orderId
+                string designIdBase64 = await GetDesignIdByOrderId(orderIdBinary);
+
+                if (string.IsNullOrEmpty(designIdBase64))
+                {
+                    return NotFound($"No DesignId found for order with ID '{orderId}'.");
+                }
+
+                // Convert Base64 string to binary(16) format
+                string designIdHex = ConvertBase64ToBinary16(designIdBase64).ToLower();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    using (var transaction = await connection.BeginTransactionAsync())
+                    {
+                        try
+                        {
+                            // Retrieve existing order add-ons
+                            List<OrderAddOn> existingOrderAddOns = await GetOrderAddOns(connection, transaction, orderIdBinary);
+
+                            // Fetch all design addons for the designId
+                            List<DesignAddOn> designAddOns = await GetAllDesignAddOns(connection, transaction, designIdHex);
+
+                            // Dictionary to track which design addons are already added to orderaddons
+                            var addedAddOns = new HashSet<string>(existingOrderAddOns.Select(a => a.AddOnName));
+
+                            // Process each action in the request
+                            foreach (var action in request.Actions)
+                            {
+                                if (action.ActionType.ToLower() == "setquantity")
+                                {
+                                    // Check if the add-on exists in designaddons
+                                    var designAddOn = designAddOns.FirstOrDefault(da => da.AddOnName == action.AddOnName);
+                                    if (designAddOn != null)
+                                    {
+                                        // Insert or update quantity for the specified add-on in orderaddons
+                                        await SetOrUpdateAddOn(connection, transaction, orderIdBinary, designAddOn.DesignAddOnId, action.AddOnName, action.Quantity);
+
+                                        // Mark as added
+                                        addedAddOns.Add(action.AddOnName);
+                                    }
+                                    else
+                                    {
+                                        return BadRequest($"Add-on '{action.AddOnName}' not found in designaddons for order with ID '{orderId}'.");
+                                    }
+                                }
+                            }
+
+                            // Insert remaining design addons that are not already added
+                            foreach (var designAddOn in designAddOns)
+                            {
+                                if (!addedAddOns.Contains(designAddOn.AddOnName))
+                                {
+                                    await SetOrUpdateAddOn(connection, transaction, orderIdBinary, designAddOn.DesignAddOnId, designAddOn.AddOnName, designAddOn.Quantity);
+                                }
+                            }
+
+                            // Calculate the total from orderaddons
+                            double totalFromOrderAddons = await GetTotalFromOrderAddons(connection, transaction, orderIdBinary);
+
+                            // Update the price in orders table
+                            await UpdateOrderPrice(connection, transaction, orderIdBinary, totalFromOrderAddons);
+
+                            await transaction.CommitAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Transaction failed, rolling back");
+                            await transaction.RollbackAsync();
+                            throw;
+                        }
+                    }
+                }
+
+                return Ok("Add-ons quantities successfully managed.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error managing add-ons for order with ID '{orderId}'");
+                return StatusCode(500, $"An error occurred while managing add-ons for order with ID '{orderId}'.");
+            }
+        }
+
+        private async Task<double> GetTotalFromOrderAddons(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary)
+        {
+            string getTotalSql = @"SELECT SUM(Total) AS TotalSum
+                           FROM orderaddons
+                           WHERE OrderId = UNHEX(@orderId)";
+
+            using (var command = new MySqlCommand(getTotalSql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                object totalSumObj = await command.ExecuteScalarAsync();
+                double totalSum = totalSumObj == DBNull.Value ? 0.0 : Convert.ToDouble(totalSumObj);
+
+                return totalSum;
+            }
+        }
+
+        private async Task UpdateOrderPrice(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, double totalFromOrderAddons)
+        {
+            string updatePriceSql = @"UPDATE orders
+                              SET price = price + @totalFromOrderAddons
+                              WHERE OrderId = UNHEX(@orderId)";
+
+            using (var command = new MySqlCommand(updatePriceSql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@totalFromOrderAddons", totalFromOrderAddons);
+                command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                await command.ExecuteNonQueryAsync();
+
+                _logger.LogInformation($"Updated price in orders table for order with ID '{orderIdBinary}'");
+            }
+        }
+
+        private async Task<List<DesignAddOn>> GetAllDesignAddOns(MySqlConnection connection, MySqlTransaction transaction, string designIdHex)
+        {
+            List<DesignAddOn> designAddOns = new List<DesignAddOn>();
+
+            string sql = @"SELECT DesignAddOnId, AddOnName, Quantity, Price
+                   FROM designaddons 
+                   WHERE DesignId = UNHEX(@designId)";
+
+            using (var command = new MySqlCommand(sql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@designId", designIdHex);
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        DesignAddOn designAddOn = new DesignAddOn
+                        {
+                            DesignAddOnId = reader.GetInt32("DesignAddOnId"),
+                            AddOnName = reader.GetString("AddOnName"),
+                            Quantity = reader.GetInt32("Quantity"),
+                            Price = reader.GetDouble("Price")
+                        };
+
+                        designAddOns.Add(designAddOn);
+                    }
+                }
+            }
+
+            return designAddOns;
+        }
+
+
+        private async Task<List<OrderAddOn>> GetOrderAddOns(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary)
+        {
+            List<OrderAddOn> orderAddOns = new List<OrderAddOn>();
+
+            string sql = @"SELECT addOnsId, name, quantity, Price 
+                   FROM orderaddons 
+                   WHERE OrderId = UNHEX(@orderId)";
+
+            using (var command = new MySqlCommand(sql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        OrderAddOn addOn = new OrderAddOn
+                        {
+                            AddOnId = reader.GetInt32("addOnsId"),
+                            AddOnName = reader.GetString("name"),
+                            Quantity = reader.GetInt32("quantity"),
+                            Price = reader.GetDouble("Price")
+                        };
+
+                        orderAddOns.Add(addOn);
+                    }
+                }
+            }
+
+            return orderAddOns;
+        }
+
+        private async Task SetOrUpdateAddOn(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, int designAddOnId, string addOnName, int quantity)
+        {
+            // Fetch the price from designaddons based on designAddOnId and addOnName
+            string getPriceSql = @"SELECT Price 
+                           FROM designaddons 
+                           WHERE DesignAddOnId = @designAddOnId AND AddOnName = @addOnName";
+
+            double price = 0.0; // Initialize price
+
+            using (var getPriceCommand = new MySqlCommand(getPriceSql, connection, transaction))
+            {
+                getPriceCommand.Parameters.AddWithValue("@designAddOnId", designAddOnId);
+                getPriceCommand.Parameters.AddWithValue("@addOnName", addOnName);
+
+                object priceResult = await getPriceCommand.ExecuteScalarAsync();
+                if (priceResult != null && priceResult != DBNull.Value)
+                {
+                    price = Convert.ToDouble(priceResult);
+                }
+                else
+                {
+                    throw new Exception($"Price not found for add-on '{addOnName}' with DesignAddOnId '{designAddOnId}'.");
+                }
+            }
+
+            // Calculate total price
+            double total = quantity * price;
+
+            // Check if the add-on already exists in orderaddons
+            string selectSql = @"SELECT COUNT(*) 
+                         FROM orderaddons 
+                         WHERE OrderId = UNHEX(@orderId) AND name = @addOnName";
+
+            using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
+            {
+                selectCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                selectCommand.Parameters.AddWithValue("@addOnName", addOnName);
+
+                int count = Convert.ToInt32(await selectCommand.ExecuteScalarAsync());
+
+                if (count == 0)
+                {
+                    // Insert new add-on into orderaddons
+                    string insertSql = @"INSERT INTO orderaddons (OrderId, addOnsId, name, quantity, Price, Total)
+                                 VALUES (UNHEX(@orderId), @designAddOnId, @addOnName, @quantity, @price, @total)";
+
+                    using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
+                    {
+                        insertCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                        insertCommand.Parameters.AddWithValue("@designAddOnId", designAddOnId);
+                        insertCommand.Parameters.AddWithValue("@addOnName", addOnName);
+                        insertCommand.Parameters.AddWithValue("@quantity", quantity);
+                        insertCommand.Parameters.AddWithValue("@price", price);
+                        insertCommand.Parameters.AddWithValue("@total", total);
+
+                        _logger.LogInformation($"Inserting add-on '{addOnName}' with quantity '{quantity}', price '{price}', and total '{total}' into orderaddons");
+
+                        await insertCommand.ExecuteNonQueryAsync();
+                    }
+                }
+                else
+                {
+                    // Update quantity and total for existing add-on in orderaddons
+                    string updateSql = @"UPDATE orderaddons 
+                                 SET quantity = @quantity, Total = @total
+                                 WHERE OrderId = UNHEX(@orderId) AND name = @addOnName";
+
+                    using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
+                    {
+                        updateCommand.Parameters.AddWithValue("@quantity", quantity);
+                        updateCommand.Parameters.AddWithValue("@total", total);
+                        updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                        updateCommand.Parameters.AddWithValue("@addOnName", addOnName);
+
+                        _logger.LogInformation($"Updating quantity for add-on '{addOnName}' to '{quantity}', and total to '{total}' in orderaddons");
+
+                        await updateCommand.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+        }
+
+        [HttpPatch("{orderId}/add_new_add_ons")]
+        public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Starting AddNewAddOnToOrder for orderId: {orderId}");
+
+                // Convert orderId to binary(16) format without '0x' prefix
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                // Retrieve add-ons from the AddOns table
+                List<AddOnDSOS> addOnDSOSList = await GetAddOnDSOSFromDatabase();
+
+                // Find the add-on in the retrieved list
+                var addOnDSOS = addOnDSOSList.FirstOrDefault(a => a.AddOnName == request.AddOnName);
+                if (addOnDSOS == null)
+                {
+                    return BadRequest($"Add-on '{request.AddOnName}' not found in the AddOns table.");
+                }
+
+                // Calculate total price
+                double total = request.Quantity * addOnDSOS.PricePerUnit;
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    using (var transaction = await connection.BeginTransactionAsync())
+                    {
+                        try
+                        {
+                            // Check if the add-on already exists in orderaddons
+                            string selectSql = @"SELECT COUNT(*) 
+                                         FROM orderaddons 
+                                         WHERE OrderId = UNHEX(@orderId) AND name = @addOnName";
+
+                            using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
+                            {
+                                selectCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                selectCommand.Parameters.AddWithValue("@addOnName", request.AddOnName);
+
+                                int count = Convert.ToInt32(await selectCommand.ExecuteScalarAsync());
+
+                                if (count == 0)
+                                {
+                                    // Insert new add-on into orderaddons
+                                    string insertSql = @"INSERT INTO orderaddons (OrderId, addOnsId, name, quantity, Price, Total)
+                                                 VALUES (UNHEX(@orderId), @addOnsId, @addOnName, @quantity, @price, @total)";
+
+                                    using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
+                                    {
+                                        insertCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                        insertCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);  // Corrected to use addOnDSOS.AddOnId
+                                        insertCommand.Parameters.AddWithValue("@addOnName", request.AddOnName);
+                                        insertCommand.Parameters.AddWithValue("@quantity", request.Quantity);
+                                        insertCommand.Parameters.AddWithValue("@price", addOnDSOS.PricePerUnit);
+                                        insertCommand.Parameters.AddWithValue("@total", total);
+
+                                        _logger.LogInformation($"Inserting add-on '{request.AddOnName}' with quantity '{request.Quantity}', price '{addOnDSOS.PricePerUnit}', and total '{total}' into orderaddons");
+
+                                        await insertCommand.ExecuteNonQueryAsync();
+                                    }
+                                }
+                                else
+                                {
+                                    // Update existing add-on in orderaddons
+                                    string updateSql = @"UPDATE orderaddons 
+                                                 SET quantity = @quantity, Total = @total 
+                                                 WHERE OrderId = UNHEX(@orderId) AND name = @addOnName";
+
+                                    using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
+                                    {
+                                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity);
+                                        updateCommand.Parameters.AddWithValue("@total", total);
+                                        updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                        updateCommand.Parameters.AddWithValue("@addOnName", request.AddOnName);
+
+                                        _logger.LogInformation($"Updating add-on '{request.AddOnName}' to quantity '{request.Quantity}' and total '{total}' in orderaddons");
+
+                                        await updateCommand.ExecuteNonQueryAsync();
+                                    }
+                                }
+                            }
+
+                            await transaction.CommitAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Transaction failed, rolling back");
+                            await transaction.RollbackAsync();
+                            throw;
+                        }
+                    }
+                }
+
+                return Ok("Add-on successfully added or updated in the order.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error adding or updating add-on to order with ID '{orderId}'");
+                return StatusCode(500, $"An error occurred while adding or updating add-on to order with ID '{orderId}'.");
+            }
+        }
+
+
+        private async Task<List<AddOnDSOS>> GetAddOnDSOSFromDatabase()
+        {
+            List<AddOnDSOS> addOnDSOSList = new List<AddOnDSOS>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT addOnsId, name, price FROM AddOns";  // Ensure addOnsId is fetched
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var addOnDSOS = new AddOnDSOS
+                            {
+                                AddOnId = reader.GetInt32("addOnsId"),  // Added this line to fetch addOnsId
+                                AddOnName = reader.GetString("name"),
+                                PricePerUnit = reader.GetDouble("price")
+                            };
+
+                            addOnDSOSList.Add(addOnDSOS);
+                        }
+                    }
+                }
+            }
+
+            return addOnDSOSList;
+        }
+
+
+        [HttpPatch("assign_employee")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderId, [FromQuery] string employeeUsername)
         {
