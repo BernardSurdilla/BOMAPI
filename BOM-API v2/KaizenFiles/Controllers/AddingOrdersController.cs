@@ -9,6 +9,7 @@ using JWTAuthentication.Authentication;
 using System.Data;
 using System.Globalization;
 using System.Security.Claims;
+using BillOfMaterialsAPI.Schemas;
 
 namespace CRUDFI.Controllers
 {
@@ -26,7 +27,7 @@ namespace CRUDFI.Controllers
             _logger = logger;
         }
 
-        [HttpPost]
+        [HttpPost("manual_ordering")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string type)
         {
@@ -345,7 +346,45 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpPost("addOn")]
+        [HttpGet("assign_employees")]
+        public async Task<IActionResult> GetEmployeesOfType2()
+        {
+            try
+            {
+                List<employee> employees = new List<employee>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"SELECT DisplayName AS Name FROM users WHERE Type = 2";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                employee employee = new employee
+                                {
+                                    name = reader.GetString("Name")
+                                };
+
+                                employees.Add(employee);
+                            }
+                        }
+                    }
+                }
+
+                return Ok(employees);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Failed to retrieve employees: {ex.Message}");
+            }
+        }
+
+        [HttpPost("add_ons_table")]
         public async Task<IActionResult> AddAddOn([FromBody] AddOnDetails addOnDetails)
         {
             try
@@ -407,12 +446,12 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpGet("addOns")]
+        [HttpGet("add_ons_table")]
         public async Task<IActionResult> GetAllAddOns()
         {
             try
             {
-                var addOns = await GetAddOnDSOSFromDatabase();
+                var addOns = await GetAddOnDSOSFromDatabase2();
 
                 if (addOns == null || addOns.Count == 0)
                 {
@@ -426,6 +465,37 @@ namespace CRUDFI.Controllers
                 _logger.LogError(ex, "Error retrieving all Add-Ons.");
                 return StatusCode(500, "An error occurred while processing the request.");
             }
+        }
+
+        private async Task<List<AddOnDS2>> GetAddOnDSOSFromDatabase2()
+        {
+            List<AddOnDS2> addOnDSOSList = new List<AddOnDS2>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT  name, price FROM AddOns";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var addOnDSOS = new AddOnDS2
+                            {
+                                AddOnName = reader.GetString("name"),
+                                PricePerUnit = reader.GetDouble("price")
+                            };
+
+                            addOnDSOSList.Add(addOnDSOS);
+                        }
+                    }
+                }
+            }
+
+            return addOnDSOSList;
         }
 
 
@@ -463,7 +533,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("{orderId}/addons")]
+        [HttpGet("{orderId}/add_ons")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string orderId)
         {
@@ -537,7 +607,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT DesignAddOnId, Quantity, DateAdded, LastModifiedDate, IsActive, AddOnName, Price " +
+                string sql = "SELECT Quantity, AddOnName, Price " +
                              "FROM DesignAddOns " +
                              "WHERE DesignId = UNHEX(@designId)";
 
@@ -551,11 +621,7 @@ namespace CRUDFI.Controllers
                         {
                             var addOn = new AddOnDPOS
                             {
-                                DesignAddOnId = reader.GetInt32("DesignAddOnId"),
                                 Quantity = reader.GetInt32("Quantity"),
-                                DateAdded = reader.GetDateTime("DateAdded"),
-                                LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("LastModifiedDate")) ? (DateTime?)null : reader.GetDateTime("LastModifiedDate"),
-                                IsActive = reader.GetBoolean("IsActive"),
                                 AddOnName = reader.GetString(reader.GetOrdinal("AddOnName")),
                                 PricePerUnit = reader.GetInt32("Price"),
 
@@ -572,7 +638,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpGet("total-orders")]
+        [HttpGet("total_orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetTotalQuantities()
         {
@@ -606,7 +672,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("byId/{orderIdHex}")]
+        [HttpGet("final_order_details/{orderIdHex}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
         {
@@ -615,15 +681,15 @@ namespace CRUDFI.Controllers
                 // Convert the hex string to a binary(16) formatted string
                 string binary16OrderId = ConvertGuidToBinary16(orderIdHex).ToLower();
 
-                // Fetch the specific order from the database
-                Order order = await GetOrderByIdFromDatabase(binary16OrderId);
+                // Fetch the specific order and its addons from the database
+                FinalOrder finalOrder = await GetFinalOrderByIdFromDatabase(binary16OrderId);
 
-                if (order == null)
+                if (finalOrder == null)
                 {
                     return NotFound($"Order with orderId {orderIdHex} not found.");
                 }
 
-                return Ok(order);
+                return Ok(finalOrder);
             }
             catch (Exception ex)
             {
@@ -632,60 +698,77 @@ namespace CRUDFI.Controllers
             }
         }
 
-        private async Task<Order> GetOrderByIdFromDatabase(string orderId)
+        private async Task<FinalOrder> GetFinalOrderByIdFromDatabase(string orderId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT * FROM orders WHERE OrderId = UNHEX(@orderId)";
+                string orderSql = @"
+            SELECT orderName, DesignName, price, quantity, Size, Flavor, type, Description, PickupDateTime
+            FROM orders
+            WHERE OrderId = UNHEX(@orderId)";
 
-                using (var command = new MySqlCommand(sql, connection))
+                string addOnsSql = @"
+            SELECT name, quantity, Price, Total
+            FROM orderaddons
+            WHERE OrderId = UNHEX(@orderId)";
+
+                FinalOrder finalOrder = null;
+
+                using (var orderCommand = new MySqlCommand(orderSql, connection))
                 {
-                    command.Parameters.AddWithValue("@orderId", orderId);
+                    orderCommand.Parameters.AddWithValue("@orderId", orderId);
 
-                    using (var reader = await command.ExecuteReaderAsync())
+                    using (var reader = await orderCommand.ExecuteReaderAsync())
                     {
                         if (await reader.ReadAsync())
                         {
-                            Guid employeeId = Guid.Empty; // Default value for employeeId
-
-                            if (!reader.IsDBNull(reader.GetOrdinal("EmployeeId")))
+                            finalOrder = new FinalOrder
                             {
-                                // If the EmployeeId column is not null, get its value
-                                employeeId = reader.GetGuid(reader.GetOrdinal("EmployeeId"));
-                            }
-
-                            return new Order
-                            {
-                                Id = reader.GetGuid(reader.GetOrdinal("OrderId")),
-                                customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
-                                employeeId = employeeId,
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                status = reader.GetString(reader.GetOrdinal("Status")),
-                                designName = reader.GetString(reader.GetOrdinal("DesignName")),
-                                orderName = reader.GetString(reader.GetOrdinal("orderName")),
-                                price = reader.GetDouble(reader.GetOrdinal("price")),
-                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
-                                Description = reader.GetString(reader.GetOrdinal("Description")),
-                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                size = reader.GetString(reader.GetOrdinal("Size")),
-                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-
+                                OrderName = reader.GetString("orderName"),
+                                designName = reader.GetString("DesignName"),
+                                Price = reader.GetDouble("price"),
+                                Quantity = reader.GetInt32("quantity"),
+                                Description = reader.GetString("Description"),
+                                size = reader.GetString("Size"),
+                                flavor = reader.GetString("Flavor"),
+                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString("type"),
+                                PickupDateTime = reader.GetDateTime("PickupDateTime"),
+                                AddOns = new List<AddOnDetails2>()
                             };
-                        }
-                        else
-                        {
-                            return null; // Order not found
                         }
                     }
                 }
+
+                if (finalOrder != null)
+                {
+                    using (var addOnsCommand = new MySqlCommand(addOnsSql, connection))
+                    {
+                        addOnsCommand.Parameters.AddWithValue("@orderId", orderId);
+
+                        using (var reader = await addOnsCommand.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                finalOrder.AddOns.Add(new AddOnDetails2
+                                {
+                                    name = reader.GetString("name"),
+                                    quantity = reader.GetInt32("quantity"),
+                                    pricePerUnit = reader.GetDouble("Price"),
+                                    total = reader.GetDouble("Total") // Assuming Total is of type double as per previous context
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return finalOrder;
             }
         }
 
 
-        [HttpGet("bytype/{type}")]
+        [HttpGet("by_type/{type}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public IActionResult GetOrdersByType(string type)
         {
@@ -753,7 +836,7 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpGet("byemployeeusername")]
+        [HttpGet("by_employee_username")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByUsername()
         {
@@ -910,7 +993,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpGet("bycustomerusername/{customerUsername}")]
+        [HttpGet("by_customer_username/{customerUsername}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername)
         {
@@ -1011,7 +1094,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpGet("bytype/{type}/{username}")]
+        [HttpGet("by_type/{type}/{username}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
@@ -1314,7 +1397,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpPatch("updatePrice")]
+        [HttpPatch("update_price")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderPrice([FromQuery] string orderIdHex, [FromQuery] decimal newPrice)
         {
@@ -1522,7 +1605,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpPatch("orderstatus")]
+        [HttpPatch("order_status_artist")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
         public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
@@ -1700,7 +1783,7 @@ namespace CRUDFI.Controllers
 
 
 
-        [HttpPatch("updateorder")]
+        [HttpPatch("update_cart_customer")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate([FromQuery] string orderId, [FromQuery] string type, [FromQuery] string pickupTime)
         {
@@ -1832,7 +1915,7 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpPatch("{orderId}/manage-addons")]
+        [HttpPatch("{orderId}/manage_add_ons")]
         public async Task<IActionResult> ManageAddOnsByOrderId(string orderId, [FromBody] ManageAddOnsRequest request)
         {
             try
@@ -1901,6 +1984,12 @@ namespace CRUDFI.Controllers
                                 }
                             }
 
+                            // Calculate the total from orderaddons
+                            double totalFromOrderAddons = await GetTotalFromOrderAddons(connection, transaction, orderIdBinary);
+
+                            // Update the price in orders table
+                            await UpdateOrderPrice(connection, transaction, orderIdBinary, totalFromOrderAddons);
+
                             await transaction.CommitAsync();
                         }
                         catch (Exception ex)
@@ -1918,6 +2007,40 @@ namespace CRUDFI.Controllers
             {
                 _logger.LogError(ex, $"Error managing add-ons for order with ID '{orderId}'");
                 return StatusCode(500, $"An error occurred while managing add-ons for order with ID '{orderId}'.");
+            }
+        }
+
+        private async Task<double> GetTotalFromOrderAddons(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary)
+        {
+            string getTotalSql = @"SELECT SUM(Total) AS TotalSum
+                           FROM orderaddons
+                           WHERE OrderId = UNHEX(@orderId)";
+
+            using (var command = new MySqlCommand(getTotalSql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                object totalSumObj = await command.ExecuteScalarAsync();
+                double totalSum = totalSumObj == DBNull.Value ? 0.0 : Convert.ToDouble(totalSumObj);
+
+                return totalSum;
+            }
+        }
+
+        private async Task UpdateOrderPrice(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, double totalFromOrderAddons)
+        {
+            string updatePriceSql = @"UPDATE orders
+                              SET price = price + @totalFromOrderAddons
+                              WHERE OrderId = UNHEX(@orderId)";
+
+            using (var command = new MySqlCommand(updatePriceSql, connection, transaction))
+            {
+                command.Parameters.AddWithValue("@totalFromOrderAddons", totalFromOrderAddons);
+                command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                await command.ExecuteNonQueryAsync();
+
+                _logger.LogInformation($"Updated price in orders table for order with ID '{orderIdBinary}'");
             }
         }
 
@@ -2068,7 +2191,7 @@ namespace CRUDFI.Controllers
             }
         }
 
-        [HttpPatch("{orderId}/add-new-addon")]
+        [HttpPatch("{orderId}/add_new_add_ons")]
         public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
         {
             try
@@ -2206,8 +2329,7 @@ namespace CRUDFI.Controllers
         }
 
 
-
-        [HttpPatch("assignemployee")]
+        [HttpPatch("assign_employee")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderId, [FromQuery] string employeeUsername)
         {
