@@ -2615,7 +2615,7 @@ namespace CRUDFI.Controllers
                 await connection.OpenAsync();
 
                 string designQuery = "SELECT DisplayName FROM designs WHERE DisplayName = @displayName";
-                using(var designcommand = new MySqlCommand(designQuery, connection))
+                using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@displayName", design);
                     object result = await designcommand.ExecuteScalarAsync();
