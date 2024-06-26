@@ -689,6 +689,20 @@ namespace CRUDFI.Controllers
                     return NotFound($"Order with orderId {orderIdHex} not found.");
                 }
 
+                // Calculate the total from orderaddons
+                double totalFromOrderAddons = await GetTotalFromOrderAddons(binary16OrderId);
+
+                // Update the price in orders table
+                await UpdateOrderPrice(binary16OrderId, totalFromOrderAddons);
+
+                // Fetch the updated order details after price update
+                finalOrder = await GetFinalOrderByIdFromDatabase(binary16OrderId);
+
+                if (finalOrder == null)
+                {
+                    return NotFound($"Order with orderId {orderIdHex} not found after updating price.");
+                }
+
                 return Ok(finalOrder);
             }
             catch (Exception ex)
@@ -697,6 +711,82 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred while processing the request.");
             }
         }
+
+        private async Task<double> GetTotalFromOrderAddons(string orderIdBinary)
+        {
+            double totalSum = 0.0;
+
+            string getTotalSql = @"
+        SELECT SUM(Total) AS TotalSum
+        FROM orderaddons
+        WHERE OrderId = UNHEX(@orderId)";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = new MySqlCommand(getTotalSql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    object totalSumObj = await command.ExecuteScalarAsync();
+                    if (totalSumObj != DBNull.Value && totalSumObj != null)
+                    {
+                        totalSum = Convert.ToDouble(totalSumObj);
+                    }
+                }
+            }
+
+            return totalSum;
+        }
+
+        private async Task UpdateOrderPrice(string orderIdBinary, double totalFromOrderAddons)
+        {
+            string getPriceSql = @"
+        SELECT price
+        FROM orders
+        WHERE OrderId = UNHEX(@orderId)";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                double initialPrice = 0.0;
+
+                // Fetch initial price from orders table
+                using (var command = new MySqlCommand(getPriceSql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    object initialPriceObj = await command.ExecuteScalarAsync();
+                    if (initialPriceObj != DBNull.Value && initialPriceObj != null)
+                    {
+                        initialPrice = Convert.ToDouble(initialPriceObj);
+                    }
+                }
+
+                // Calculate new total price
+                double newPrice = initialPrice + totalFromOrderAddons;
+
+                // Update the price in orders table
+                string updatePriceSql = @"
+            UPDATE orders
+            SET price = @newPrice
+            WHERE OrderId = UNHEX(@orderId)";
+
+                using (var updateCommand = new MySqlCommand(updatePriceSql, connection))
+                {
+                    updateCommand.Parameters.AddWithValue("@newPrice", newPrice);
+                    updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    await updateCommand.ExecuteNonQueryAsync();
+
+                    _logger.LogInformation($"Updated price in orders table for order with ID '{orderIdBinary}'");
+                }
+            }
+        }
+
+
 
         private async Task<FinalOrder> GetFinalOrderByIdFromDatabase(string orderId)
         {
@@ -1973,6 +2063,14 @@ namespace CRUDFI.Controllers
                                         return BadRequest($"Add-on '{action.AddOnName}' not found in designaddons for order with ID '{orderId}'.");
                                     }
                                 }
+                                else if (action.ActionType.ToLower() == "remove")
+                                {
+                                    // Set quantity to 0 for the specified add-on
+                                    await SetOrUpdateAddOn(connection, transaction, orderIdBinary, 0, action.AddOnName, 0);
+
+                                    // Mark as added (or removed, handled in SetOrUpdateAddOn)
+                                    addedAddOns.Add(action.AddOnName);
+                                }
                             }
 
                             // Insert remaining design addons that are not already added
@@ -2009,6 +2107,7 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred while managing add-ons for order with ID '{orderId}'.");
             }
         }
+
 
         private async Task<double> GetTotalFromOrderAddons(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary)
         {
@@ -2111,6 +2210,27 @@ namespace CRUDFI.Controllers
 
         private async Task SetOrUpdateAddOn(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, int designAddOnId, string addOnName, int quantity)
         {
+            // Check if the quantity is 0 to handle removal
+            if (quantity == 0)
+            {
+                // Delete the add-on from orderaddons if it exists
+                string deleteSql = @"DELETE FROM orderaddons 
+                             WHERE OrderId = UNHEX(@orderId) AND name = @addOnName";
+
+                using (var deleteCommand = new MySqlCommand(deleteSql, connection, transaction))
+                {
+                    deleteCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    deleteCommand.Parameters.AddWithValue("@addOnName", addOnName);
+
+                    _logger.LogInformation($"Deleting add-on '{addOnName}' from orderaddons");
+
+                    await deleteCommand.ExecuteNonQueryAsync();
+                }
+
+                // Exit the method since no insertion or update is needed
+                return;
+            }
+
             // Fetch the price from designaddons based on designAddOnId and addOnName
             string getPriceSql = @"SELECT Price 
                            FROM designaddons 
@@ -2190,6 +2310,8 @@ namespace CRUDFI.Controllers
                 }
             }
         }
+
+
 
         [HttpPatch("{orderId}/add_new_add_ons")]
         public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
@@ -2493,7 +2615,7 @@ namespace CRUDFI.Controllers
                 await connection.OpenAsync();
 
                 string designQuery = "SELECT DisplayName FROM designs WHERE DisplayName = @displayName";
-                using(var designcommand = new MySqlCommand(designQuery, connection))
+                using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@displayName", design);
                     object result = await designcommand.ExecuteScalarAsync();
