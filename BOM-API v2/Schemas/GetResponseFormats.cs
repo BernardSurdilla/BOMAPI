@@ -112,13 +112,14 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public string design_id { get; set; }
         [Required] public string design_name { get; set;  }
         [Required][MaxLength(26)] public string pastry_material_id { get; set; }
-        public string main_variant_name { get; set; }
 
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
         public double cost_estimate { get; set; }
-
+        
+        public string main_variant_name { get; set; }
+        public bool ingredients_in_stock { get; set; }
         public List<GetPastryMaterialIngredients> ingredients { get; set; }
         public List<GetPastryMaterialSubVariant>? sub_variants { get; set; }
 
@@ -159,7 +160,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         public string sub_variant_name { get; set; }
         public double cost_estimate { get; set; }
-
+        public bool ingredients_in_stock { get; set; }
         public List<SubGetPastryMaterialSubVariantIngredients> sub_variant_ingredients { get; set; }
 
         [Required] public DateTime date_added { get; set; }
@@ -283,5 +284,6 @@ namespace BillOfMaterialsAPI.Schemas
     {
         public string variant_name { get; set; }
         public double cost_estimate { get; set; }
+        public bool in_stock { get; set; }
     }
 }
