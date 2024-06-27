@@ -13,6 +13,7 @@ using UnitsNet;
 using BOM_API_v2.Services;
 using System.Runtime.CompilerServices;
 using Castle.Components.DictionaryAdapter.Xml;
+using System.Text.Json;
 
 namespace BOM_API_v2.Controllers
 {
@@ -1221,12 +1222,15 @@ namespace BOM_API_v2.Controllers
             response.date_added = data.date_added;
             response.last_modified_date = data.last_modified_date;
             response.main_variant_name = data.main_variant_name;
+            response.ingredients_in_stock = true;
 
             List<GetPastryMaterialIngredients> responsePastryMaterialList = new List<GetPastryMaterialIngredients>();
             List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+
+            Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
             foreach (Ingredients currentIngredient in currentPastryMaterialIngredients)
             {
@@ -1278,6 +1282,7 @@ namespace BOM_API_v2.Controllers
 
                             newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
                             newSubIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
+                            string currentIngredientStringId = Convert.ToString(currentInventoryItemI.id);
 
                             double convertedAmountI = 0.0;
                             double calculatedAmountI = 0.0;
@@ -1290,6 +1295,21 @@ namespace BOM_API_v2.Controllers
                             {
                                 convertedAmountI = currentIngredient.amount;
                                 calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
+                            }
+
+                            if (baseVariantIngredientAmountDict.ContainsKey(currentIngredientStringId))
+                            {
+                                double currentIngredientTotalConsumption = baseVariantIngredientAmountDict[currentIngredientStringId];
+                                baseVariantIngredientAmountDict[currentIngredientStringId] = currentIngredientTotalConsumption += convertedAmountI;
+                            }
+                            else
+                            {
+                                baseVariantIngredientAmountDict.Add(currentIngredientStringId, convertedAmountI);
+                            }
+
+                            if (baseVariantIngredientAmountDict[currentIngredientStringId] > currentInventoryItemI.quantity)
+                            {
+                                response.ingredients_in_stock = false;
                             }
                             calculatedCost += calculatedAmountI;
                             break;
@@ -1354,9 +1374,33 @@ namespace BOM_API_v2.Controllers
                                 try { currentReferencedIngredientM = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
                                 catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
 
+                                string currentIngredientStringId = Convert.ToString(currentReferencedIngredientM.id);
                                 double currentRefItemPrice = currentReferencedIngredientM.price;
-                                double ingredientCost = currentReferencedIngredientM.measurements == subIng.amount_measurement ? (currentRefItemPrice * currentIngredient.amount) * currentSubIngredientCostMultiplier : (currentRefItemPrice * UnitConverter.ConvertByName(currentIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+                                double convertedAmount = 0.0;
+                                double ingredientCost = 0.0;//currentReferencedIngredientM.measurements == subIng.amount_measurement ?
+                                                            //(currentRefItemPrice * currentIngredient.amount) * currentSubIngredientCostMultiplier : 
+                                                            //(currentRefItemPrice * UnitConverter.ConvertByName(currentIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+                                if (currentReferencedIngredientM.measurements == subIng.amount_measurement)
+                                { convertedAmount = subIng.amount; }
+                                else
+                                { convertedAmount = UnitConverter.ConvertByName(subIng.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements); }
 
+                                if (baseVariantIngredientAmountDict.ContainsKey(currentIngredientStringId))
+                                {
+                                    double currentIngredientTotalConsumption = baseVariantIngredientAmountDict[currentIngredientStringId];
+                                    baseVariantIngredientAmountDict[currentIngredientStringId] = currentIngredientTotalConsumption += convertedAmount;
+                                }
+                                else
+                                {
+                                    baseVariantIngredientAmountDict.Add(currentIngredientStringId, convertedAmount);
+                                }
+
+                                if (baseVariantIngredientAmountDict[currentIngredientStringId] > currentReferencedIngredientM.quantity)
+                                {
+                                    response.ingredients_in_stock = false;
+                                }
+
+                                ingredientCost = (currentRefItemPrice * convertedAmount) * currentSubIngredientCostMultiplier;
                                 calculatedCost += ingredientCost;
                             }
 
@@ -1403,6 +1447,7 @@ namespace BOM_API_v2.Controllers
                                             Item? refItemForSubMatIng = null;
                                             try { refItemForSubMatIng = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
                                             catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+                                            string currentIngredientStringId = Convert.ToString(refItemForSubMatIng.id);
 
                                             string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
                                             double subMatIngRowAmount = subMaterialIngredientsRow.amount;
@@ -1422,7 +1467,30 @@ namespace BOM_API_v2.Controllers
                                                 else { continue; }
                                             }
 
-                                            double currentSubMaterialIngredientPrice = refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? (refItemPrice * subMatIngRowAmount) * costMultiplier : (refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+                                            double convertedAmountSubMaterialIngredient = 0.0;
+                                            double currentSubMaterialIngredientPrice = 0.0; //refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? 
+                                                                                            //(refItemPrice * subMatIngRowAmount) * costMultiplier : 
+                                                                                            //(refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+
+                                            if (refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement) { convertedAmountSubMaterialIngredient = subMatIngRowAmount; }
+                                            else { convertedAmountSubMaterialIngredient = UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement); }
+
+                                            if (baseVariantIngredientAmountDict.ContainsKey(currentIngredientStringId))
+                                            {
+                                                double currentIngredientTotalConsumption = baseVariantIngredientAmountDict[currentIngredientStringId];
+                                                baseVariantIngredientAmountDict[currentIngredientStringId] = currentIngredientTotalConsumption += convertedAmountSubMaterialIngredient;
+                                            }
+                                            else
+                                            {
+                                                baseVariantIngredientAmountDict.Add(currentIngredientStringId, convertedAmountSubMaterialIngredient);
+                                            }
+
+                                            if (baseVariantIngredientAmountDict[currentIngredientStringId] > refItemForSubMatIng.quantity)
+                                            {
+                                                response.ingredients_in_stock = false;
+                                            }
+
+                                            currentSubMaterialIngredientPrice = (refItemPrice * subMatIngRowAmount) * costMultiplier;
 
                                             calculatedCost += currentSubMaterialIngredientPrice;
                                             break;
@@ -1437,7 +1505,6 @@ namespace BOM_API_v2.Controllers
                             }
                             break;
                         }
-
                 }
                 responsePastryMaterialList.Add(newSubIngredientListEntry);
             }
@@ -1451,11 +1518,14 @@ namespace BOM_API_v2.Controllers
                 newSubVariantListRow.sub_variant_name = currentSubVariant.sub_variant_name;
                 newSubVariantListRow.date_added = currentSubVariant.date_added;
                 newSubVariantListRow.last_modified_date = currentSubVariant.last_modified_date;
-
+                newSubVariantListRow.ingredients_in_stock = response.ingredients_in_stock == true ? true : false;
                 double estimatedCostSubVariant = calculatedCost;
 
                 List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await _context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
                 List<SubGetPastryMaterialSubVariantIngredients> currentSubVariantIngredientList = new List<SubGetPastryMaterialSubVariantIngredients>();
+
+                string baseVariantJson = JsonSerializer.Serialize(baseVariantIngredientAmountDict);
+                Dictionary<string, double>? subVariantIngredientConsumptionDict = JsonSerializer.Deserialize<Dictionary<string, double>>(baseVariantJson);
 
                 foreach (PastryMaterialSubVariantIngredients currentSubVariantIngredient in currentSubVariantIngredients)
                 {
@@ -1505,7 +1575,7 @@ namespace BOM_API_v2.Controllers
 
                                 newSubVariantIngredientListEntry.item_name = currentInventoryItemI.item_name;
                                 newSubVariantIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
-
+                                string currentIngredientStringId = Convert.ToString(currentInventoryItemI.id);
                                 double convertedAmountI = 0.0;
                                 double calculatedAmountI = 0.0;
                                 if (amountQuantityType != "Count")
@@ -1518,6 +1588,22 @@ namespace BOM_API_v2.Controllers
                                     convertedAmountI = currentSubVariantIngredient.amount;
                                     calculatedAmountI = convertedAmountI * currentInventoryItemI.price;
                                 }
+
+                                if (subVariantIngredientConsumptionDict.ContainsKey(currentIngredientStringId))
+                                {
+                                    double currentIngredientTotalConsumption = subVariantIngredientConsumptionDict[currentIngredientStringId];
+                                    subVariantIngredientConsumptionDict[currentIngredientStringId] = currentIngredientTotalConsumption += convertedAmountI;
+                                }
+                                else
+                                {
+                                    subVariantIngredientConsumptionDict.Add(currentIngredientStringId, convertedAmountI);
+                                }
+
+                                if (subVariantIngredientConsumptionDict[currentIngredientStringId] > currentInventoryItemI.quantity)
+                                {
+                                    newSubVariantListRow.ingredients_in_stock = false;
+                                }
+
                                 estimatedCostSubVariant += calculatedAmountI;
                                 break;
                             }
@@ -1581,8 +1667,32 @@ namespace BOM_API_v2.Controllers
                                     try { currentReferencedIngredientM = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
                                     catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
 
+                                    string currentIngredientStringId = Convert.ToString(currentReferencedIngredientM.id);
                                     double currentRefItemPrice = currentReferencedIngredientM.price;
-                                    double ingredientCost = currentReferencedIngredientM.measurements == subIng.amount_measurement ? (currentRefItemPrice * currentSubVariantIngredient.amount) * currentSubIngredientCostMultiplier : (currentRefItemPrice * UnitConverter.ConvertByName(currentSubVariantIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+                                    double convertedAmount = 0.0;
+                                    double ingredientCost = 0.0;//currentReferencedIngredientM.measurements == subIng.amount_measurement ? (currentRefItemPrice * currentSubVariantIngredient.amount) * currentSubIngredientCostMultiplier : (currentRefItemPrice * UnitConverter.ConvertByName(currentSubVariantIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+
+                                    if (currentReferencedIngredientM.measurements == subIng.amount_measurement)
+                                    { convertedAmount = subIng.amount; }
+                                    else
+                                    { convertedAmount = UnitConverter.ConvertByName(subIng.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements); }
+
+                                    if (subVariantIngredientConsumptionDict.ContainsKey(currentIngredientStringId))
+                                    {
+                                        double currentIngredientTotalConsumption = subVariantIngredientConsumptionDict[currentIngredientStringId];
+                                        subVariantIngredientConsumptionDict[currentIngredientStringId] = currentIngredientTotalConsumption += convertedAmount;
+                                    }
+                                    else
+                                    {
+                                        subVariantIngredientConsumptionDict.Add(currentIngredientStringId, convertedAmount);
+                                    }
+
+                                    if (subVariantIngredientConsumptionDict[currentIngredientStringId] > currentReferencedIngredientM.quantity)
+                                    {
+                                        newSubVariantListRow.ingredients_in_stock = false;
+                                    }
+
+                                    ingredientCost = (currentRefItemPrice * convertedAmount) * currentSubIngredientCostMultiplier;
 
                                     estimatedCostSubVariant += ingredientCost;
                                 }
@@ -1630,6 +1740,7 @@ namespace BOM_API_v2.Controllers
                                                 Item? refItemForSubMatIng = null;
                                                 try { refItemForSubMatIng = await _kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
                                                 catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+                                                string currentIngredientStringId = Convert.ToString(refItemForSubMatIng.id);
 
                                                 string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
                                                 double subMatIngRowAmount = subMaterialIngredientsRow.amount;
@@ -1649,7 +1760,31 @@ namespace BOM_API_v2.Controllers
                                                     else { continue; }
                                                 }
 
-                                                double currentSubMaterialIngredientPrice = refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? (refItemPrice * subMatIngRowAmount) * costMultiplier : (refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+                                                //double currentSubMaterialIngredientPrice = //refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? (refItemPrice * subMatIngRowAmount) * costMultiplier : (refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+                                                double convertedAmountSubMaterialIngredient = 0.0;
+                                                double currentSubMaterialIngredientPrice = 0.0; //refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? 
+                                                                                                //(refItemPrice * subMatIngRowAmount) * costMultiplier : 
+                                                                                                //(refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+
+                                                if (refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement) { convertedAmountSubMaterialIngredient = subMatIngRowAmount; }
+                                                else { convertedAmountSubMaterialIngredient = UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement); }
+
+                                                if (subVariantIngredientConsumptionDict.ContainsKey(currentIngredientStringId))
+                                                {
+                                                    double currentIngredientTotalConsumption = subVariantIngredientConsumptionDict[currentIngredientStringId];
+                                                    subVariantIngredientConsumptionDict[currentIngredientStringId] = currentIngredientTotalConsumption += convertedAmountSubMaterialIngredient;
+                                                }
+                                                else
+                                                {
+                                                    subVariantIngredientConsumptionDict.Add(currentIngredientStringId, convertedAmountSubMaterialIngredient);
+                                                }
+
+                                                if (subVariantIngredientConsumptionDict[currentIngredientStringId] > refItemForSubMatIng.quantity)
+                                                {
+                                                    newSubVariantListRow.ingredients_in_stock = false;
+                                                }
+
+                                                currentSubMaterialIngredientPrice = (refItemPrice * subMatIngRowAmount) * costMultiplier;
 
                                                 estimatedCostSubVariant += currentSubMaterialIngredientPrice;
                                                 break;
@@ -1676,6 +1811,7 @@ namespace BOM_API_v2.Controllers
             response.ingredients = responsePastryMaterialList;
             response.sub_variants = responsePastryMaterialSubVariants;
             response.cost_estimate = calculatedCost;
+
             return response;
         }
 
