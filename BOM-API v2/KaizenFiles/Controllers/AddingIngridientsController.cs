@@ -160,7 +160,7 @@ namespace CRUDFI.Controllers
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
-                                    isActive = Convert.ToInt32(reader["quantity"]) > 0 // Determine isActive based on quantity
+                                    isActive = Convert.ToBoolean(reader["isActive"])
                                 };
 
                                 ingredientsDtoList.Add(ingredientDto);
@@ -202,6 +202,7 @@ namespace CRUDFI.Controllers
                     status = ingredient.status,
                     type = ingredient.type,
                     CreatedAt = ingredient.CreatedAt,
+                    isActive = ingredient.isActive,
                     lastUpdatedBy = ingredient.lastUpdatedBy,
                     lastUpdatedAt = ingredient.lastUpdatedAt
                 }).ToList();

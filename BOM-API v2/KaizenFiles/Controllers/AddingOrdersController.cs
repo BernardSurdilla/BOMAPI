@@ -33,6 +33,14 @@ namespace CRUDFI.Controllers
         {
             try
             {
+                // Fetch customer username from claims
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
                 // Get the design's ID using the provided design name
                 byte[] designId = await GetDesignIdByDesignName(designName);
                 if (designId == null || designId.Length == 0)
@@ -54,7 +62,7 @@ namespace CRUDFI.Controllers
                     size = size,
                     flavor = flavor,
                     isActive = false,
-                    customerName = orderDto.customerName
+                    customerName = customerUsername // Set customer name from authenticated user
                 };
 
                 // Set isActive to false for all orders created
@@ -618,7 +626,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT  name, price FROM AddOns";
+                string sql = "SELECT  name, price,addOnsId, measurement, size, quantity, date_added, last_modified_date, isActive  FROM AddOns";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -628,8 +636,16 @@ namespace CRUDFI.Controllers
                         {
                             var addOnDSOS = new AddOnDS2
                             {
+
                                 AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price")
+                                PricePerUnit = reader.GetDouble("price"),
+                                addOnsId = reader.GetInt32("addOnsId"),
+                                Measurement = reader.GetString("measurement"),
+                                Quantity = reader.GetInt32("quantity"),
+                                DateAdded = reader.GetDateTime("date_added"),
+                                LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("last_modified_date")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_modified_date")),
+                                IsActive = reader.GetBoolean("isActive")
+
                             };
 
                             addOnDSOSList.Add(addOnDSOS);
@@ -1676,6 +1692,60 @@ WHERE OrderId = UNHEX(@orderId)";
             string binary16String = BitConverter.ToString(guidBytes).Replace("-", "");
 
             return binary16String;
+        }
+
+        [HttpPatch("update_add_on")]
+        public async Task<IActionResult> UpdateAddOn([FromBody] UpdateAddOnRequest request)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // Check if the add-on exists
+                    string sqlCheck = "SELECT COUNT(*) FROM addons WHERE addOnsId = @addOnsId";
+                    using (var checkCommand = new MySqlCommand(sqlCheck, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@addOnsId", request.AddOnId);
+                        int addOnCount = Convert.ToInt32(await checkCommand.ExecuteScalarAsync());
+
+                        if (addOnCount == 0)
+                        {
+                            return NotFound("Add-On not found");
+                        }
+                    }
+
+                    // Update the add-on details
+                    string sqlUpdate = @"
+                UPDATE AddOns 
+                SET 
+                    price = @price,
+                    measurement = @measurement,
+                    quantity = @quantity,
+                    last_modified_date = @lastModifiedDate
+                WHERE 
+                    addOnsId = @addOnsId";
+
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@price", request.Price);
+                        updateCommand.Parameters.AddWithValue("@measurement", request.Measurement);
+                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity);
+                        updateCommand.Parameters.AddWithValue("@lastModifiedDate", DateTime.UtcNow);
+                        updateCommand.Parameters.AddWithValue("@addOnsId", request.AddOnId);
+
+                        await updateCommand.ExecuteNonQueryAsync();
+                    }
+                }
+
+                return Ok("Add-On updated successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating the Add-On.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
         }
 
 
@@ -2837,7 +2907,7 @@ WHERE OrderId = UNHEX(@orderId)";
                 await connection.OpenAsync();
 
                 string sql = @"INSERT INTO orders (OrderId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, DesignName) 
-                       VALUES (UNHEX(REPLACE(UUID(), '-', '')), NULL, @CustomerName, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @DesignName)";
+               VALUES (UNHEX(REPLACE(UUID(), '-', '')), NULL, @CustomerName, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @DesignName)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2859,6 +2929,7 @@ WHERE OrderId = UNHEX(@orderId)";
                 }
             }
         }
+
 
 
     }

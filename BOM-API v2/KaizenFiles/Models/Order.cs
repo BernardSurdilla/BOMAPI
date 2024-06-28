@@ -72,7 +72,6 @@ namespace CRUDFI.Models
     public class OrderDTO
     {
         public string OrderName { get; set; } = "";
-        public string customerName { get; set; } = string.Empty;
         public double Price { get; set; }
         public int Quantity { get; set; }
     }
@@ -143,11 +142,25 @@ namespace CRUDFI.Models
         public double PricePerUnit { get; set; }
         public int AddOnId { get; set; }
     }
+    public class UpdateAddOnRequest
+    {
+        public int AddOnId { get; set; }
+        public double Price { get; set; }
+        public string Measurement { get; set; }
+        public int Quantity { get; set; }
+    }
     public class AddOnDS2
     {
+        public int addOnsId { get; set; }
         public string AddOnName { get; set; }
+        public int Quantity { get; set; }
+        public string Measurement { get; set; }
         public double PricePerUnit { get; set; }
+        public DateTime DateAdded { get; set; }
+        public DateTime? LastModifiedDate { get; set; }
+        public bool IsActive { get; set; }
     }
+
     public class AddOns
     {
         public int addOnsId { get; set; }
