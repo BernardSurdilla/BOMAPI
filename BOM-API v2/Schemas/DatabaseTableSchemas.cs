@@ -31,9 +31,9 @@ namespace BillOfMaterialsAPI.Schemas
     public class Ingredients
     {
         [Required][Key][MaxLength(25)] public string ingredient_id { get; set; }
+        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
 
         //The id of the cake this ingredient is a part of
-        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
         //Which item in the inventory this ingredient pertains to
         [Required][MaxLength(25)] public string item_id { get; set; }
 
@@ -51,6 +51,19 @@ namespace BillOfMaterialsAPI.Schemas
 
         public PastryMaterials PastryMaterials { get; set; }
 
+    }
+    [PrimaryKey("pastry_material_add_on_id")]
+    public class PastyMaterialAddOns
+    {
+        [Required][Key][MaxLength(29)] public string pastry_material_add_on_id { get; set; }
+        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
+        [Required] public bool isActive { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+
+        public PastryMaterials PastryMaterials { get; set; }
     }
     [PrimaryKey("pastry_material_sub_variant_id")]
     public class PastryMaterialSubVariants
@@ -83,6 +96,19 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
+        [Required] public bool isActive { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+
+        public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
+    }
+    [PrimaryKey("pastry_material_sub_variant_add_on_id")]
+    public class PastryMaterialSubVariantAddOns
+    {
+        [Required][Key][MaxLength(26)] public string pastry_material_sub_variant_add_on_id { get; set; }
+        [Required][ForeignKey("PastryMaterialSubVariants")] public string pastry_material_sub_variant_id { get; set; }
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
         [Required] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }

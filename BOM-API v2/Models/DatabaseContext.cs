@@ -11,9 +11,11 @@ namespace BillOfMaterialsAPI.Models
         }
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
         public DbSet<Ingredients> Ingredients { get; set; }
+        public DbSet<PastyMaterialAddOns> PastyMaterialAddOns { get; set; }
 
         public DbSet<PastryMaterialSubVariants> PastryMaterialSubVariants { get; set; }
         public DbSet<PastryMaterialSubVariantIngredients> PastryMaterialSubVariantIngredients { get; set; }
+        public DbSet<PastryMaterialSubVariantAddOns> PastryMaterialSubVariantAddOns { get; set; }
 
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
@@ -22,7 +24,6 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<DesignTags> DesignTags { get; set; }
         public DbSet<DesignTagsForCakes> DesignTagsForCakes { get; set; }
         public DbSet<DesignImage> DesignImage { get; set; }
-
     }   
 
     public class KaizenTables : DbContext
