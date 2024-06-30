@@ -159,6 +159,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(29)] public string pastry_material_add_on_id { get; set; }
         [Required][MaxLength(26)] public string pastry_material_id { get; set; }
         [Required] public int add_ons_id { get; set; }
+        public string add_ons_name { get; set; }
         [Required] public double amount { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
@@ -182,6 +183,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(26)] public string pastry_material_sub_variant_add_on_id { get; set; }
         [Required][MaxLength(26)] public string pastry_material_sub_variant_id { get; set; }
         [Required] public int add_ons_id { get; set; }
+        public string add_ons_name { get; set; }
         [Required] public double amount { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
@@ -306,5 +308,15 @@ namespace BillOfMaterialsAPI.Schemas
         public string variant_name { get; set; }
         public double cost_estimate { get; set; }
         public bool in_stock { get; set; }
+        public List<SubGetAddOn> add_ons { get; set; }
+    }
+    public class SubGetAddOn
+    {
+        public string pastry_material_add_on_id { get; set; }
+        public int add_on_id { get; set; }
+        public string add_on_name { get; set; }
+        public double amount { get; set; }
+        public double stock { get; set; }
+        public double price { get; set; }
     }
 }

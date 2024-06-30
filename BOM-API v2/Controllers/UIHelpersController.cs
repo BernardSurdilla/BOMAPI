@@ -58,7 +58,27 @@ namespace BOM_API_v2.Controllers
             response.pastry_material_id = parsedData.pastry_material_id;
 
             response.variants = new List<SubGetVariants>();
-            response.variants.Add(new SubGetVariants {variant_id = parsedData.pastry_material_id, variant_name = parsedData.main_variant_name, cost_estimate = parsedData.cost_estimate, in_stock = parsedData.ingredients_in_stock });
+            SubGetVariants mainVariant = new SubGetVariants { variant_id = parsedData.pastry_material_id, variant_name = parsedData.main_variant_name, cost_estimate = parsedData.cost_estimate, in_stock = parsedData.ingredients_in_stock, add_ons = new List<SubGetAddOn>() };
+
+            foreach (GetPastryMaterialAddOns currentPastryMaterialAddOn in parsedData.add_ons)
+            {
+                AddOns? referencedAddOns = null;
+                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentPastryMaterialAddOn.add_ons_id).FirstAsync(); }
+                catch { continue; }
+                if (referencedAddOns == null) { continue; }
+
+                SubGetAddOn newMainVariantAddOnsEntry = new SubGetAddOn();
+                newMainVariantAddOnsEntry.pastry_material_add_on_id = currentPastryMaterialAddOn.pastry_material_add_on_id;
+                newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
+                newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
+                newMainVariantAddOnsEntry.amount = currentPastryMaterialAddOn.amount;
+                newMainVariantAddOnsEntry.stock = referencedAddOns.quantity;
+                newMainVariantAddOnsEntry.price = referencedAddOns.price;
+
+                mainVariant.add_ons.Add(newMainVariantAddOnsEntry);
+            }
+
+            response.variants.Add(mainVariant);
 
             foreach (GetPastryMaterialSubVariant currentSubVariant in parsedData.sub_variants)
             {
@@ -67,6 +87,26 @@ namespace BOM_API_v2.Controllers
                 newResponseSubVariantEntry.variant_name = currentSubVariant.sub_variant_name;
                 newResponseSubVariantEntry.cost_estimate = currentSubVariant.cost_estimate;
                 newResponseSubVariantEntry.in_stock = currentSubVariant.ingredients_in_stock;
+                newResponseSubVariantEntry.add_ons = new List<SubGetAddOn>();
+
+                foreach (GetPastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariant.sub_variant_add_ons)
+                {
+                    AddOns? referencedAddOns = null;
+                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
+                    catch { continue; }
+                    if (referencedAddOns == null) { continue; }
+
+                    SubGetAddOn newMainVariantAddOnsEntry = new SubGetAddOn();
+                    newMainVariantAddOnsEntry.pastry_material_add_on_id = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
+                    newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
+                    newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
+                    newMainVariantAddOnsEntry.amount = currentSubVariantAddOn.amount;
+                    newMainVariantAddOnsEntry.stock = referencedAddOns.quantity;
+                    newMainVariantAddOnsEntry.price = referencedAddOns.price;
+                    
+                    newResponseSubVariantEntry.add_ons.Add(newMainVariantAddOnsEntry);
+                }
+
                 response.variants.Add(newResponseSubVariantEntry);
             }
 
@@ -87,10 +127,12 @@ namespace BOM_API_v2.Controllers
             response.ingredients_in_stock = true;
 
             List<GetPastryMaterialIngredients> responsePastryMaterialList = new List<GetPastryMaterialIngredients>();
+            List<GetPastryMaterialAddOns> responsePastryMaterialAddOns = new List<GetPastryMaterialAddOns>();
             List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastyMaterialAddOns> currentPastryMaterialAddOns = await _context.PastyMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
 
             Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
@@ -240,8 +282,8 @@ namespace BOM_API_v2.Controllers
                                 double currentRefItemPrice = currentReferencedIngredientM.price;
                                 double convertedAmount = 0.0;
                                 double ingredientCost = 0.0;//currentReferencedIngredientM.measurements == subIng.amount_measurement ?
-                                    //(currentRefItemPrice * currentIngredient.amount) * currentSubIngredientCostMultiplier : 
-                                    //(currentRefItemPrice * UnitConverter.ConvertByName(currentIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
+                                                            //(currentRefItemPrice * currentIngredient.amount) * currentSubIngredientCostMultiplier : 
+                                                            //(currentRefItemPrice * UnitConverter.ConvertByName(currentIngredient.amount, amountQuantityType, amountUnitMeasurement, currentReferencedIngredientM.measurements) * currentSubIngredientCostMultiplier);
                                 if (currentReferencedIngredientM.measurements == subIng.amount_measurement)
                                 { convertedAmount = subIng.amount; }
                                 else
@@ -331,8 +373,8 @@ namespace BOM_API_v2.Controllers
 
                                             double convertedAmountSubMaterialIngredient = 0.0;
                                             double currentSubMaterialIngredientPrice = 0.0; //refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement ? 
-                                                //(refItemPrice * subMatIngRowAmount) * costMultiplier : 
-                                                //(refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
+                                                                                            //(refItemPrice * subMatIngRowAmount) * costMultiplier : 
+                                                                                            //(refItemPrice * UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement)) * costMultiplier;
 
                                             if (refItemForSubMatIng.measurements == subMaterialIngredientsRow.amount_measurement) { convertedAmountSubMaterialIngredient = subMatIngRowAmount; }
                                             else { convertedAmountSubMaterialIngredient = UnitConverter.ConvertByName(subMatIngRowAmount, refItemQuantityUnit, subMatIngRowMeasurement, refItemMeasurement); }
@@ -370,6 +412,25 @@ namespace BOM_API_v2.Controllers
                 }
                 responsePastryMaterialList.Add(newSubIngredientListEntry);
             }
+            foreach (PastyMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
+            {
+                AddOns? referencedAddOns = null;
+                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentAddOn.add_ons_id).FirstAsync(); }
+                catch { continue; }
+                if (referencedAddOns == null) { continue; }
+
+                GetPastryMaterialAddOns newResponseAddOnRow = new GetPastryMaterialAddOns();
+                newResponseAddOnRow.pastry_material_add_on_id = currentAddOn.pastry_material_add_on_id;
+                newResponseAddOnRow.pastry_material_id = currentAddOn.pastry_material_id;
+
+                newResponseAddOnRow.add_ons_id = currentAddOn.add_ons_id;
+                newResponseAddOnRow.add_ons_name = referencedAddOns.name;
+                newResponseAddOnRow.amount = currentAddOn.amount;
+
+                newResponseAddOnRow.date_added = currentAddOn.date_added;
+                newResponseAddOnRow.last_modified_date = currentAddOn.last_modified_date;
+                responsePastryMaterialAddOns.Add(newResponseAddOnRow);
+            }
 
             List<PastryMaterialSubVariants> currentPastryMaterialSubVariants = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             foreach (PastryMaterialSubVariants currentSubVariant in currentPastryMaterialSubVariants)
@@ -384,7 +445,10 @@ namespace BOM_API_v2.Controllers
                 double estimatedCostSubVariant = calculatedCost;
 
                 List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await _context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+                List<PastryMaterialSubVariantAddOns> currentSubVariantAddOns = await _context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+
                 List<SubGetPastryMaterialSubVariantIngredients> currentSubVariantIngredientList = new List<SubGetPastryMaterialSubVariantIngredients>();
+                List<GetPastryMaterialSubVariantAddOns> currentSubVariantAddOnList = new List<GetPastryMaterialSubVariantAddOns>();
 
                 string baseVariantJson = JsonSerializer.Serialize(baseVariantIngredientAmountDict);
                 Dictionary<string, double>? subVariantIngredientConsumptionDict = JsonSerializer.Deserialize<Dictionary<string, double>>(baseVariantJson);
@@ -664,17 +728,41 @@ namespace BOM_API_v2.Controllers
                     }
                     currentSubVariantIngredientList.Add(newSubVariantIngredientListEntry);
                 }
+                foreach (PastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariantAddOns)
+                {
+                    AddOns? referencedAddOns = null;
+                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
+                    catch { continue; }
+                    if (referencedAddOns == null) { continue; }
+
+
+                    GetPastryMaterialSubVariantAddOns newResponseSubVariantAddOnRow = new GetPastryMaterialSubVariantAddOns();
+                    newResponseSubVariantAddOnRow.pastry_material_sub_variant_add_on_id = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
+                    newResponseSubVariantAddOnRow.pastry_material_sub_variant_id = currentSubVariantAddOn.pastry_material_sub_variant_id;
+
+                    newResponseSubVariantAddOnRow.add_ons_id = currentSubVariantAddOn.add_ons_id;
+                    newResponseSubVariantAddOnRow.add_ons_name = referencedAddOns.name;
+                    newResponseSubVariantAddOnRow.amount = currentSubVariantAddOn.amount;
+
+                    newResponseSubVariantAddOnRow.date_added = currentSubVariantAddOn.date_added;
+                    newResponseSubVariantAddOnRow.last_modified_date = currentSubVariantAddOn.last_modified_date;
+                    currentSubVariantAddOnList.Add(newResponseSubVariantAddOnRow);
+                }
+
                 newSubVariantListRow.cost_estimate = estimatedCostSubVariant;
                 newSubVariantListRow.sub_variant_ingredients = currentSubVariantIngredientList;
+                newSubVariantListRow.sub_variant_add_ons = currentSubVariantAddOnList;
 
                 responsePastryMaterialSubVariants.Add(newSubVariantListRow);
             }
 
             response.ingredients = responsePastryMaterialList;
+            response.add_ons = responsePastryMaterialAddOns;
             response.sub_variants = responsePastryMaterialSubVariants;
             response.cost_estimate = calculatedCost;
 
             return response;
         }
+
     }
 }

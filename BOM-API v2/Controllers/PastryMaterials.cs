@@ -15,6 +15,7 @@ using System.Runtime.CompilerServices;
 using Castle.Components.DictionaryAdapter.Xml;
 using System.Text.Json;
 using Microsoft.Identity.Client;
+using ZstdSharp.Unsafe;
 
 namespace BOM_API_v2.Controllers
 {
@@ -404,7 +405,7 @@ namespace BOM_API_v2.Controllers
                     }
 
                     string lastSubVariantAddOnId = "";
-                    try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_add_on_id; }
+                    try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantAddOnId = x.pastry_material_sub_variant_add_on_id; }
                     catch (Exception ex)
                     {
                         string newSubVariantAddOnId = IdFormat.pastryMaterialSubVariantAddOnIdFormat;
@@ -456,7 +457,6 @@ namespace BOM_API_v2.Controllers
                     }
                 }
             }
-            
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "POST", "Add Pastry Materials " + newPastryMaterialEntry.pastry_material_id);
@@ -528,6 +528,50 @@ namespace BOM_API_v2.Controllers
 
             await _actionLogger.LogAction(User, "POST", "Add Ingredient " + newIngredientsEntry.ingredient_id + " to " + pastry_material_id);
             return Ok(new { message = "Data inserted to the database." });
+
+        }
+        [HttpPost("{pastry_material_id}/add_ons")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> AddNewPastryMaterialAddOn(string pastry_material_id, PostPastryMaterialAddOns entry)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); };
+
+            AddOns? selectedAddOn = null;
+            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == entry.add_ons_id && x.isActive == true).FirstAsync(); }
+            catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+            if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+
+            string lastPastryMaterialAddOnId = "";
+            try { PastyMaterialAddOns x = await _context.PastyMaterialAddOns.OrderByDescending(x => x.pastry_material_add_on_id).FirstAsync(); lastPastryMaterialAddOnId = x.pastry_material_add_on_id; }
+            catch (Exception ex)
+            {
+                string newPastryMaterialAddOnId = IdFormat.pastryMaterialAddOnIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialAddOnId += "0"; }
+                lastPastryMaterialAddOnId = newPastryMaterialAddOnId;
+            }
+
+            PastyMaterialAddOns newAddOnEntry = new PastyMaterialAddOns();
+            string newId = IdFormat.IncrementId(IdFormat.pastryMaterialAddOnIdFormat, IdFormat.idNumLength, lastPastryMaterialAddOnId);
+            DateTime currentTime = DateTime.Now;
+
+            lastPastryMaterialAddOnId = newId;
+
+            newAddOnEntry.pastry_material_add_on_id = newId;
+            newAddOnEntry.pastry_material_id = currentPastryMaterial.pastry_material_id;
+            newAddOnEntry.add_ons_id = selectedAddOn.add_ons_id;
+            newAddOnEntry.amount = entry.amount;
+
+            newAddOnEntry.isActive = true;
+            newAddOnEntry.date_added = currentTime;
+            newAddOnEntry.last_modified_date = currentTime;
+
+            await _context.PastyMaterialAddOns.AddAsync(newAddOnEntry);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "New add on added to " + pastry_material_id });
 
         }
         [HttpPost("{pastry_material_id}/sub_variants")]
@@ -749,6 +793,54 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add Sub variant ingredient for " + pastry_material_sub_variant_id + " of " + pastry_material_id);
             return Ok(new { message = "New sub variant ingredient for " + pastry_material_sub_variant_id + " added" });
         }
+        [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/add_ons")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> AddNewPastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantAddOns entry)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); };
+
+            PastryMaterialSubVariants? currentPastryMaterialSubVariant = null;
+            try { currentPastryMaterialSubVariant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material sub variant with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material sub variant with the specified id found." }); };
+
+            AddOns? selectedAddOn = null;
+            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == entry.add_ons_id && x.isActive == true).FirstAsync(); }
+            catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+            if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+
+            string lastSubVariantAddOnId = "";
+            try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantAddOnId = x.pastry_material_sub_variant_add_on_id; }
+            catch (Exception ex)
+            {
+                string newSubVariantAddOnId = IdFormat.pastryMaterialSubVariantAddOnIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantAddOnId += "0"; }
+                lastSubVariantAddOnId = newSubVariantAddOnId;
+            }
+
+            string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantAddOnIdFormat, IdFormat.idNumLength, lastSubVariantAddOnId);
+            DateTime currentTime = DateTime.Now;
+
+            PastryMaterialSubVariantAddOns newPastryMaterialSubVariantAddOn = new PastryMaterialSubVariantAddOns();
+            newPastryMaterialSubVariantAddOn.pastry_material_sub_variant_id = currentPastryMaterialSubVariant.pastry_material_sub_variant_id;
+            newPastryMaterialSubVariantAddOn.pastry_material_sub_variant_add_on_id = newId;
+
+            newPastryMaterialSubVariantAddOn.add_ons_id = selectedAddOn.add_ons_id;
+            newPastryMaterialSubVariantAddOn.amount = entry.amount;
+
+            newPastryMaterialSubVariantAddOn.isActive = true;
+            newPastryMaterialSubVariantAddOn.date_added = currentTime;
+            newPastryMaterialSubVariantAddOn.last_modified_date = currentTime;
+
+            await _context.PastryMaterialSubVariantAddOns.AddAsync(newPastryMaterialSubVariantAddOn);
+            await _context.SaveChangesAsync();
+
+
+            return Ok(new { message = "New add on inserted to " + pastry_material_sub_variant_id });
+        }
 
         //PATCH
         [HttpPatch("{pastry_material_id}")]
@@ -778,7 +870,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material updated." });
 
         }
-        [HttpPatch("{pastry_material_id}/{ingredient_id}")]
+        [HttpPatch("{pastry_material_id}/ingredients/{ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialIngredient(string pastry_material_id, string ingredient_id, PatchIngredients entry)
         {
@@ -829,6 +921,34 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Ingredient " + pastry_material_id);
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
+        }
+        [HttpPatch("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> UpdatePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id, PatchPastryMaterialAddOn entry)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); };
+
+            PastyMaterialAddOns? currentPastryMaterialAddOn = null;
+            try { currentPastryMaterialAddOn = await _context.PastyMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_add_on_id == pastry_material_add_on_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material add on with the specified id found." }); }
+            if (currentPastryMaterialAddOn == null) { return NotFound(new { message = "No Pastry Material add on with the specified id found." }); };
+
+            AddOns? selectedAddOn = null;
+            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == entry.add_ons_id && x.isActive == true).FirstAsync(); }
+            catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+            if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+
+            _context.PastyMaterialAddOns.Update(currentPastryMaterialAddOn);
+            currentPastryMaterialAddOn.add_ons_id = selectedAddOn.add_ons_id;
+            currentPastryMaterialAddOn.amount = entry.amount;
+            currentPastryMaterialAddOn.last_modified_date = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+            
+            return Ok(new { message = "Add on " + pastry_material_add_on_id + " updated " });
         }
         [HttpPatch("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
         [Authorize(Roles = UserRoles.Admin)]
@@ -911,6 +1031,39 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
             return Ok(new { message = "Sub variant updated" });
         }
+        [HttpPatch("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> UpdatePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id, PatchPastryMaterialSubVariantAddOn entry)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); };
+
+            PastryMaterialSubVariants? currentPastryMaterialSubVariant = null;
+            try { currentPastryMaterialSubVariant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id).FirstAsync(); }
+            catch { return NotFound(new { message = "Pastry material subvariant " + pastry_material_sub_variant_id + " for " + pastry_material_id + " does not exist" }); }
+            if (currentPastryMaterialSubVariant == null) { return NotFound(new { message = "Pastry material subvariant " + pastry_material_sub_variant_id + " for " + pastry_material_id + " does not exist" }); }
+
+            PastryMaterialSubVariantAddOns? currentPastryMaterialSubVariantAddOn = null;
+            try { currentPastryMaterialSubVariantAddOn = await _context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_add_on_id == pastry_material_sub_variant_add_on_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material sub variant with the specified id found." }); }
+            if (currentPastryMaterialSubVariantAddOn == null) { return NotFound(new { message = "No Pastry Material sub variant add on with the specified id found." }); };
+
+            AddOns? selectedAddOn = null;
+            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == entry.add_ons_id && x.isActive == true).FirstAsync(); }
+            catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+            if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry.add_ons_id) + " does not exist" }); }
+
+            _context.PastryMaterialSubVariantAddOns.Update(currentPastryMaterialSubVariantAddOn);
+            currentPastryMaterialSubVariantAddOn.add_ons_id = selectedAddOn.add_ons_id;
+            currentPastryMaterialSubVariantAddOn.amount = entry.amount;
+            currentPastryMaterialSubVariantAddOn.last_modified_date = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Add on " + pastry_material_sub_variant_add_on_id + " updated " });
+        }
 
 
         //DELETE
@@ -964,6 +1117,28 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material Ingredient " + ingredient_id);
             return Ok(new { message = "Ingredient deleted." });
         }
+        [HttpDelete("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> DeletePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); };
+
+            PastyMaterialAddOns? currentPastryMaterialAddOn = null;
+            try { currentPastryMaterialAddOn = await _context.PastyMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_add_on_id == pastry_material_add_on_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material add on with the specified id found." }); }
+            if (currentPastryMaterialAddOn == null) { return NotFound(new { message = "No Pastry Material add on with the specified id found." }); };
+
+            _context.PastyMaterialAddOns.Update(currentPastryMaterialAddOn);
+            currentPastryMaterialAddOn.isActive = false;
+            currentPastryMaterialAddOn.last_modified_date = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Add on " + pastry_material_add_on_id + " deleted " });
+        }
         [HttpDelete("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariant(string pastry_material_id, string pastry_material_sub_variant_id)
@@ -1012,6 +1187,33 @@ namespace BOM_API_v2.Controllers
 
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
             return Ok(new { message = "Sub variant deleted" });
+        }
+        [HttpDelete("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> DeletePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id)
+        {
+            PastryMaterials? currentPastryMaterial = null;
+            try { currentPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); };
+
+            PastryMaterialSubVariants? currentPastryMaterialSubVariant = null;
+            try { currentPastryMaterialSubVariant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id).FirstAsync(); }
+            catch { return NotFound(new { message = "Pastry material subvariant " + pastry_material_sub_variant_id + " for " + pastry_material_id + " does not exist" }); }
+            if (currentPastryMaterialSubVariant == null) { return NotFound(new { message = "Pastry material subvariant " + pastry_material_sub_variant_id + " for " + pastry_material_id + " does not exist" }); }
+
+            PastryMaterialSubVariantAddOns? currentPastryMaterialSubVariantAddOn = null;
+            try { currentPastryMaterialSubVariantAddOn = await _context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_add_on_id == pastry_material_sub_variant_add_on_id).FirstAsync(); }
+            catch { return NotFound(new { message = "No Pastry Material sub variant with the specified id found." }); }
+            if (currentPastryMaterialSubVariantAddOn == null) { return NotFound(new { message = "No Pastry Material sub variant add on with the specified id found." }); };
+
+            _context.PastryMaterialSubVariantAddOns.Update(currentPastryMaterialSubVariantAddOn);
+            currentPastryMaterialSubVariantAddOn.isActive = false;
+            currentPastryMaterialSubVariantAddOn.last_modified_date = DateTime.Now;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Add on " + pastry_material_sub_variant_add_on_id + " deleted " });
         }
 
         //
@@ -1349,10 +1551,12 @@ namespace BOM_API_v2.Controllers
             response.ingredients_in_stock = true;
 
             List<GetPastryMaterialIngredients> responsePastryMaterialList = new List<GetPastryMaterialIngredients>();
+            List<GetPastryMaterialAddOns> responsePastryMaterialAddOns = new List<GetPastryMaterialAddOns>();
             List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastyMaterialAddOns> currentPastryMaterialAddOns = await _context.PastyMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
 
             Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
@@ -1632,6 +1836,25 @@ namespace BOM_API_v2.Controllers
                 }
                 responsePastryMaterialList.Add(newSubIngredientListEntry);
             }
+            foreach (PastyMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
+            {
+                AddOns? referencedAddOns = null;
+                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentAddOn.add_ons_id).FirstAsync(); }
+                catch { continue; }
+                if (referencedAddOns == null) { continue; }
+
+                GetPastryMaterialAddOns newResponseAddOnRow = new GetPastryMaterialAddOns();
+                newResponseAddOnRow.pastry_material_add_on_id = currentAddOn.pastry_material_add_on_id;
+                newResponseAddOnRow.pastry_material_id = currentAddOn.pastry_material_id;
+
+                newResponseAddOnRow.add_ons_id = currentAddOn.add_ons_id;
+                newResponseAddOnRow.add_ons_name = referencedAddOns.name;
+                newResponseAddOnRow.amount = currentAddOn.amount;
+
+                newResponseAddOnRow.date_added = currentAddOn.date_added;
+                newResponseAddOnRow.last_modified_date = currentAddOn.last_modified_date;
+                responsePastryMaterialAddOns.Add(newResponseAddOnRow);
+            }
 
             List<PastryMaterialSubVariants> currentPastryMaterialSubVariants = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             foreach (PastryMaterialSubVariants currentSubVariant in currentPastryMaterialSubVariants)
@@ -1646,7 +1869,10 @@ namespace BOM_API_v2.Controllers
                 double estimatedCostSubVariant = calculatedCost;
 
                 List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await _context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+                List<PastryMaterialSubVariantAddOns> currentSubVariantAddOns = await _context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+
                 List<SubGetPastryMaterialSubVariantIngredients> currentSubVariantIngredientList = new List<SubGetPastryMaterialSubVariantIngredients>();
+                List<GetPastryMaterialSubVariantAddOns> currentSubVariantAddOnList = new List<GetPastryMaterialSubVariantAddOns>();
 
                 string baseVariantJson = JsonSerializer.Serialize(baseVariantIngredientAmountDict);
                 Dictionary<string, double>? subVariantIngredientConsumptionDict = JsonSerializer.Deserialize<Dictionary<string, double>>(baseVariantJson);
@@ -1926,13 +2152,36 @@ namespace BOM_API_v2.Controllers
                     }
                     currentSubVariantIngredientList.Add(newSubVariantIngredientListEntry);
                 }
+                foreach (PastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariantAddOns)
+                {
+                    AddOns? referencedAddOns = null;
+                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
+                    catch { continue; }
+                    if (referencedAddOns == null) { continue; }
+
+
+                    GetPastryMaterialSubVariantAddOns newResponseSubVariantAddOnRow = new GetPastryMaterialSubVariantAddOns();
+                    newResponseSubVariantAddOnRow.pastry_material_sub_variant_add_on_id = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
+                    newResponseSubVariantAddOnRow.pastry_material_sub_variant_id = currentSubVariantAddOn.pastry_material_sub_variant_id;
+
+                    newResponseSubVariantAddOnRow.add_ons_id = currentSubVariantAddOn.add_ons_id;
+                    newResponseSubVariantAddOnRow.add_ons_name = referencedAddOns.name;
+                    newResponseSubVariantAddOnRow.amount = currentSubVariantAddOn.amount;
+
+                    newResponseSubVariantAddOnRow.date_added = currentSubVariantAddOn.date_added;
+                    newResponseSubVariantAddOnRow.last_modified_date = currentSubVariantAddOn.last_modified_date;
+                    currentSubVariantAddOnList.Add(newResponseSubVariantAddOnRow);
+                } 
+
                 newSubVariantListRow.cost_estimate = estimatedCostSubVariant;
                 newSubVariantListRow.sub_variant_ingredients = currentSubVariantIngredientList;
+                newSubVariantListRow.sub_variant_add_ons = currentSubVariantAddOnList;
 
                 responsePastryMaterialSubVariants.Add(newSubVariantListRow);
             }
 
             response.ingredients = responsePastryMaterialList;
+            response.add_ons = responsePastryMaterialAddOns;
             response.sub_variants = responsePastryMaterialSubVariants;
             response.cost_estimate = calculatedCost;
 
