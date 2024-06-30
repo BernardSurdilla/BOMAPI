@@ -58,11 +58,12 @@ namespace BOM_API_v2.Controllers
             response.pastry_material_id = parsedData.pastry_material_id;
 
             response.variants = new List<SubGetVariants>();
-            response.variants.Add(new SubGetVariants { variant_name = parsedData.main_variant_name, cost_estimate = parsedData.cost_estimate, in_stock = parsedData.ingredients_in_stock });
+            response.variants.Add(new SubGetVariants {variant_id = parsedData.pastry_material_id, variant_name = parsedData.main_variant_name, cost_estimate = parsedData.cost_estimate, in_stock = parsedData.ingredients_in_stock });
 
             foreach (GetPastryMaterialSubVariant currentSubVariant in parsedData.sub_variants)
             {
                 SubGetVariants newResponseSubVariantEntry = new SubGetVariants();
+                newResponseSubVariantEntry.variant_id = currentSubVariant.pastry_material_sub_variant_id;
                 newResponseSubVariantEntry.variant_name = currentSubVariant.sub_variant_name;
                 newResponseSubVariantEntry.cost_estimate = currentSubVariant.cost_estimate;
                 newResponseSubVariantEntry.in_stock = currentSubVariant.ingredients_in_stock;

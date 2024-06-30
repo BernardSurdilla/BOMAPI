@@ -121,6 +121,7 @@ namespace BillOfMaterialsAPI.Schemas
         public string main_variant_name { get; set; }
         public bool ingredients_in_stock { get; set; }
         public List<GetPastryMaterialIngredients> ingredients { get; set; }
+        public List<GetPastryMaterialAddOns>? add_ons { get; set; }
         public List<GetPastryMaterialSubVariant>? sub_variants { get; set; }
 
         public static GetPastryMaterial DefaultResponse() { return new GetPastryMaterial(); }
@@ -153,6 +154,15 @@ namespace BillOfMaterialsAPI.Schemas
         public List<SubGetMaterialIngredients>? material_ingredients { get; set; }
 
     }
+    public class GetPastryMaterialAddOns
+    {
+        [Required][MaxLength(29)] public string pastry_material_add_on_id { get; set; }
+        [Required][MaxLength(26)] public string pastry_material_id { get; set; }
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+    }
     public class GetPastryMaterialSubVariant
     {
         [Required][Key][MaxLength(26)] public string pastry_material_sub_variant_id { get; set; }
@@ -161,8 +171,18 @@ namespace BillOfMaterialsAPI.Schemas
         public string sub_variant_name { get; set; }
         public double cost_estimate { get; set; }
         public bool ingredients_in_stock { get; set; }
+        public List<GetPastryMaterialSubVariantAddOns>? sub_variant_add_ons { get; set; }
         public List<SubGetPastryMaterialSubVariantIngredients> sub_variant_ingredients { get; set; }
 
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+    }
+    public class GetPastryMaterialSubVariantAddOns
+    {
+        [Required][MaxLength(26)] public string pastry_material_sub_variant_add_on_id { get; set; }
+        [Required][MaxLength(26)] public string pastry_material_sub_variant_id { get; set; }
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
     }
@@ -282,6 +302,7 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class SubGetVariants
     {
+        public string variant_id { get; set; }
         public string variant_name { get; set; }
         public double cost_estimate { get; set; }
         public bool in_stock { get; set; }

@@ -14,6 +14,7 @@ using BOM_API_v2.Services;
 using System.Runtime.CompilerServices;
 using Castle.Components.DictionaryAdapter.Xml;
 using System.Text.Json;
+using Microsoft.Identity.Client;
 
 namespace BOM_API_v2.Controllers
 {
@@ -223,6 +224,16 @@ namespace BOM_API_v2.Controllers
                         return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
                 }
             }
+            if (newEntry.add_ons.IsNullOrEmpty() == false)
+            {
+                foreach (PostPastryMaterialAddOns addOnEntry in newEntry.add_ons)
+                {
+                    AddOns? selectedAddOn = null;
+                    try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == addOnEntry.add_ons_id && x.isActive == true).FirstAsync(); }
+                    catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(addOnEntry.add_ons_id) + " does not exist" }); }
+                    if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(addOnEntry.add_ons_id) + " does not exist" }); }
+                }
+            }
             if (newEntry.sub_variants != null)
             {
                 foreach (PostPastryMaterialSubVariant entry_sub_variant in newEntry.sub_variants)
@@ -257,7 +268,16 @@ namespace BOM_API_v2.Controllers
                                 return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
                         }
                     }
-
+                    if (entry_sub_variant.sub_variant_add_ons != null)
+                    {
+                        foreach (PostPastryMaterialSubVariantAddOns entry_sub_variant_add_on in entry_sub_variant.sub_variant_add_ons)
+                        {
+                            AddOns? selectedAddOn = null;
+                            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == entry_sub_variant_add_on.add_ons_id && x.isActive == true).FirstAsync(); }
+                            catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry_sub_variant_add_on.add_ons_id) + " does not exist" }); }
+                            if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(entry_sub_variant_add_on.add_ons_id) + " does not exist" }); }
+                        }
+                    }
                 }
             }
 
@@ -295,6 +315,15 @@ namespace BOM_API_v2.Controllers
                 lastIngredientId = newIngredientId;
             }
 
+            string lastPastryMaterialAddOnId = "";
+            try { PastyMaterialAddOns x = await _context.PastyMaterialAddOns.OrderByDescending(x => x.pastry_material_add_on_id).FirstAsync(); lastPastryMaterialAddOnId = x.pastry_material_add_on_id; }
+            catch (Exception ex)
+            {
+                string newPastryMaterialAddOnId = IdFormat.pastryMaterialAddOnIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialAddOnId += "0"; }
+                lastPastryMaterialAddOnId = newPastryMaterialAddOnId;
+            }
+
             foreach (PostIngredients entry in newEntry.ingredients)
             {
                 Ingredients newIngredientsEntry = new Ingredients();
@@ -302,7 +331,7 @@ namespace BOM_API_v2.Controllers
                 lastIngredientId = newId;
 
                 newIngredientsEntry.ingredient_id = newId;
-                newIngredientsEntry.pastry_material_id = lastPastryMaterialId;
+                newIngredientsEntry.pastry_material_id = newPastryId;
 
                 newIngredientsEntry.item_id = entry.item_id;
                 newIngredientsEntry.ingredient_type = entry.ingredient_type;
@@ -315,65 +344,119 @@ namespace BOM_API_v2.Controllers
 
                 await _context.Ingredients.AddAsync(newIngredientsEntry);
             }
-            await _context.SaveChangesAsync();
-
-
-            foreach (PostPastryMaterialSubVariant entry_sub_variant in newEntry.sub_variants)
+            if (newEntry.add_ons != null)
             {
-                string lastPastryMaterialSubVariantId = "";
-
-                try { PastryMaterialSubVariants x = await _context.PastryMaterialSubVariants.OrderByDescending(x => x.pastry_material_sub_variant_id).FirstAsync(); lastPastryMaterialSubVariantId = x.pastry_material_sub_variant_id; }
-                catch (Exception ex)
+                foreach (PostPastryMaterialAddOns entryAddOn in newEntry.add_ons)
                 {
-                    string newPastryMaterialSubVariantId = IdFormat.pastryMaterialSubVariantIdFormat;
-                    for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialSubVariantId += "0"; }
-                    lastPastryMaterialSubVariantId = newPastryMaterialSubVariantId;
-                }
-                string newPastrySubVariantId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIdFormat, IdFormat.idNumLength, lastPastryMaterialSubVariantId);
-                lastPastryMaterialSubVariantId = newPastrySubVariantId;
+                    PastyMaterialAddOns newAddOnEntry = new PastyMaterialAddOns();
+                    string newId = IdFormat.IncrementId(IdFormat.pastryMaterialAddOnIdFormat, IdFormat.idNumLength, lastPastryMaterialAddOnId);
+                    lastPastryMaterialAddOnId = newId;
 
-                PastryMaterialSubVariants newSubMaterialDbEntry = new PastryMaterialSubVariants();
-                newSubMaterialDbEntry.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
-                newSubMaterialDbEntry.pastry_material_id = newPastryId;
-                newSubMaterialDbEntry.sub_variant_name = entry_sub_variant.sub_variant_name;
-                newSubMaterialDbEntry.date_added = currentTime;
-                newSubMaterialDbEntry.last_modified_date = currentTime;
-                newSubMaterialDbEntry.isActive = true;
+                    newAddOnEntry.pastry_material_add_on_id = newId;
+                    newAddOnEntry.pastry_material_id = newPastryId;
+                    newAddOnEntry.add_ons_id = entryAddOn.add_ons_id;
+                    newAddOnEntry.amount = entryAddOn.amount;
 
-                await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
-                await _context.SaveChangesAsync();
+                    newAddOnEntry.isActive = true;
+                    newAddOnEntry.date_added = currentTime;
+                    newAddOnEntry.last_modified_date = currentTime;
 
-                string lastSubVariantIngredientId = "";
-                try { PastryMaterialSubVariantIngredients x = await _context.PastryMaterialSubVariantIngredients.OrderByDescending(x => x.pastry_material_sub_variant_ingredient_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_ingredient_id; }
-                catch (Exception ex)
-                {
-                    string newSubVariantIngredientId = IdFormat.pastryMaterialSubVariantIngredientIdFormat;
-                    for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantIngredientId += "0"; }
-                    lastSubVariantIngredientId = newSubVariantIngredientId;
-                }
-
-                foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry_sub_variant.sub_variant_ingredients)
-                {
-                    PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
-                    string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIngredientIdFormat, IdFormat.idNumLength, lastSubVariantIngredientId);
-                    lastSubVariantIngredientId = newId;
-
-                    Debug.WriteLine(lastPastryMaterialSubVariantId);
-                    newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = lastSubVariantIngredientId;
-                    newSubVariantIngredient.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
-
-                    newSubVariantIngredient.date_added = currentTime;
-                    newSubVariantIngredient.last_modified_date = currentTime;
-                    newSubVariantIngredient.isActive = true;
-
-                    newSubVariantIngredient.item_id = subVariantIngredient.item_id;
-                    newSubVariantIngredient.ingredient_type = subVariantIngredient.ingredient_type;
-                    newSubVariantIngredient.amount = subVariantIngredient.amount;
-                    newSubVariantIngredient.amount_measurement = subVariantIngredient.amount_measurement;
-
-                    await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
+                    await _context.PastyMaterialAddOns.AddAsync(newAddOnEntry);
                 }
             }
+
+            await _context.SaveChangesAsync();
+
+            if (newEntry.sub_variants != null)
+            {
+                foreach (PostPastryMaterialSubVariant entry_sub_variant in newEntry.sub_variants)
+                {
+                    string lastPastryMaterialSubVariantId = "";
+
+                    try { PastryMaterialSubVariants x = await _context.PastryMaterialSubVariants.OrderByDescending(x => x.pastry_material_sub_variant_id).FirstAsync(); lastPastryMaterialSubVariantId = x.pastry_material_sub_variant_id; }
+                    catch (Exception ex)
+                    {
+                        string newPastryMaterialSubVariantId = IdFormat.pastryMaterialSubVariantIdFormat;
+                        for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialSubVariantId += "0"; }
+                        lastPastryMaterialSubVariantId = newPastryMaterialSubVariantId;
+                    }
+                    string newPastrySubVariantId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIdFormat, IdFormat.idNumLength, lastPastryMaterialSubVariantId);
+                    lastPastryMaterialSubVariantId = newPastrySubVariantId;
+
+                    PastryMaterialSubVariants newSubMaterialDbEntry = new PastryMaterialSubVariants();
+                    newSubMaterialDbEntry.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
+                    newSubMaterialDbEntry.pastry_material_id = newPastryId;
+                    newSubMaterialDbEntry.sub_variant_name = entry_sub_variant.sub_variant_name;
+                    newSubMaterialDbEntry.date_added = currentTime;
+                    newSubMaterialDbEntry.last_modified_date = currentTime;
+                    newSubMaterialDbEntry.isActive = true;
+
+                    await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
+                    await _context.SaveChangesAsync();
+
+                    string lastSubVariantIngredientId = "";
+                    try { PastryMaterialSubVariantIngredients x = await _context.PastryMaterialSubVariantIngredients.OrderByDescending(x => x.pastry_material_sub_variant_ingredient_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_ingredient_id; }
+                    catch (Exception ex)
+                    {
+                        string newSubVariantIngredientId = IdFormat.pastryMaterialSubVariantIngredientIdFormat;
+                        for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantIngredientId += "0"; }
+                        lastSubVariantIngredientId = newSubVariantIngredientId;
+                    }
+
+                    string lastSubVariantAddOnId = "";
+                    try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_add_on_id; }
+                    catch (Exception ex)
+                    {
+                        string newSubVariantAddOnId = IdFormat.pastryMaterialSubVariantAddOnIdFormat;
+                        for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantAddOnId += "0"; }
+                        lastSubVariantAddOnId = newSubVariantAddOnId;
+                    }
+
+                    foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry_sub_variant.sub_variant_ingredients)
+                    {
+                        PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
+                        string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIngredientIdFormat, IdFormat.idNumLength, lastSubVariantIngredientId);
+                        lastSubVariantIngredientId = newId;
+
+                        newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = newId;
+                        newSubVariantIngredient.pastry_material_sub_variant_id = newPastrySubVariantId;
+
+                        newSubVariantIngredient.item_id = subVariantIngredient.item_id;
+                        newSubVariantIngredient.ingredient_type = subVariantIngredient.ingredient_type;
+                        newSubVariantIngredient.amount = subVariantIngredient.amount;
+                        newSubVariantIngredient.amount_measurement = subVariantIngredient.amount_measurement;
+
+                        newSubVariantIngredient.date_added = currentTime;
+                        newSubVariantIngredient.last_modified_date = currentTime;
+                        newSubVariantIngredient.isActive = true;
+
+
+                        await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
+                    }
+                    if (entry_sub_variant.sub_variant_add_ons != null)
+                    {
+                        foreach (PostPastryMaterialSubVariantAddOns subVariantAddOn in entry_sub_variant.sub_variant_add_ons)
+                        {
+                            PastryMaterialSubVariantAddOns newSubVariantAddOn = new PastryMaterialSubVariantAddOns();
+                            string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantAddOnIdFormat, IdFormat.idNumLength, lastSubVariantAddOnId);
+                            lastSubVariantAddOnId = newId;
+
+                            newSubVariantAddOn.pastry_material_sub_variant_add_on_id = newId;
+                            newSubVariantAddOn.pastry_material_sub_variant_id = newPastrySubVariantId;
+
+                            newSubVariantAddOn.add_ons_id = subVariantAddOn.add_ons_id;
+                            newSubVariantAddOn.amount = subVariantAddOn.amount;
+
+                            newSubVariantAddOn.date_added = currentTime;
+                            newSubVariantAddOn.last_modified_date = currentTime;
+                            newSubVariantAddOn.isActive = true;
+
+                            await _context.PastryMaterialSubVariantAddOns.AddAsync(newSubVariantAddOn);
+                        }
+                    }
+                }
+            }
+            
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "POST", "Add Pastry Materials " + newPastryMaterialEntry.pastry_material_id);
@@ -489,6 +572,17 @@ namespace BOM_API_v2.Controllers
                         return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
                 }
             }
+            //Add on verification
+            if (entry.sub_variant_add_ons != null)
+            {
+                foreach(PostPastryMaterialSubVariantAddOns subVariantAddOn in entry.sub_variant_add_ons)
+                {
+                    AddOns? selectedAddOn = null;
+                    try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.add_ons_id == subVariantAddOn.add_ons_id && x.isActive == true).FirstAsync(); }
+                    catch { return NotFound(new { message = "Add on with the id " + Convert.ToString(subVariantAddOn.add_ons_id) + " does not exist" }); }
+                    if (selectedAddOn == null) { return NotFound(new { message = "Add on with the id " + Convert.ToString(subVariantAddOn.add_ons_id) + " does not exist" }); }
+                }
+            }
 
             DateTime currentTime = DateTime.Now;
             string lastPastryMaterialSubVariantId = "";
@@ -523,6 +617,15 @@ namespace BOM_API_v2.Controllers
                 lastSubVariantIngredientId = newSubVariantIngredientId;
             }
 
+            string lastSubVariantAddOnId = "";
+            try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_add_on_id; }
+            catch (Exception ex)
+            {
+                string newSubVariantAddOnId = IdFormat.pastryMaterialSubVariantAddOnIdFormat;
+                for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantAddOnId += "0"; }
+                lastSubVariantAddOnId = newSubVariantAddOnId;
+            }
+
             foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry.sub_variant_ingredients)
             {
                 PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
@@ -544,12 +647,33 @@ namespace BOM_API_v2.Controllers
 
                 await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
             }
+            if (entry.sub_variant_add_ons != null)
+            {
+                foreach (PostPastryMaterialSubVariantAddOns subVariantAddOn in entry.sub_variant_add_ons)
+                {
+                    PastryMaterialSubVariantAddOns newSubVariantAddOn = new PastryMaterialSubVariantAddOns();
+                    string newId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantAddOnIdFormat, IdFormat.idNumLength, lastSubVariantAddOnId);
+                    lastSubVariantAddOnId = newId;
+
+                    newSubVariantAddOn.pastry_material_sub_variant_add_on_id = newId;
+                    newSubVariantAddOn.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
+
+                    newSubVariantAddOn.add_ons_id = subVariantAddOn.add_ons_id;
+                    newSubVariantAddOn.amount = subVariantAddOn.amount;
+
+                    newSubVariantAddOn.date_added = currentTime;
+                    newSubVariantAddOn.last_modified_date = currentTime;
+                    newSubVariantAddOn.isActive = true;
+
+                    await _context.PastryMaterialSubVariantAddOns.AddAsync(newSubVariantAddOn);
+                }
+            }
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "POST", "Add Sub variant " + lastPastryMaterialSubVariantId + " for " + pastry_material_id);
             return Ok(new { message = "New sub variant for " + pastry_material_id + " added" });
         }
-        [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}")]
+        [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/ingredients")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients entry)
         {
@@ -729,7 +853,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update sub variant " + pastry_material_sub_variant_id);
             return Ok(new { message = "Sub variant updated" });
         }
-        [HttpPatch("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/{pastry_material_sub_variant_ingredient_id}")]
+        [HttpPatch("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/ingredients/{pastry_material_sub_variant_ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id, PatchPastryMaterialSubVariantsIngredient entry)
         {
@@ -818,7 +942,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material " + pastry_material_id);
             return Ok(new { message = "Pastry Material deleted." });
         }
-        [HttpDelete("{pastry_material_id}/{ingredient_id}")]
+        [HttpDelete("{pastry_material_id}/ingredients/{ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
         {
@@ -862,7 +986,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id);
             return Ok(new { message = "Sub variant deleted" });
         }
-        [HttpDelete("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/{pastry_material_sub_variant_ingredient_id}")]
+        [HttpDelete("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/ingredients/{pastry_material_sub_variant_ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id)
         {
@@ -893,9 +1017,9 @@ namespace BOM_API_v2.Controllers
         //
         // INVENTORY ACTIONS
         //
-        [HttpPost("{pastry_material_id}/subtract_recipe_ingredients_on_inventory/{variant_name}")]
+        [HttpPost("{pastry_material_id}/subtract_recipe_ingredients_on_inventory/{variant_id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_name)
+        public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_id)
         {
             PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.FindAsync(pastry_material_id);
             List<Ingredients> currentPastryIngredients = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).ToListAsync();
@@ -903,10 +1027,10 @@ namespace BOM_API_v2.Controllers
 
             if (currentPastryMaterial == null) { return NotFound(new { message = "No pastry material with the specified id found" }); }
             if (currentPastryIngredients.IsNullOrEmpty()) { return StatusCode(500, new { message = "The specified pastry material does not contain any active ingredients" }); }
-            if (currentPastryMaterial.main_variant_name.Equals(variant_name) == false)
+            if (currentPastryMaterial.pastry_material_id.Equals(variant_id) == false)
             {
-                try { sub_variant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.sub_variant_name.Equals(variant_name)).FirstAsync(); }
-                catch { return NotFound(new { message = "No variant with the name " + variant_name + " exists" }); }
+                try { sub_variant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id.Equals(variant_id)).FirstAsync(); }
+                catch { return NotFound(new { message = "No variant with the id " + variant_id + " exists" }); }
             }
 
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
@@ -1031,7 +1155,7 @@ namespace BOM_API_v2.Controllers
                 }
             }
 
-            if (currentPastryMaterial.main_variant_name.Equals(variant_name) == false)
+            if (currentPastryMaterial.pastry_material_id.Equals(variant_id) == false)
             {
                 List<PastryMaterialSubVariantIngredients> currentVariantIngredients = await _context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == sub_variant.pastry_material_sub_variant_id).ToListAsync();
 

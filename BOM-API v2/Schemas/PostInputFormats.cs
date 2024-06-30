@@ -47,6 +47,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public byte[] design_id { get; set; }
         [Required] public string main_variant_name { get; set; }
         [Required] public List<PostIngredients> ingredients { get; set; }
+        public List<PostPastryMaterialAddOns>? add_ons { get; set; }
         public List<PostPastryMaterialSubVariant>? sub_variants { get; set; }
     }
     public class PostIngredients
@@ -62,6 +63,7 @@ namespace BillOfMaterialsAPI.Schemas
     {
         [Required] public string sub_variant_name { get; set; }
         [Required] public List<PostPastryMaterialSubVariantIngredients> sub_variant_ingredients { get; set; }
+        public List<PostPastryMaterialSubVariantAddOns>? sub_variant_add_ons { get; set; }
     }
     public class PostPastryMaterialSubVariantIngredients
     {
@@ -71,6 +73,17 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
+    }
+
+    public class PostPastryMaterialAddOns
+    {
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
+    }
+    public class PostPastryMaterialSubVariantAddOns
+    {
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
     }
 
     public class PostDesign
