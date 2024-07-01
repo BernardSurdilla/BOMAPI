@@ -1024,15 +1024,15 @@ namespace CRUDFI.Controllers
 
                 // Query to get order details
                 string orderSql = @"
-                SELECT orderName, DesignName, price, quantity, Size, Flavor, type, Description, PickupDateTime
-                FROM orders
-                WHERE OrderId = UNHEX(@orderId)";
+        SELECT orderName, DesignName, price, quantity, Size, Flavor, type, Description, PickupDateTime
+        FROM orders
+        WHERE OrderId = UNHEX(@orderId)";
 
                 // Query to get add-on IDs, quantity, and total from orderaddons
                 string addOnsSql = @"
-                SELECT addOnsId, quantity, Total
-                FROM orderaddons
-                WHERE OrderId = UNHEX(@orderId)";
+        SELECT addOnsId, quantity, Total
+        FROM orderaddons
+        WHERE OrderId = UNHEX(@orderId)";
 
                 FinalOrder finalOrder = null;
 
@@ -1056,7 +1056,8 @@ namespace CRUDFI.Controllers
                                 flavor = reader.GetString("Flavor"),
                                 type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString("type"),
                                 PickupDateTime = reader.GetDateTime("PickupDateTime"),
-                                AddOns = new List<AddOnDetails2>()
+                                AddOns = new List<AddOnDetails2>(),
+                                customAddons = new List<CustomAddons>()
                             };
                         }
                     }
@@ -1075,7 +1076,7 @@ namespace CRUDFI.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
-                                int addOnsId = reader.GetInt32("addOnsId");
+                                int? addOnsId = reader.IsDBNull(reader.GetOrdinal("addOnsId")) ? (int?)null : reader.GetInt32("addOnsId");
                                 int quantity = reader.GetInt32("quantity");
                                 double total = reader.GetDouble("Total");
 
@@ -1092,6 +1093,9 @@ namespace CRUDFI.Controllers
                     }
 
                     finalOrder.AddOns = addOnsDetails;
+
+                    // Fetch custom add-ons
+                    finalOrder.customAddons = await GetCustomAddonsByOrderId(orderId);
                 }
 
                 return finalOrder;
@@ -1099,7 +1103,7 @@ namespace CRUDFI.Controllers
         }
 
         // Method to fetch add-on details from the addons table by addOnsId
-        private async Task<AddOnDetails2> GetAddOnDetailsById(int addOnsId)
+        private async Task<AddOnDetails2> GetAddOnDetailsById(int? addOnsId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -1126,6 +1130,43 @@ namespace CRUDFI.Controllers
             }
 
             return null;
+        }
+
+        private async Task<List<CustomAddons>> GetCustomAddonsByOrderId(string orderId)
+        {
+            List<CustomAddons> customAddonsList = new List<CustomAddons>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+        SELECT name, price, quantity
+        FROM orderaddons
+        WHERE OrderId = UNHEX(@orderId) AND name LIKE 'custom%'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            CustomAddons customAddon = new CustomAddons
+                            {
+                                Name = reader.IsDBNull(reader.GetOrdinal("name")) ? null : reader.GetString("name"),
+                                PricePerUnit = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble("price"),
+                                Quantity = reader.IsDBNull(reader.GetOrdinal("quantity")) ? (int?)null : reader.GetInt32("quantity")
+                            };
+
+                            customAddonsList.Add(customAddon);
+                        }
+                    }
+                }
+            }
+
+            return customAddonsList;
         }
 
 
@@ -1955,7 +1996,7 @@ namespace CRUDFI.Controllers
                             // Retrieve addOnsId and quantity from orderaddons table
                             string sqlGetOrderAddOns = @"SELECT addOnsId, quantity FROM orderaddons WHERE OrderId = UNHEX(@orderId)";
 
-                            List<(int AddOnsId, int Quantity)> orderAddOnsList = new List<(int, int)>();
+                            List<(int? AddOnsId, int Quantity)> orderAddOnsList = new List<(int?, int)>();
 
                             using (var getOrderAddOnsCommand = new MySqlCommand(sqlGetOrderAddOns, connection))
                             {
@@ -1964,7 +2005,8 @@ namespace CRUDFI.Controllers
                                 {
                                     while (await reader.ReadAsync())
                                     {
-                                        int addOnsId = reader.GetInt32(0);
+                                        // Retrieve addOnsId and check for null
+                                        int? addOnsId = reader.IsDBNull(0) ? (int?)null : reader.GetInt32(0);
                                         int quantity = reader.GetInt32(1);
                                         orderAddOnsList.Add((addOnsId, quantity));
                                     }
@@ -1974,12 +2016,16 @@ namespace CRUDFI.Controllers
                             // Update AddOns quantities for each entry in orderaddons
                             foreach (var (AddOnsId, Quantity) in orderAddOnsList)
                             {
-                                string sqlUpdateAddOns = "UPDATE addons SET quantity = quantity - @Quantity WHERE addOnsId = @AddOnsId";
-                                using (var updateAddOnsCommand = new MySqlCommand(sqlUpdateAddOns, connection))
+                                // Only update if AddOnsId is not null
+                                if (AddOnsId.HasValue)
                                 {
-                                    updateAddOnsCommand.Parameters.AddWithValue("@Quantity", Quantity);
-                                    updateAddOnsCommand.Parameters.AddWithValue("@AddOnsId", AddOnsId);
-                                    await updateAddOnsCommand.ExecuteNonQueryAsync();
+                                    string sqlUpdateAddOns = "UPDATE addons SET quantity = quantity - @Quantity WHERE addOnsId = @AddOnsId";
+                                    using (var updateAddOnsCommand = new MySqlCommand(sqlUpdateAddOns, connection))
+                                    {
+                                        updateAddOnsCommand.Parameters.AddWithValue("@Quantity", Quantity);
+                                        updateAddOnsCommand.Parameters.AddWithValue("@AddOnsId", AddOnsId.Value);
+                                        await updateAddOnsCommand.ExecuteNonQueryAsync();
+                                    }
                                 }
                             }
 
@@ -1990,6 +2036,7 @@ namespace CRUDFI.Controllers
                             // Update the last_updated_at column
                             await UpdateLastUpdatedAt(orderIdBinary);
                         }
+
                     else
                     {
                             return BadRequest($"Order with ID '{orderIdHex}' is already confirmed.");
