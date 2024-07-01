@@ -88,7 +88,7 @@ namespace CRUDFI.Models
         public DateTime? PickupDateTime { get; set; }
 
         public List<AddOnDetails2> AddOns { get; set; } = new List<AddOnDetails2>(); // List of add-ons
-
+        public List<CustomAddons> customAddons { get; set; } = new List<CustomAddons>();
         public double allTotal { get; set; }
     }
     public class TotalOrders
@@ -117,9 +117,11 @@ namespace CRUDFI.Models
         public int Quantity { get; set; }
     }
 
-    public class DesignAddOnsDTO
+    public class CustomAddons
     {
-        public List<AddOnDTOS> AddOns { get; set; }
+        public string? Name { get; set; }
+        public int? Quantity { get; set; }
+        public double? PricePerUnit { get; set; }
     }
 
     public class AddOnDTOS
