@@ -29,7 +29,7 @@ namespace BOM_API_v2.Controllers
         [HttpGet("valid_item_types")]
         public async Task<string[]> ValidItemTypes()
         {
-            return ["MAT", "INV"];
+            return ["INV"];
         }
         [HttpGet("get_design_info/{designId}")]
         public async Task<GetDesignInfo> GetDesignInfo([FromRoute] string designId)
