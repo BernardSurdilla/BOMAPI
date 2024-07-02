@@ -68,7 +68,7 @@ namespace CRUDFI.Controllers
                 // Set isActive to false for all orders created
 
                 // Set the status to pending
-                order.status = "Pending";
+                order.status = "pending";
 
                 // Fetch the count of confirmed orders
                 int confirmedOrderCount = await GetConfirmedOrderCount();
@@ -168,7 +168,7 @@ namespace CRUDFI.Controllers
                 };
 
                 // Set the status to pending
-                order.status = "Pending";
+                order.status = "pending";
 
                 // Set the pickup date and time to null
                 order.PickupDateTime = null;
@@ -2388,7 +2388,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET type = @type, PickupDateTime = @pickupDate WHERE OrderId = UNHEX(@orderId)";
+                string sql = "UPDATE orders SET type = @type, PickupDateTime = @pickupDate, status = 'for update' WHERE OrderId = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
