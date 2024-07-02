@@ -20,7 +20,6 @@ using Microsoft.EntityFrameworkCore.Internal;
 namespace BOM_API_v2.Controllers
 {
     [ApiController]
-    [Authorize]
     [Route("BOM/designs/")]
     public class DesignsController : ControllerBase
     {
@@ -31,7 +30,6 @@ namespace BOM_API_v2.Controllers
         public DesignsController(DatabaseContext databaseContext, IActionLogger actionLogger, KaizenTables kaizenTables) { _databaseContext = databaseContext; _actionLogger = actionLogger; _kaizenTables = kaizenTables; }
 
         [HttpGet]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<List<GetDesign>> GetAllDesigns(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             IQueryable<Designs> dbQuery = _databaseContext.Designs.Where(x => x.isActive == true);
@@ -100,7 +98,6 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("tags/")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<List<GetDesignTag>> GetAllDesignTags(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             IQueryable<DesignTags> dbQuery = _databaseContext.DesignTags.Where(x => x.isActive == true);
@@ -158,7 +155,6 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("{designId}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<GetDesign> GetSpecificDesign([FromRoute]string designId)
         {
             Designs? selectedDesign;
@@ -207,7 +203,6 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("tags/{design_tag_id}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<GetTag> GetSpecificTag([FromRoute] Guid design_tag_id)
         {
             DesignTags? selectedTag = null;
@@ -221,7 +216,6 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("with_tags/{*tags}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<List<GetDesign>> GetDesignsWithTag([FromRoute]string tags )
         {
             List<GetDesign> response = new List<GetDesign>();
