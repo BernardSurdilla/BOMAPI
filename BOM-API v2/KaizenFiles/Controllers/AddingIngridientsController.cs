@@ -43,7 +43,7 @@ namespace CRUDFI.Controllers
                 }
 
                 // Fetch the user ID of the user performing the update
-                byte[] lastUpdatedBy = FetchUserId(username);
+                string lastUpdatedBy = username;
 
                 if (lastUpdatedBy == null)
                 {
@@ -702,38 +702,6 @@ namespace CRUDFI.Controllers
                         return null; // Employee not found or not of type 2 or 3
                     }
                 }
-            }
-        }
-
-        private byte[] FetchUserId(string username)
-        {
-            try
-            {
-                using (var connection = new MySqlConnection(connectionstring))
-                {
-                    connection.Open();
-
-                    string sql = "SELECT UserId FROM users WHERE Username = @username";
-                    using (var command = new MySqlCommand(sql, connection))
-                    {
-                        command.Parameters.AddWithValue("@username", username);
-
-                        var result = command.ExecuteScalar();
-                        if (result != null && result is byte[])
-                        {
-                            return (byte[])result;
-                        }
-                        else
-                        {
-                            throw new Exception("User not found or invalid user ID.");
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error fetching UserId for username: {username}");
-                throw; // Re-throw the exception for the caller to handle
             }
         }
 

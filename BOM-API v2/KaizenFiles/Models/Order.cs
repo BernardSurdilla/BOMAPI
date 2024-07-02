@@ -86,8 +86,7 @@ namespace CRUDFI.Models
         public string flavor { get; set; }
         public string type { get; set; } = "";
         public DateTime? PickupDateTime { get; set; }
-
-        public List<AddOnDetails2> AddOns { get; set; } = new List<AddOnDetails2>(); // List of add-ons
+        public List<AddOnDetails2> AddOns { get; set; } = new List<AddOnDetails2>();
         public List<CustomAddons> customAddons { get; set; } = new List<CustomAddons>();
         public double allTotal { get; set; }
     }
@@ -131,12 +130,20 @@ namespace CRUDFI.Models
         public double PricePerUnit { get; set; }
         public int Quantity { get; set; }
     }
+    public class orderAddons
+    {
+        public string pastryId { get; set; }
+        public List<AddOnDPOS> addOnDPOs { get; set; }
+    }
+
     public class AddOnDPOS
     {
+        public int AddOnId { get; set; }
         public string AddOnName { get; set; }
         public double PricePerUnit { get; set; }
         public int Quantity { get; set; }
     }
+
 
     public class AddOnDSOS
     {
@@ -146,9 +153,7 @@ namespace CRUDFI.Models
     }
     public class UpdateAddOnRequest
     {
-        public int AddOnId { get; set; }
         public double Price { get; set; }
-        public string Measurement { get; set; }
         public int Quantity { get; set; }
     }
     public class AddOnDS2
