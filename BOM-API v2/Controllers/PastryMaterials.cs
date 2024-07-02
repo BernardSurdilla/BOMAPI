@@ -662,7 +662,7 @@ namespace BOM_API_v2.Controllers
             }
 
             string lastSubVariantAddOnId = "";
-            try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_add_on_id; }
+            try { PastryMaterialSubVariantAddOns x = await _context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantAddOnId = x.pastry_material_sub_variant_add_on_id; }
             catch (Exception ex)
             {
                 string newSubVariantAddOnId = IdFormat.pastryMaterialSubVariantAddOnIdFormat;
@@ -717,8 +717,8 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add Sub variant " + lastPastryMaterialSubVariantId + " for " + pastry_material_id);
             return Ok(new { message = "New sub variant for " + pastry_material_id + " added" });
         }
-        [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/ingredients")]
         [Authorize(Roles = UserRoles.Admin)]
+        [HttpPost("{pastry_material_id}/sub_variants/{pastry_material_sub_variant_id}/ingredients")]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients entry)
         {
             PastryMaterials? currentPastryMaterial = null;

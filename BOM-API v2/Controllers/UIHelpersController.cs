@@ -14,18 +14,19 @@ namespace BOM_API_v2.Controllers
 {
     [ApiController]
     [Route("BOM/ui_helpers/")]
-    [Authorize]
     public class UIHelpersController: ControllerBase
     {
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
         public UIHelpersController(DatabaseContext databaseContext, KaizenTables kaizenTables) { _context = databaseContext; _kaizenTables = kaizenTables; }
 
+        [Authorize]
         [HttpGet("valid_measurement_values")]
         public async Task<Dictionary<string, List<string>>> ValidMeasurementValues()
         {
             return ValidUnits.ValidMeasurementUnits();
         }
+        [Authorize]
         [HttpGet("valid_item_types")]
         public async Task<string[]> ValidItemTypes()
         {
