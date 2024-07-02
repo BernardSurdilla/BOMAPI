@@ -68,7 +68,7 @@ namespace CRUDFI.Controllers
                 // Set isActive to false for all orders created
 
                 // Set the status to pending
-                order.status = "Pending";
+                order.status = "pending";
 
                 // Fetch the count of confirmed orders
                 int confirmedOrderCount = await GetConfirmedOrderCount();
@@ -168,7 +168,7 @@ namespace CRUDFI.Controllers
                 };
 
                 // Set the status to pending
-                order.status = "Pending";
+                order.status = "pending";
 
                 // Set the pickup date and time to null
                 order.PickupDateTime = null;
@@ -659,15 +659,6 @@ namespace CRUDFI.Controllers
             return addOnDSOSList;
         }
 
-
-
-        private string ConvertBase64ToBinary16(string base64String)
-        {
-            byte[] bytes = Convert.FromBase64String(base64String);
-            string hexString = BitConverter.ToString(bytes).Replace("-", "");
-            return hexString;
-        }
-
         [HttpGet("{orderId}/add_ons")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string orderId)
@@ -735,6 +726,7 @@ namespace CRUDFI.Controllers
                     foreach (var detail in details)
                     {
                         detail.Quantity = allAddOns[addOnsId]; // Set quantity from the combined total
+                        detail.AddOnId = addOnsId; // Set the AddOnId
                         addOns.Add(detail);
                     }
                 }
@@ -744,7 +736,14 @@ namespace CRUDFI.Controllers
                     return NotFound($"No add-ons found for pastry material ID '{pastryMaterialId}' with Size '{size}'.");
                 }
 
-                return Ok(addOns);
+                // Prepare the response object
+                var response = new orderAddons
+                {
+                    pastryId = pastryMaterialId,
+                    addOnDPOs = addOns
+                };
+
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -752,6 +751,8 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred while retrieving add-ons for order with ID '{orderId}'.");
             }
         }
+
+
 
         private async Task<(string designIdHex, string size)> GetDesignIdAndSizeByOrderId(string orderIdBinary)
         {
@@ -906,8 +907,10 @@ namespace CRUDFI.Controllers
                         {
                             var addOn = new AddOnDPOS
                             {
+                                AddOnId = addOnsId, // Set AddOnId here
                                 AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price")
+                                PricePerUnit = reader.GetDouble("price"),
+                                Quantity = 0 // Placeholder, will be set in the main method
                             };
 
                             addOns.Add(addOn);
@@ -918,7 +921,6 @@ namespace CRUDFI.Controllers
 
             return addOns;
         }
-
 
 
 
@@ -1887,6 +1889,72 @@ namespace CRUDFI.Controllers
             }
         }
 
+        [HttpPatch("send_back_to_customer_no_change")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> UpdateOrderStatus([FromQuery] string orderIdHex)
+        {
+            try
+            {
+                // Ensure the user is authorized
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Fetch the user ID of the user performing the update
+                string lastUpdatedBy = await GetLastupdater(username);
+                if (lastUpdatedBy == null)
+                {
+                    return Unauthorized("Username not found");
+                }
+
+                // Convert the hexadecimal orderId to binary(16) format with '0x' prefix for MySQL UNHEX function
+                string orderIdBinary = ConvertGuidToBinary16(orderIdHex).ToLower();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // Check if the order exists with the given OrderId
+                    string sqlCheck = "SELECT COUNT(*) FROM orders WHERE OrderId = UNHEX(@orderId)";
+                    using (var checkCommand = new MySqlCommand(sqlCheck, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                        int orderCount = Convert.ToInt32(await checkCommand.ExecuteScalarAsync());
+                        if (orderCount == 0)
+                        {
+                            Debug.Write(orderIdBinary);
+                            return NotFound("Order not found");
+                        }
+                    }
+
+                    // Update the status of the order in the database
+                    string sqlUpdate = "UPDATE orders SET Status = 'confirmation', last_updated_by = @lastUpdatedBy, last_updated_at = @lastUpdatedAt WHERE OrderId = UNHEX(@orderId)";
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                        updateCommand.Parameters.AddWithValue("@lastUpdatedBy", lastUpdatedBy);
+                        updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
+
+                        int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound("Order not found");
+                        }
+                    }
+                }
+
+                return Ok("Order status updated to confirmation successfully");
+            }
+            catch (Exception ex)
+            {
+                // Log and return an error message if an exception occurs
+                _logger.LogError(ex, "An error occurred while updating the order status");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
 
 
         private string ConvertGuidToBinary16(string guidString)
@@ -1904,8 +1972,11 @@ namespace CRUDFI.Controllers
             return binary16String;
         }
 
+
         [HttpPatch("update_add_on")]
-        public async Task<IActionResult> UpdateAddOn([FromBody] UpdateAddOnRequest request)
+        public async Task<IActionResult> UpdateAddOn(
+     [FromQuery] string addOnsId,
+     [FromBody] UpdateAddOnRequest request)
         {
             try
             {
@@ -1917,7 +1988,7 @@ namespace CRUDFI.Controllers
                     string sqlCheck = "SELECT COUNT(*) FROM addons WHERE addOnsId = @addOnsId";
                     using (var checkCommand = new MySqlCommand(sqlCheck, connection))
                     {
-                        checkCommand.Parameters.AddWithValue("@addOnsId", request.AddOnId);
+                        checkCommand.Parameters.AddWithValue("@addOnsId", addOnsId);
                         int addOnCount = Convert.ToInt32(await checkCommand.ExecuteScalarAsync());
 
                         if (addOnCount == 0)
@@ -1931,7 +2002,6 @@ namespace CRUDFI.Controllers
                 UPDATE AddOns 
                 SET 
                     price = @price,
-                    measurement = @measurement,
                     quantity = @quantity,
                     last_modified_date = @lastModifiedDate
                 WHERE 
@@ -1940,10 +2010,9 @@ namespace CRUDFI.Controllers
                     using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
                         updateCommand.Parameters.AddWithValue("@price", request.Price);
-                        updateCommand.Parameters.AddWithValue("@measurement", request.Measurement);
-                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity);
+                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity); // Corrected parameter name to match request
                         updateCommand.Parameters.AddWithValue("@lastModifiedDate", DateTime.UtcNow);
-                        updateCommand.Parameters.AddWithValue("@addOnsId", request.AddOnId);
+                        updateCommand.Parameters.AddWithValue("@addOnsId", addOnsId); // Use the ID from query
 
                         await updateCommand.ExecuteNonQueryAsync();
                     }
@@ -2266,10 +2335,13 @@ namespace CRUDFI.Controllers
         }
 
 
-
         [HttpPatch("update_cart_customer")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> PatchOrderTypeAndPickupDate([FromQuery] string orderId, [FromQuery] string type, [FromQuery] string pickupTime)
+        public async Task<IActionResult> PatchOrderTypeAndPickupDate(
+            [FromQuery] string orderId,
+            [FromQuery] string type,
+            [FromQuery] string pickupDate,
+            [FromQuery] string pickupTime)
         {
             try
             {
@@ -2283,28 +2355,20 @@ namespace CRUDFI.Controllers
                     return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
                 }
 
-                // Parse the pickup time string to DateTime
+                // Parse the pickup date string to DateTime
+                if (!DateTime.TryParseExact(pickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+                {
+                    return BadRequest("Invalid pickup date format. Use 'yyyy-MM-dd'.");
+                }
+
+                // Parse the pickup time string to TimeSpan
                 if (!DateTime.TryParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
                 {
-                    return BadRequest("Invalid pickup time format.");
+                    return BadRequest("Invalid pickup time format. Use 'h:mm tt'.");
                 }
 
-                // Fetch the count of confirmed orders
-                int confirmedOrderCount = await GetConfirmedOrderCount();
-
-                // Determine the pickup date based on order type and confirmed orders count
-                DateTime pickupDate;
-                if (confirmedOrderCount < 5)
-                {
-                    pickupDate = type == "rush" ? DateTime.Today.AddDays(3) : DateTime.Today.AddDays(7);
-                }
-                else
-                {
-                    pickupDate = type == "rush" ? DateTime.Today.AddDays(4) : DateTime.Today.AddDays(8);
-                }
-
-                // Combine the pickup date and parsed time into a single DateTime object
-                DateTime pickupDateTime = new DateTime(pickupDate.Year, pickupDate.Month, pickupDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+                // Combine the pickup date and time into a single DateTime object
+                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
 
                 // Update the type and pickup date in the database
                 await UpdateOrderTypeAndPickupDate(orderIdBinary, type, pickupDateTime);
@@ -2318,14 +2382,13 @@ namespace CRUDFI.Controllers
             }
         }
 
-
         private async Task UpdateOrderTypeAndPickupDate(string orderIdBinary, string type, DateTime pickupDateTime)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET type = @type, PickupDateTime = @pickupDate WHERE OrderId = UNHEX(@orderId)";
+                string sql = "UPDATE orders SET type = @type, PickupDateTime = @pickupDate, status = 'for update' WHERE OrderId = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2336,6 +2399,8 @@ namespace CRUDFI.Controllers
                 }
             }
         }
+
+
 
 
         private async Task<int?> GetExistingTotal(string orderName)
