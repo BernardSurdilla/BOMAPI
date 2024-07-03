@@ -402,6 +402,7 @@ namespace CRUDFI.Controllers {
 
                                 // Create a Guid from byte array
                                 Guid orderId = new Guid(orderIdBytes);
+                                string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
 
                                 orders.Add(new OrderSummary {
                                     Id = orderId,
@@ -415,7 +416,23 @@ namespace CRUDFI.Controllers {
                                     Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                     Size = reader.GetString(reader.GetOrdinal("Size")),
                                     PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime"))
-                                });
+                                };
+
+                                if (designIdAndSize.designIdHex != null && designIdAndSize.size != null)
+                                {
+                                    // Retrieve PastryMaterialId using DesignId
+                                    string pastryMaterialId = await GetPastryMaterialIdByDesignId(designIdAndSize.designIdHex);
+                                    if (pastryMaterialId != null)
+                                    {
+                                        // Set PastryMaterialId
+                                        orderSummary.PastryMaterialId = pastryMaterialId;
+
+                                        // Retrieve variantId
+                                        orderSummary.variantId = await GetVariantIdByPastryMaterialIdAndSize(pastryMaterialId, designIdAndSize.size);
+                                    }
+                                }
+
+                                orders.Add(orderSummary);
                             }
                         }
                     }
@@ -430,6 +447,8 @@ namespace CRUDFI.Controllers {
                 return StatusCode(500,$"An error occurred: {ex.Message}");
             }
         }
+
+
 
 
         [HttpGet("assign_employees")]
@@ -828,6 +847,20 @@ namespace CRUDFI.Controllers {
                     return NotFound($"Order with orderId {orderIdHex} not found.");
                 }
 
+                // Retrieve DesignId and Size
+                var designIdAndSize = await GetDesignIdAndSizeByOrderId(binary16OrderId);
+                if (designIdAndSize.designIdHex != null && designIdAndSize.size != null)
+                {
+                    // Retrieve PastryMaterialId using DesignId
+                    finalOrder.PastryMaterialId = await GetPastryMaterialIdByDesignId(designIdAndSize.designIdHex);
+
+                    if (finalOrder.PastryMaterialId != null)
+                    {
+                        // Retrieve variantId
+                        finalOrder.variantId = await GetVariantIdByPastryMaterialIdAndSize(finalOrder.PastryMaterialId, designIdAndSize.size);
+                    }
+                }
+
                 // Calculate the total from orderaddons
                 double totalFromOrderAddons = await GetTotalFromOrderAddons(binary16OrderId);
 
@@ -845,9 +878,9 @@ namespace CRUDFI.Controllers {
             double totalSum = 0.0;
 
             string getTotalSql = @"
-            SELECT SUM(Total) AS TotalSum
-            FROM orderaddons
-            WHERE OrderId = UNHEX(@orderId)";
+    SELECT SUM(Total) AS TotalSum
+    FROM orderaddons
+    WHERE OrderId = UNHEX(@orderId)";
 
             using(var connection = new MySqlConnection(connectionstring)) {
                 await connection.OpenAsync();
@@ -994,6 +1027,7 @@ namespace CRUDFI.Controllers {
 
             return customAddonsList;
         }
+
 
 
 
@@ -2772,7 +2806,6 @@ namespace CRUDFI.Controllers {
                 return StatusCode(500,$"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
             }
         }
-
         private async Task<bool> CheckOrderExists(string orderIdBinary) {
             using(var connection = new MySqlConnection(connectionstring)) {
                 await connection.OpenAsync();
