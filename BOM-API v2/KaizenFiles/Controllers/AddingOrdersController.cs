@@ -390,7 +390,7 @@ namespace CRUDFI.Controllers {
                     Description, Flavor, Size, PickupDateTime
                 FROM orders 
                 WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-                AND status = 'for confirmation' ";
+                AND status = 'confirmation' ";
 
                     using(var command = new MySqlCommand(sql,connection)) {
                         command.Parameters.AddWithValue("@customerUsername",customerUsername);
@@ -815,7 +815,7 @@ namespace CRUDFI.Controllers {
 
 
         [HttpGet("final_order_details/{orderIdHex}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex) {
             try {
                 // Convert the hex string to a binary(16) formatted string
