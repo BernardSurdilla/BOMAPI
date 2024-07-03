@@ -444,12 +444,12 @@ namespace CRUDFI.Controllers
                     await connection.OpenAsync();
 
                     string sql = @"
-                SELECT 
-                   OrderId, Status, DesignName, orderName, price, quantity, type, 
-                    Description, Flavor, Size, PickupDateTime
-                FROM orders 
-                WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-                AND status = 'confirmation' ";
+        SELECT 
+            OrderId, Status, DesignName, orderName, price, quantity, type, 
+            Description, Flavor, Size, PickupDateTime
+        FROM orders 
+        WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
+        AND status = 'confirmation' ";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -464,8 +464,13 @@ namespace CRUDFI.Controllers
 
                                 // Create a Guid from byte array
                                 Guid orderId = new Guid(orderIdBytes);
+                                string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
 
-                                orders.Add(new OrderSummary
+                                // Retrieve DesignId and Size
+                                var designIdAndSize = await GetDesignIdAndSizeByOrderId(orderIdBinary);
+
+                                // Initialize OrderSummary with the fetched details
+                                var orderSummary = new OrderSummary
                                 {
                                     Id = orderId,
                                     Status = reader.GetString(reader.GetOrdinal("Status")),
@@ -478,7 +483,23 @@ namespace CRUDFI.Controllers
                                     Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                     Size = reader.GetString(reader.GetOrdinal("Size")),
                                     PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime"))
-                                });
+                                };
+
+                                if (designIdAndSize.designIdHex != null && designIdAndSize.size != null)
+                                {
+                                    // Retrieve PastryMaterialId using DesignId
+                                    string pastryMaterialId = await GetPastryMaterialIdByDesignId(designIdAndSize.designIdHex);
+                                    if (pastryMaterialId != null)
+                                    {
+                                        // Set PastryMaterialId
+                                        orderSummary.PastryMaterialId = pastryMaterialId;
+
+                                        // Retrieve variantId
+                                        orderSummary.variantId = await GetVariantIdByPastryMaterialIdAndSize(pastryMaterialId, designIdAndSize.size);
+                                    }
+                                }
+
+                                orders.Add(orderSummary);
                             }
                         }
                     }
@@ -495,6 +516,8 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
+
 
 
         [HttpGet("assign_employees")]
@@ -975,6 +998,20 @@ namespace CRUDFI.Controllers
                     return NotFound($"Order with orderId {orderIdHex} not found.");
                 }
 
+                // Retrieve DesignId and Size
+                var designIdAndSize = await GetDesignIdAndSizeByOrderId(binary16OrderId);
+                if (designIdAndSize.designIdHex != null && designIdAndSize.size != null)
+                {
+                    // Retrieve PastryMaterialId using DesignId
+                    finalOrder.PastryMaterialId = await GetPastryMaterialIdByDesignId(designIdAndSize.designIdHex);
+
+                    if (finalOrder.PastryMaterialId != null)
+                    {
+                        // Retrieve variantId
+                        finalOrder.variantId = await GetVariantIdByPastryMaterialIdAndSize(finalOrder.PastryMaterialId, designIdAndSize.size);
+                    }
+                }
+
                 // Calculate the total from orderaddons
                 double totalFromOrderAddons = await GetTotalFromOrderAddons(binary16OrderId);
 
@@ -990,14 +1027,61 @@ namespace CRUDFI.Controllers
             }
         }
 
+
+        private async Task<string> GetVariantIdByPastryMaterialIdAndSize(string pastryMaterialId, string size)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Check in pastrymaterials table
+                string mainVariantSql = @"
+            SELECT pastry_material_id
+            FROM pastrymaterials
+            WHERE pastry_material_id = @pastryMaterialId AND main_variant_name = @size";
+
+                using (var mainVariantCommand = new MySqlCommand(mainVariantSql, connection))
+                {
+                    mainVariantCommand.Parameters.AddWithValue("@pastryMaterialId", pastryMaterialId);
+                    mainVariantCommand.Parameters.AddWithValue("@size", size);
+
+                    var result = await mainVariantCommand.ExecuteScalarAsync();
+                    if (result != null)
+                    {
+                        return pastryMaterialId; // Return the pastry_material_id as variantId
+                    }
+                }
+
+                // Check in pastrymaterialsubvariants table
+                string subVariantSql = @"
+            SELECT pastry_material_sub_variant_id
+            FROM pastrymaterialsubvariants
+            WHERE pastry_material_id = @pastryMaterialId AND sub_variant_name = @size";
+
+                using (var subVariantCommand = new MySqlCommand(subVariantSql, connection))
+                {
+                    subVariantCommand.Parameters.AddWithValue("@pastryMaterialId", pastryMaterialId);
+                    subVariantCommand.Parameters.AddWithValue("@size", size);
+
+                    var result = await subVariantCommand.ExecuteScalarAsync();
+                    if (result != null)
+                    {
+                        return result.ToString(); // Return the pastry_material_sub_variant_id as variantId
+                    }
+                }
+            }
+
+            return null; // Return null if no matching variant is found
+        }
+
         private async Task<double> GetTotalFromOrderAddons(string orderIdBinary)
         {
             double totalSum = 0.0;
 
             string getTotalSql = @"
-            SELECT SUM(Total) AS TotalSum
-            FROM orderaddons
-            WHERE OrderId = UNHEX(@orderId)";
+    SELECT SUM(Total) AS TotalSum
+    FROM orderaddons
+    WHERE OrderId = UNHEX(@orderId)";
 
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -1157,9 +1241,9 @@ namespace CRUDFI.Controllers
                         {
                             CustomAddons customAddon = new CustomAddons
                             {
-                                Name = reader.IsDBNull(reader.GetOrdinal("name")) ? null : reader.GetString("name"),
-                                PricePerUnit = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble("price"),
-                                Quantity = reader.IsDBNull(reader.GetOrdinal("quantity")) ? (int?)null : reader.GetInt32("quantity")
+                                name = reader.IsDBNull(reader.GetOrdinal("name")) ? null : reader.GetString("name"),
+                                price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble("price"),
+                                quantity = reader.IsDBNull(reader.GetOrdinal("quantity")) ? (int?)null : reader.GetInt32("quantity")
                             };
 
                             customAddonsList.Add(customAddon);
@@ -1170,6 +1254,7 @@ namespace CRUDFI.Controllers
 
             return customAddonsList;
         }
+
 
 
 
@@ -3240,6 +3325,89 @@ namespace CRUDFI.Controllers
                 return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
             }
         }
+
+        [HttpDelete("remove_cart/{orderIdHex}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
+        public async Task<IActionResult> RemoveCart(string orderIdHex)
+        {
+            try
+            {
+                // Get the current user's username
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("No valid customer username found.");
+                }
+
+                // Convert the hex orderId to binary format
+                string orderIdBinary = ConvertGuidToBinary16(orderIdHex).ToLower();
+
+                // Check if the order belongs to the current user
+                bool isOrderOwnedByUser = await IsOrderOwnedByUser(customerUsername, orderIdBinary);
+                if (!isOrderOwnedByUser)
+                {
+                    return Unauthorized("You do not have permission to delete this order.");
+                }
+
+                // Delete the order from the database
+                bool deleteSuccess = await DeleteOrderByOrderId(orderIdBinary);
+                if (deleteSuccess)
+                {
+                    return Ok("Order removed successfully.");
+                }
+                else
+                {
+                    return NotFound("Order not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing cart");
+                return StatusCode(500, $"An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<bool> IsOrderOwnedByUser(string customerUsername, string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT COUNT(*) 
+            FROM orders 
+            WHERE OrderId = UNHEX(@orderId) 
+            AND CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
+
+                    var count = Convert.ToInt32(await command.ExecuteScalarAsync());
+                    return count > 0;
+                }
+            }
+        }
+
+        private async Task<bool> DeleteOrderByOrderId(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "DELETE FROM orders WHERE OrderId = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    int rowsAffected = await command.ExecuteNonQueryAsync();
+                    return rowsAffected > 0;
+                }
+            }
+        }
+
 
         private async Task<bool> CheckOrderExists(string orderIdBinary)
         {
