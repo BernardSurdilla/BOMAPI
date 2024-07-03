@@ -449,7 +449,7 @@ namespace CRUDFI.Controllers
                     Description, Flavor, Size, PickupDateTime
                 FROM orders 
                 WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-                AND status = 'for confirmation' ";
+                AND status = 'confirmation' ";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
