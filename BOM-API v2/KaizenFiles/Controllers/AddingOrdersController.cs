@@ -426,7 +426,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("for_confirmation_orders_by_customer")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager "," + UserRoles.Customer)]
         public async Task<IActionResult> GetOrdersByCustomerId()
         {
             try
