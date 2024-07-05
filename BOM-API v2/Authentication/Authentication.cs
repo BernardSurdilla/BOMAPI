@@ -362,7 +362,7 @@ namespace JWTAuthentication.Controllers
             return response;
         }
 
-        [Authorize][HttpGet("user/")]
+        [Authorize][HttpGet("user/current")]
         public async Task<GetUser> CurrentUser()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -381,7 +381,7 @@ namespace JWTAuthentication.Controllers
             //await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
             return response;
         }
-        [Authorize][HttpPost("user/send-confirmation-email/")]
+        [Authorize][HttpPost("user/current/send-confirmation-email/")]
         public async Task<IActionResult> SendEmailConfirmationEmail()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -429,7 +429,7 @@ namespace JWTAuthentication.Controllers
                 return StatusCode(500, new { message = "Email failed to send to " + email });
             }
         }
-        [Authorize][HttpPost("user/confirm-email/")]
+        [Authorize][HttpPost("user/current/confirm-email/")]
         public async Task<IActionResult> ConfirmUserEmail(string confirmationCode)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -461,7 +461,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new { message = "Email confirmed successfully" });
         }
 
-        [Authorize][HttpGet("user/profile-picture")]
+        [Authorize][HttpGet("user/current/profile-picture")]
         public async Task<byte[]?> CurrentUserProfilePicture()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -475,7 +475,7 @@ namespace JWTAuthentication.Controllers
             return currentUserImage.picture_data;
             
         }
-        [Authorize][HttpPost("user/upload-profile-picture")]
+        [Authorize][HttpPost("user/current/upload-profile-picture")]
         public async Task<IActionResult> UploadProfilePicture([FromBody] byte[] picture_data)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -492,7 +492,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new { message = "Image uploaded for " + currentUser.Id });
         }
 
-        [Authorize][HttpPatch("user/update/")]
+        [Authorize][HttpPatch("user/current/update/")]
         public async Task<IActionResult> UpdateUser(PatchUser input)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -509,7 +509,7 @@ namespace JWTAuthentication.Controllers
             else { return BadRequest(new { message = "Something unexpected occured in saving the account in the inventory accounts" }); }
             
         }
-        [Authorize][HttpPatch("user/profile-picture")]
+        [Authorize][HttpPatch("user/current/profile-picture")]
         public async Task<IActionResult> UpdateUserProfileImage([FromBody] byte[] picture_data)
         {
             var currentUser = await userManager.GetUserAsync(User);
