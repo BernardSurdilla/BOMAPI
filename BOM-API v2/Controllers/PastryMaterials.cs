@@ -167,25 +167,6 @@ namespace BOM_API_v2.Controllers
             return response;
         }
 
-        [HttpGet("by_design_id/{designId}")]
-        [Authorize(Roles = UserRoles.Admin)]
-        public async Task<GetPastryMaterial> GetSpecificPastryMaterialByDesignId([FromRoute]byte[] designId)
-        {
-            PastryMaterials? currentPastryMat = null;
-            try { currentPastryMat = await _context.PastryMaterials.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
-            catch (Exception e) { return new GetPastryMaterial(); }
-
-
-            List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMat.pastry_material_id).ToListAsync();
-            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
-
-            GetPastryMaterial response = await CreatePastryMaterialResponseFromDBRow(currentPastryMat);
-
-            await _actionLogger.LogAction(User, "GET", "Pastry Material " + currentPastryMat.pastry_material_id);
-            return response;
-
-        }
-
         //POST
         [HttpPost]
         [Authorize(Roles = UserRoles.Admin)]

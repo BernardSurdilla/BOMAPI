@@ -1,12 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using CRUDFI.Models;
+using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
-using CRUDFI.Models;
-using System.Data.SqlTypes;
-using System.Diagnostics;
-using Microsoft.AspNetCore.Authorization;
-using JWTAuthentication.Authentication;
 using System.Data;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Claims;
 //using BillOfMaterialsAPI.Schemas;
@@ -426,7 +424,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("for_confirmation_orders_by_customer")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetOrdersByCustomerId()
         {
             try
@@ -982,7 +980,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("final_order_details/{orderIdHex}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
         {
             try
@@ -1409,7 +1407,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (2, 3)";
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (2, 3, 4)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
