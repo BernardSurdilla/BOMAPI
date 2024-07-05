@@ -17,7 +17,7 @@ using BOM_API_v2.Controllers;
 
 
 const string API_VERSION = "v1";
-const string APP_CONTEXT = "CULO-API";
+const string APP_CONTEXT = "culo-api";
 const string GLOBAL_ROUTE_PREFIX = APP_CONTEXT + "/" + API_VERSION;
 
 var builder = WebApplication.CreateBuilder(args);
