@@ -36,7 +36,7 @@ namespace API_TEST.Controllers
 
 
     [ApiController]
-    [Route("BOM/data_analysis")]
+    [Route("data-analysis")]
     [Authorize(Roles = UserRoles.Admin)]
     public class BOMController : ControllerBase
     {
@@ -52,7 +52,7 @@ namespace API_TEST.Controllers
         }
 
         //!!!MIGHT HAVE BUGS!!!
-        [HttpGet("item_used/occurrence/")]
+        [HttpGet("item-used/occurrence/")]
         public async Task<List<GetUsedItemsByOccurence>> GetMostCommonlyUsedItems(string? sortBy, string? sortOrder)
         {
             List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
@@ -284,7 +284,7 @@ namespace API_TEST.Controllers
         }
 
         //!!!UNTESTED!!!
-        [HttpGet("item_used/seasonal_occurrence")]
+        [HttpGet("item-used/seasonal-occurrence")]
         public async Task<List<GetUsedItemsBySeasonalTrends>> GetIngredientTrendsByMonths(string? sortOrder)
         {
             List<Orders> ordersList = await _kaizenTables.Orders.Where(x => x.is_active == true).ToListAsync();
@@ -432,7 +432,7 @@ namespace API_TEST.Controllers
             return response;
         }
 
-        [HttpGet("tags_used/occurrence/")]
+        [HttpGet("tags-used/occurrence/")]
         public async Task<List<GetTagOccurrence>> GetTagOccurrence(string? sortBy, string? sortOrder)
         {
             List<DesignTags> allTags = await _context.DesignTags.Where(x => x.isActive == true).ToListAsync();

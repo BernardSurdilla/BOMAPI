@@ -12,6 +12,7 @@ using BOM_API_v2.Services;
 
 namespace BOM_API_v2.Controllers
 {
+    /*
     [ApiController]
     [Route("BOM/materials/")]
     [Authorize(Roles = UserRoles.Admin)]
@@ -204,7 +205,7 @@ namespace BOM_API_v2.Controllers
                 else { return GetMaterials.DefaultResponse(); }
             }
             else { return GetMaterials.DefaultResponse(); }
-            */
+            
         }
         [HttpGet("{material_id}/{column_name}")]
         public async Task<object> GetMaterialColumn(string material_id, string column_name)
@@ -725,6 +726,7 @@ namespace BOM_API_v2.Controllers
 
             await _actionLogger.LogAction(User, "DELETE", "Material " + material_id + " - Ingredient " + material_ingredient_id);
             return Ok(new { message = "Material ingredient deleted." });
-        }
+}
     }
+*/
 }

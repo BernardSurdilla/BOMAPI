@@ -13,7 +13,7 @@ using ZstdSharp.Unsafe;
 namespace BOM_API_v2.Controllers
 {
     [ApiController]
-    [Route("BOM/ui_helpers/")]
+    [Route("ui-helpers/")]
     public class UIHelpersController: ControllerBase
     {
         private readonly DatabaseContext _context;
@@ -21,18 +21,18 @@ namespace BOM_API_v2.Controllers
         public UIHelpersController(DatabaseContext databaseContext, KaizenTables kaizenTables) { _context = databaseContext; _kaizenTables = kaizenTables; }
 
         [Authorize]
-        [HttpGet("valid_measurement_values")]
+        [HttpGet("valid-measurement-values")]
         public async Task<Dictionary<string, List<string>>> ValidMeasurementValues()
         {
             return ValidUnits.ValidMeasurementUnits();
         }
         [Authorize]
-        [HttpGet("valid_item_types")]
+        [HttpGet("valid-item-types")]
         public async Task<string[]> ValidItemTypes()
         {
             return ["INV"];
         }
-        [HttpGet("get_design_info/{designId}")]
+        [HttpGet("get-design-info/{designId}")]
         public async Task<GetDesignInfo> GetDesignInfo([FromRoute] string designId)
         {
             GetDesignInfo response = new GetDesignInfo();

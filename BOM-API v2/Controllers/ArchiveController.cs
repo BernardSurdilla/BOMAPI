@@ -15,7 +15,7 @@ using BOM_API_v2.Services;
 
 namespace BillOfMaterialsAPI.Controllers
 {
-    [Route("BOM/archive/")]
+    [Route("archive/")]
     [ApiController]
     [Authorize(Roles = UserRoles.Admin)]
     public class ArchiveController : ControllerBase
@@ -29,7 +29,7 @@ namespace BillOfMaterialsAPI.Controllers
 
         //Getting deleted data
         //GET
-        [HttpGet("pastry_materials/")]
+        [HttpGet("pastry-materials/")]
         public async Task<List<GetPastryMaterial>> GetAllDeletedPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             List<PastryMaterials> pastryMaterials;
@@ -164,7 +164,7 @@ namespace BillOfMaterialsAPI.Controllers
             return response;
 
         }
-        [HttpGet("pastry_materials/{pastry_material_id}/ingredients")]
+        [HttpGet("pastry-materials/{pastry-material-id}/ingredients")]
         public async Task<List<GetPastryMaterialIngredients>> GetAllPastryIngredient(string pastry_material_id)
         {
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
@@ -218,7 +218,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "GET", "All Deleted Pastry Material Ingredients");
             return response;
         }
-
+        /*
         [HttpGet("materials/")]
         public async Task<List<GetMaterials>> GetDeletedMaterials(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
@@ -360,7 +360,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "GET", "All Deleted Materials");
             return response;
         }
-        [HttpGet("materials/{material_id}/ingredients")]
+        [HttpGet("materials/{material-id}/ingredients")]
         public async Task<List<SubGetMaterialIngredients>> GetDeletedMaterialIngredients(string material_id)
         {
             Materials? currentMaterial = await _context.Materials.FindAsync(material_id);
@@ -377,6 +377,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "GET", "All Deleted Material Ingredients");
             return materialIngredients;
         }
+        */
 
         [HttpGet("designs/")]
         public async Task<List<Designs>> GetDeletedDesigns(int? page, int? record_per_page, string? sortBy, string? sortOrder)
@@ -441,7 +442,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "GET", "All deleted designs");
             return response;
         }
-        [HttpGet("designs/{design_id}")]
+        [HttpGet("designs/{design-id}")]
         public async Task<Designs> GetSpecifiedDeletedDesign(byte[] design_id)
         {
             if (design_id == null) { return new Designs(); }
@@ -515,7 +516,7 @@ namespace BillOfMaterialsAPI.Controllers
         //Note: Restoring Pastry Materials will also restore All ingredient entry tied to it
         //If the item or material pointed by the ingredient is not active...
         //It will not restore it
-        [HttpPatch("pastry_materials/{pastry_material_id}")]
+        [HttpPatch("pastry-materials/{pastry_material_id}")]
         public async Task<IActionResult> RestorePastryMaterial(string pastry_material_id)
         {
             PastryMaterials? selectedPastryMaterialsEntry = await _context.PastryMaterials.FindAsync(pastry_material_id);
@@ -569,7 +570,7 @@ namespace BillOfMaterialsAPI.Controllers
             if (failedToRestoreEntries.IsNullOrEmpty()) { return Ok(new { message = "Pastry Materials restored. All associated ingredients recovered" }); }
             else { return Ok(new { message = "Pastry Materials restored. Some associated Ingredients failed to be restored however. Check results for more details", results = failedToRestoreEntries }); }
         }
-        [HttpPatch("pastry_materials/{pastry_material_id}/{ingredient_id}")]
+        [HttpPatch("pastry-materials/{pastry_material_id}/{ingredient_id}")]
         public async Task<IActionResult> RestorePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
         {
             PastryMaterials? pastryMaterialEntry = await _context.PastryMaterials.FindAsync(pastry_material_id);
@@ -616,6 +617,7 @@ namespace BillOfMaterialsAPI.Controllers
             return Ok(new { message = "Ingredient restored" });
         }
 
+        /*
         //NOTE: When restore all is true
         //It will restore any record that references this material if their associated parent is active
         //
@@ -802,8 +804,9 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Recover Material " + material_id + " - Material Ingredient " + material_ingredient_id);
             return Ok(new { message = "Material ingredient restored." });
         }
+        */
 
-        [HttpPatch("designs/{design_id}")]
+        [HttpPatch("designs/{design-id}")]
         public async Task<IActionResult> RestoreDesign(byte[] design_id)
         {
             Designs? selectedRow;
@@ -815,7 +818,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Design restored sucessfully" });
         }
-        [HttpPatch("designs/tags/{design_tag_id}")]
+        [HttpPatch("designs/tags/{design-tag-id}")]
         public async Task<IActionResult> RecoverDesignTag(Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;

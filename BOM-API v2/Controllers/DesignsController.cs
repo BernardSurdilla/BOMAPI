@@ -22,7 +22,7 @@ using System.Text.Json;
 namespace BOM_API_v2.Controllers
 {
     [ApiController]
-    [Route("BOM/designs/")]
+    [Route("designs/")]
     public class DesignsController : ControllerBase
     {
         private readonly DatabaseContext _databaseContext;
@@ -204,7 +204,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "Design " + decodedId);
             return response;
         }
-        [HttpGet("tags/{design_tag_id}")]
+        [HttpGet("tags/{design-tag-id}")]
         public async Task<GetTag> GetSpecificTag([FromRoute] Guid design_tag_id)
         {
             DesignTags? selectedTag = null;
@@ -217,7 +217,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "Design tag " + selectedTag.design_tag_id);
             return response;
         }
-        [HttpGet("with_tags/{*tags}")]
+        [HttpGet("with-tags/{*tags}")]
         public async Task<List<GetDesign>> GetDesignsWithTag([FromRoute]string tags )
         {
             List<GetDesign> response = new List<GetDesign>();
@@ -275,12 +275,24 @@ namespace BOM_API_v2.Controllers
 
         }
 
-        [HttpGet("{designId}/pastry_material")]
+        [HttpGet("{designId}/pastry-material")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<GetPastryMaterial> GetSpecificPastryMaterialByDesignId([FromRoute] byte[] designId)
+        public async Task<GetPastryMaterial> GetSpecificPastryMaterialByDesignId([FromRoute] string designId)
         {
+            Designs? selectedDesign;
+            string decodedId = designId;
+            byte[]? byteArrEncodedId = null;
+            try
+            {
+                decodedId = Uri.UnescapeDataString(designId);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return new GetPastryMaterial(); }
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
+            catch (Exception e) { return new GetPastryMaterial(); }
+
             PastryMaterials? currentPastryMat = null;
-            try { currentPastryMat = await _databaseContext.PastryMaterials.Where(x => x.isActive == true && x.design_id == designId).FirstAsync(); }
+            try { currentPastryMat = await _databaseContext.PastryMaterials.Where(x => x.isActive == true && x.design_id.SequenceEqual(selectedDesign.design_id)).FirstAsync(); }
             catch (Exception e) { return new GetPastryMaterial(); }
 
 
@@ -294,8 +306,7 @@ namespace BOM_API_v2.Controllers
 
         }
 
-
-        [HttpGet("without_pastry_material")]
+        [HttpGet("without-pastry-material")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetDesignWithoutPastryMaterial>> GetDesignsWithoutPastryMaterial()
         {
@@ -313,6 +324,7 @@ namespace BOM_API_v2.Controllers
             return response;
         }
 
+        /*
         [HttpGet("with_pastry_material")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetDesignWithPastryMaterial>> GetDesignsWithPastryMaterial()
@@ -333,8 +345,8 @@ namespace BOM_API_v2.Controllers
                 response.Add(newResponseRow);
             }
 
-            */
         }
+        */
         private async Task<GetDesign> CreateGetDesignResponseFromDbRow(Designs data)
         {
             GetDesign response = new GetDesign();
@@ -368,7 +380,7 @@ namespace BOM_API_v2.Controllers
 
             return response;
         }
-
+        
         [HttpPost]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewDesign(PostDesign input)
@@ -466,45 +478,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add new tag " + newTags.design_tag_name.ToString());
             return Ok(new {message = "Tag " + newTags.design_tag_id + " created"});
         }
-        [HttpPost("{designId}/tags")]
-        [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string designId)
-        {
-            Designs? selectedDesign;
-            string decodedId = designId;
-            byte[]? byteArrEncodedId = null;
-
-            try
-            {
-                decodedId = Uri.UnescapeDataString(designId);
-                byteArrEncodedId = Convert.FromBase64String(decodedId);
-            }
-            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
-
-            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
-            catch (Exception e) { return NotFound(new {message = "Design id not found"}); }
-
-            if (input == null) { return BadRequest(new { message = "Input is null" }); }
-            if (input.design_tag_ids.IsNullOrEmpty()) { return BadRequest(new { message = "No tag ids in the input body" }); }
-
-            foreach (Guid tagId in input.design_tag_ids)
-            {
-                DesignTags referencedTag;
-                try { referencedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == tagId).FirstAsync(); }
-                catch (InvalidOperationException e) { return BadRequest(new { message = "The tag with the id " + tagId + " does not exist" }); }
-                catch (Exception e) { return StatusCode(500, new { message = e.GetType().ToString() }); }
-
-                DesignTagsForCakes newDesignTag = new DesignTagsForCakes();
-                newDesignTag.isActive = true;
-                newDesignTag.design_tags_for_cake_id = new Guid();
-                newDesignTag.design_id = selectedDesign.design_id;
-                newDesignTag.design_tag_id = referencedTag.design_tag_id;
-                _databaseContext.DesignTagsForCakes.Add(newDesignTag);
-            }
-            await _databaseContext.SaveChangesAsync();
-            return Ok(new {message = "Tags inserted to " + selectedDesign.design_id.ToString()});
-        }
-        [HttpPost("{designId}/add_ons/")]
+        [HttpPost("{designId}/add-ons/")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewAddOns([FromBody]PostDesignAddOns input, [FromRoute] string designId)
         {
@@ -543,6 +517,60 @@ namespace BOM_API_v2.Controllers
             await _kaizenTables.SaveChangesAsync();
 
             return Ok(new {message = "New add on added for " + decodedId});
+        }
+
+        [HttpPut("{designId}/tags")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string designId)
+        {
+            Designs? selectedDesign;
+            string decodedId = designId;
+            byte[]? byteArrEncodedId = null;
+
+            try
+            {
+                decodedId = Uri.UnescapeDataString(designId);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
+
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
+
+            if (input == null) { return BadRequest(new { message = "Input is null" }); }
+            if (input.design_tag_ids.IsNullOrEmpty()) { return BadRequest(new { message = "No tag ids in the input body" }); }
+
+            foreach (Guid tagId in input.design_tag_ids)
+            {
+                DesignTags referencedTag;
+                try { referencedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == tagId).FirstAsync(); }
+                catch (InvalidOperationException e) { return BadRequest(new { message = "The tag with the id " + tagId + " does not exist" }); }
+                catch (Exception e) { return StatusCode(500, new { message = e.GetType().ToString() }); }
+
+                DesignTagsForCakes? currentDesignTagConnection = null;
+                try
+                {
+                    currentDesignTagConnection = await _databaseContext.DesignTagsForCakes.Where(x => x.design_id.SequenceEqual(byteArrEncodedId) == true && x.design_tag_id == referencedTag.design_tag_id).FirstAsync();
+
+                    if (currentDesignTagConnection.isActive == false)
+                    {
+                        _databaseContext.DesignTagsForCakes.Update(currentDesignTagConnection);
+                        currentDesignTagConnection.isActive = true;
+                    }
+                    else { continue; }
+                }
+                catch
+                {
+                    DesignTagsForCakes newDesignTag = new DesignTagsForCakes();
+                    newDesignTag.isActive = true;
+                    newDesignTag.design_tags_for_cake_id = new Guid();
+                    newDesignTag.design_id = selectedDesign.design_id;
+                    newDesignTag.design_tag_id = referencedTag.design_tag_id;
+                    _databaseContext.DesignTagsForCakes.Add(newDesignTag);
+                }
+            }
+            await _databaseContext.SaveChangesAsync();
+            return Ok(new { message = "Tags inserted to " + selectedDesign.design_id.ToString() });
         }
 
         [HttpPatch("{designId}/")]
@@ -616,7 +644,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
             return Ok(new { message = "Design " + designId.ToString() + " updated" });
         }
-        [HttpPatch("tags/{design_tag_id}")]
+        [HttpPatch("tags/{design-tag-id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateTag(PostTags input, [FromRoute] Guid design_tag_id)
         {
@@ -632,7 +660,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update design tag " + selectedDesignTag.design_tag_id);
             return Ok(new { message = "Design tag " + selectedDesignTag.design_tag_id + " updated" });
         }
-        [HttpPatch("{designId}/add_ons/{design_add_on_id}")]
+        [HttpPatch("{designId}/add-ons/{design-add-on-id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateDesignAddOn(PatchDesignAddOns input, [FromRoute] string designId, [FromRoute] int design_add_on_id)
         {
@@ -693,7 +721,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete design " + decodedId);
             return Ok(new { message = "Design " + decodedId + " deleted" });
         }
-        [HttpDelete("tags/{design_tag_id}")]
+        [HttpDelete("tags/{design-tag-id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesignTag(Guid design_tag_id)
         {
@@ -743,7 +771,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Tags for " + foundEntry.design_id);
             return Ok(new { message = "Tags removed successfully" });
         }
-        [HttpDelete("{designId}/add_ons/{design_add_on_id}")]
+        [HttpDelete("{designId}/add-ons/{design-add-on-id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesignAddOn([FromRoute] string designId, [FromRoute] int design_add_on_id)
         {
@@ -769,7 +797,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design add on for " + decodedId + " id " + selectedAddOnForDesign.design_add_on_id + " deleted" });
         }
 
-        [HttpDelete("{designId}/tags/{tag_id}")]
+        [HttpDelete("{designId}/tags/{tag-id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RemoveDesignTagById([FromRoute] string designId, [FromRoute] Guid tag_id)
         {

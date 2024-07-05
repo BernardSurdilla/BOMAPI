@@ -108,7 +108,6 @@ namespace JWTAuthentication.Authentication
 
 namespace JWTAuthentication.Controllers
 {
-    [Route("auth/")]
     [ApiController]
     public class AuthenticateController : ControllerBase
     {
@@ -175,8 +174,7 @@ namespace JWTAuthentication.Controllers
             }
             return Unauthorized();
         }
-
-        [HttpPost("register_customer/")]
+        [HttpPost("register-customer/")]
         public async Task<IActionResult> RegisterCustomer([FromBody] RegisterModel model)
         {
             var userExists = await userManager.FindByNameAsync(model.Username);
@@ -209,7 +207,7 @@ namespace JWTAuthentication.Controllers
             
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
-        [HttpPost("register_artist/")]
+        [HttpPost("register-artist/")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RegisterArtist([FromBody] RegisterModel model)
         {
@@ -219,6 +217,7 @@ namespace JWTAuthentication.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified username already exists!" });
             if (userEmailExist != null)
                 return StatusCode(StatusCodes.Status500InternalServerError, new Response { Status = "Error", Message = "Account with specified email already exists!" });
+
             APIUsers user = new APIUsers()
             {
                 Email = model.Email,
@@ -242,7 +241,7 @@ namespace JWTAuthentication.Controllers
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
-        [HttpPost("register_manager/")]
+        [HttpPost("register-manager/")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RegisterManager([FromBody] RegisterModel model)
         {
@@ -275,8 +274,7 @@ namespace JWTAuthentication.Controllers
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
-
-        [HttpPost("register_admin/")]
+        [HttpPost("register-admin/")]
         public async Task<IActionResult> RegisterAdmin([FromBody] RegisterModel model, string secret_key)
         {
             string configSecretKey = _configuration.GetValue("AdminAccountCreationKey", "");
@@ -314,8 +312,18 @@ namespace JWTAuthentication.Controllers
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
 
+        [HttpPost("{roles}")]
+        public async Task<IActionResult> RegisterTest(string roles)
+        {
+            List<Object> resp = new List<Object>();
+            foreach (var item in User.Claims)
+            {
+                resp.Add(item);
+            }
+            return Ok(new {message = roles, claims = resp});
+        }
         
-        [Authorize(Roles = UserRoles.Admin)][HttpGet("all_users/")]
+        [Authorize(Roles = UserRoles.Admin)][HttpGet("all-users/")]
         public async Task<List<GetUser>> GetAllUser(int? page, int? record_per_page)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -373,7 +381,7 @@ namespace JWTAuthentication.Controllers
             //await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
             return response;
         }
-        [Authorize][HttpPost("user/send_confirmation_email/")]
+        [Authorize][HttpPost("user/send-confirmation-email/")]
         public async Task<IActionResult> SendEmailConfirmationEmail()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -421,7 +429,7 @@ namespace JWTAuthentication.Controllers
                 return StatusCode(500, new { message = "Email failed to send to " + email });
             }
         }
-        [Authorize][HttpPost("user/confirm_email/")]
+        [Authorize][HttpPost("user/confirm-email/")]
         public async Task<IActionResult> ConfirmUserEmail(string confirmationCode)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -453,7 +461,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new { message = "Email confirmed successfully" });
         }
 
-        [Authorize][HttpGet("user/profile_picture")]
+        [Authorize][HttpGet("user/profile-picture")]
         public async Task<byte[]?> CurrentUserProfilePicture()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -467,7 +475,7 @@ namespace JWTAuthentication.Controllers
             return currentUserImage.picture_data;
             
         }
-        [Authorize][HttpPost("user/upload_profile_picture")]
+        [Authorize][HttpPost("user/upload-profile-picture")]
         public async Task<IActionResult> UploadProfilePicture([FromBody] byte[] picture_data)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -501,7 +509,7 @@ namespace JWTAuthentication.Controllers
             else { return BadRequest(new { message = "Something unexpected occured in saving the account in the inventory accounts" }); }
             
         }
-        [Authorize][HttpPatch("user/profile_picture")]
+        [Authorize][HttpPatch("user/profile-picture")]
         public async Task<IActionResult> UpdateUserProfileImage([FromBody] byte[] picture_data)
         {
             var currentUser = await userManager.GetUserAsync(User);

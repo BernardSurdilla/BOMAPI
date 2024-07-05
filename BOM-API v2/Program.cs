@@ -13,9 +13,10 @@ using Microsoft.EntityFrameworkCore.InMemory;
 using BOM_API_v2.Bridge;
 using API_TEST.Controllers;
 using BOM_API_v2.Helpers;
+using BOM_API_v2.Controllers;
 
 
-const string API_VERSION = "v0.5";
+const string API_VERSION = "v1";
 const string APP_CONTEXT = "CULO-API";
 const string GLOBAL_ROUTE_PREFIX = APP_CONTEXT + "/" + API_VERSION;
 
@@ -35,6 +36,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers(options => options.Conventions.Add(new GlobalControllerRoutePrefixConvention(new GlobalControllerRoutePrefix(GLOBAL_ROUTE_PREFIX))));
+
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
