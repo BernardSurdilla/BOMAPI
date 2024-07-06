@@ -391,7 +391,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add new design " + newEntryId.ToString());
             return Ok(new { message = "Design " + Convert.ToBase64String(newEntryId) + " added", id = Convert.ToBase64String(newEntryId) });
         }
-        [HttpPost("{designId}/add-ons/")]
+        [HttpPost("{design_id}/add-ons/")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewAddOns([FromBody]PostDesignAddOns input, [FromRoute] string designId)
         {
@@ -432,7 +432,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new {message = "New add on added for " + decodedId});
         }
 
-        [HttpPut("{designId}/tags")]
+        [HttpPut("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string designId)
         {
@@ -486,7 +486,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Tags inserted to " + selectedDesign.design_id.ToString() });
         }
 
-        [HttpPatch("{designId}/")]
+        [HttpPatch("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute]string designId)
         {
@@ -557,7 +557,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
             return Ok(new { message = "Design " + designId.ToString() + " updated" });
         }
-        [HttpPatch("{designId}/add-ons/{design_add_on_id}")]
+        [HttpPatch("{design_id}/add-ons/{design_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateDesignAddOn(PatchDesignAddOns input, [FromRoute] string designId, [FromRoute] int design_add_on_id)
         {
@@ -591,7 +591,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design add on for " + decodedId + " id " + selectedAddOnForDesign.design_add_on_id + " updated" });
         }
 
-        [HttpDelete("{designId}/")]
+        [HttpDelete("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesign([FromRoute] string designId)
         {
@@ -618,7 +618,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete design " + decodedId);
             return Ok(new { message = "Design " + decodedId + " deleted" });
         }
-        [HttpDelete("{designId}/tags")]
+        [HttpDelete("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RemoveDesignTag([FromRoute]string designId, [FromBody] List<Guid> tag_ids)
         {
@@ -652,7 +652,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Tags for " + foundEntry.design_id);
             return Ok(new { message = "Tags removed successfully" });
         }
-        [HttpDelete("{designId}/add-ons/{design_add_on_id}")]
+        [HttpDelete("{design_id}/add-ons/{design_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesignAddOn([FromRoute] string designId, [FromRoute] int design_add_on_id)
         {
@@ -678,7 +678,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design add on for " + decodedId + " id " + selectedAddOnForDesign.design_add_on_id + " deleted" });
         }
 
-        [HttpDelete("{designId}/tags/{tag_id}")]
+        [HttpDelete("{design_id}/tags/{tag_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> RemoveDesignTagById([FromRoute] string designId, [FromRoute] Guid tag_id)
         {

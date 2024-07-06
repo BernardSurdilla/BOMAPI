@@ -806,7 +806,7 @@ namespace BillOfMaterialsAPI.Controllers
         }
         */
 
-        [HttpPatch("designs/{design-id}")]
+        [HttpPatch("designs/{design_id}")]
         public async Task<IActionResult> RestoreDesign(byte[] design_id)
         {
             Designs? selectedRow;
@@ -818,7 +818,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Design restored sucessfully" });
         }
-        [HttpPatch("designs/tags/{design-tag-id}")]
+        [HttpPatch("designs/tags/{design_tag_id}")]
         public async Task<IActionResult> RecoverDesignTag(Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;
