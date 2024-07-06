@@ -48,7 +48,6 @@ namespace BillOfMaterialsAPI.Helpers
         public static int DefaultStartingPageNumber = 1;
         public static int DefaultNumberOfEntriesPerPage = 10;
     }
-
     public class ValidUnits
     {
         public static Dictionary<string, List<string>> ValidMeasurementUnits()
@@ -122,5 +121,22 @@ namespace BillOfMaterialsAPI.Helpers
             return "";
         }
     }
-    
+
+    public class InventorySubtractorInfo
+    {
+
+        public string AmountQuantityType;
+        public string AmountUnit;
+        public double Amount;
+
+        public InventorySubtractorInfo() { }
+        public InventorySubtractorInfo(string amountQuantityType, string amountUnit, double amount)
+        {
+            this.AmountQuantityType = amountQuantityType;
+            this.AmountUnit = amountUnit;
+            this.Amount = amount;
+        }
+    }
+
+
 }

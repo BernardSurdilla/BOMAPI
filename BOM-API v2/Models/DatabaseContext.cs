@@ -9,6 +9,16 @@ namespace BillOfMaterialsAPI.Models
         {
 
         }
+        /*
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.Entity<IngredientSubtractionHistory>().OwnsOne(x => x.item_subtraction_info, ownedNavigationBuilder =>
+            {
+                ownedNavigationBuilder.ToJson();
+            });
+        }
+        */
+
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
         public DbSet<Ingredients> Ingredients { get; set; }
         public DbSet<PastyMaterialAddOns> PastyMaterialAddOns { get; set; }
@@ -16,6 +26,8 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<PastryMaterialSubVariants> PastryMaterialSubVariants { get; set; }
         public DbSet<PastryMaterialSubVariantIngredients> PastryMaterialSubVariantIngredients { get; set; }
         public DbSet<PastryMaterialSubVariantAddOns> PastryMaterialSubVariantAddOns { get; set; }
+
+        public DbSet<IngredientSubtractionHistory> IngredientSubtractionHistory { get; set; }
 
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }

@@ -78,7 +78,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "All Design tags");
             return response;
         }
-        [HttpGet("{design-tag-id}")]
+        [HttpGet("{design_tag_id}")]
         public async Task<GetTag> GetSpecificTag([FromRoute] Guid design_tag_id)
         {
             DesignTags? selectedTag = null;
@@ -110,7 +110,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Tag " + newTags.design_tag_id + " created" });
         }
 
-        [HttpPatch("{design-tag-id}")]
+        [HttpPatch("{design_tag_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdateTag(PostTags input, [FromRoute] Guid design_tag_id)
         {
@@ -127,7 +127,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Design tag " + selectedDesignTag.design_tag_id + " updated" });
         }
 
-        [HttpDelete("{design-tag-id}")]
+        [HttpDelete("{design_tag_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeleteDesignTag(Guid design_tag_id)
         {

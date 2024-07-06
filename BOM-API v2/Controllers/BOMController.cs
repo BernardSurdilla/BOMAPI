@@ -34,7 +34,6 @@ namespace API_TEST.Controllers
         }
     }
 
-
     [ApiController]
     [Route("data-analysis")]
     [Authorize(Roles = UserRoles.Admin)]

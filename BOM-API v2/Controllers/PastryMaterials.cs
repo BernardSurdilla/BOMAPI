@@ -129,7 +129,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "All Pastry Material ");
             return response;
         }
-        [HttpGet("{pastry-material-id}")]
+        [HttpGet("{pastry_material_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<GetPastryMaterial> GetSpecificPastryMaterial(string pastry_material_id)
         {
@@ -147,7 +147,7 @@ namespace BOM_API_v2.Controllers
             return response;
 
         }
-        [HttpGet("{pastry-material-id}/ingredients")]
+        [HttpGet("{pastry_material_id}/ingredients")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetPastryMaterialIngredients>> GetAllPastryMaterialIngredient(string pastry_material_id)
         {
@@ -444,7 +444,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Data inserted to the database." });
 
         }
-        [HttpPost("{pastry-material-id}/ingredients")]
+        [HttpPost("{pastry_material_id}/ingredients")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialIngredient(string pastry_material_id, PostIngredients entry)
         {
@@ -511,7 +511,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Data inserted to the database." });
 
         }
-        [HttpPost("{pastry-material-id}/add_ons")]
+        [HttpPost("{pastry_material_id}/add_ons")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialAddOn(string pastry_material_id, PostPastryMaterialAddOns entry)
         {
@@ -555,7 +555,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "New add on added to " + pastry_material_id });
 
         }
-        [HttpPost("{pastry-material-id}/sub-variants")]
+        [HttpPost("{pastry_material_id}/sub-variants")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariant(string pastry_material_id, PostPastryMaterialSubVariant entry)
         {
@@ -699,7 +699,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "New sub variant for " + pastry_material_id + " added" });
         }
         [Authorize(Roles = UserRoles.Admin)]
-        [HttpPost("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}/ingredients")]
+        [HttpPost("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/ingredients")]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients entry)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -774,7 +774,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add Sub variant ingredient for " + pastry_material_sub_variant_id + " of " + pastry_material_id);
             return Ok(new { message = "New sub variant ingredient for " + pastry_material_sub_variant_id + " added" });
         }
-        [HttpPost("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}/add_ons")]
+        [HttpPost("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantAddOns entry)
         {
@@ -824,7 +824,7 @@ namespace BOM_API_v2.Controllers
         }
 
         //PATCH
-        [HttpPatch("{pastry-material-id}")]
+        [HttpPatch("{pastry_material_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterial(string pastry_material_id, PatchPastryMaterials entry)
         {
@@ -851,7 +851,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material updated." });
 
         }
-        [HttpPatch("{pastry-material-id}/ingredients/{ingredient-id}")]
+        [HttpPatch("{pastry_material_id}/ingredients/{ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialIngredient(string pastry_material_id, string ingredient_id, PatchIngredients entry)
         {
@@ -903,7 +903,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
         }
-        [HttpPatch("{pastry-material-id}/add_ons/{pastry-material-add-on-id}")]
+        [HttpPatch("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id, PatchPastryMaterialAddOn entry)
         {
@@ -931,7 +931,7 @@ namespace BOM_API_v2.Controllers
             
             return Ok(new { message = "Add on " + pastry_material_add_on_id + " updated " });
         }
-        [HttpPatch("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}")]
+        [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariant(string pastry_material_id, string pastry_material_sub_variant_id, PatchPastryMaterialSubVariants entry)
         {
@@ -954,7 +954,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update sub variant " + pastry_material_sub_variant_id);
             return Ok(new { message = "Sub variant updated" });
         }
-        [HttpPatch("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}/ingredients/{pastry-material-sub-variant-ingredient-id}")]
+        [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/ingredients/{pastry_material_sub_variant_ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id, PatchPastryMaterialSubVariantsIngredient entry)
         {
@@ -1012,7 +1012,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
             return Ok(new { message = "Sub variant updated" });
         }
-        [HttpPatch("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}/add_ons/{pastry-material-sub-variant-add-on-id}")]
+        [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id, PatchPastryMaterialSubVariantAddOn entry)
         {
@@ -1048,7 +1048,7 @@ namespace BOM_API_v2.Controllers
 
 
         //DELETE
-        [HttpDelete("{pastry-material-id}")]
+        [HttpDelete("{pastry_material_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterial(string pastry_material_id)
         {
@@ -1076,7 +1076,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material " + pastry_material_id);
             return Ok(new { message = "Pastry Material deleted." });
         }
-        [HttpDelete("{pastry-material-id}/ingredients/{ingredient-id}")]
+        [HttpDelete("{pastry_material_id}/ingredients/{ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
         {
@@ -1098,7 +1098,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material Ingredient " + ingredient_id);
             return Ok(new { message = "Ingredient deleted." });
         }
-        [HttpDelete("{pastry-material-id}/add_ons/{pastry-material-add-on-id}")]
+        [HttpDelete("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id)
         {
@@ -1120,7 +1120,7 @@ namespace BOM_API_v2.Controllers
 
             return Ok(new { message = "Add on " + pastry_material_add_on_id + " deleted " });
         }
-        [HttpDelete("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}")]
+        [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariant(string pastry_material_id, string pastry_material_sub_variant_id)
         {
@@ -1142,7 +1142,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id);
             return Ok(new { message = "Sub variant deleted" });
         }
-        [HttpDelete("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}/ingredients/{pastry-material-sub-variant-ingredient-id}")]
+        [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/ingredients/{pastry_material_sub_variant_ingredient_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id)
         {
@@ -1169,7 +1169,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
             return Ok(new { message = "Sub variant deleted" });
         }
-        [HttpDelete("{pastry-material-id}/sub-variants/{pastry-material-sub-variant-id}/add_ons/{pastry-material-sub-variant-add-on-id}")]
+        [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id)
         {
@@ -1200,7 +1200,7 @@ namespace BOM_API_v2.Controllers
         //
         // INVENTORY ACTIONS
         //
-        [HttpPost("{pastry-material-id}/subtract-recipe-ingredients-on-inventory/{variant_id}")]
+        [HttpPost("{pastry_material_id}/subtract-recipe-ingredients-on-inventory/{variant_id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_id)
         {
@@ -1462,6 +1462,7 @@ namespace BOM_API_v2.Controllers
                 }
             }
 
+            List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
             foreach (string currentInventoryItemId in inventoryItemsAboutToBeSubtracted.Keys)
             {
                 InventorySubtractorInfo currentInventorySubtractorInfo = inventoryItemsAboutToBeSubtracted[currentInventoryItemId];
@@ -1472,6 +1473,7 @@ namespace BOM_API_v2.Controllers
                 string? inventoryItemMeasurement = null;
                 string? inventoryItemQuantityUnit = null;
                 bool isInventoryItemMeasurementValid = false;
+
                 //Add code here to check if the unit of the item in the inventory and the recorded total is the same
                 foreach(string unitQuantity in validMeasurementUnits.Keys)
                 {
@@ -1490,32 +1492,41 @@ namespace BOM_API_v2.Controllers
                 if (isInventoryItemMeasurementValid == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" }); }
                 if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType }); }
 
-                if (inventoryItemQuantityUnit.Equals("Count")) { referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount; }
+                double amountToBeSubtracted = 0.0;
+                if (inventoryItemQuantityUnit.Equals("Count")) {
+                    amountToBeSubtracted = currentInventorySubtractorInfo.Amount;
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount; 
+                }
                 else
                 {
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
+                    amountToBeSubtracted = UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - amountToBeSubtracted;
                 }
+                ItemSubtractionInfo newIngredientSubtractionInfoEntry = new ItemSubtractionInfo
+                {
+                    item_id = Convert.ToString(referencedInventoryItem.id),
+                    item_name = referencedInventoryItem.item_name,
+                    amount_quantity_type = inventoryItemQuantityUnit,
+                    amount_unit = referencedInventoryItem.measurements,
+                    amount = amountToBeSubtracted
+                };
+
+                dataForSubtractionHistory.Add(newIngredientSubtractionInfoEntry);
                 _kaizenTables.Item.Update(referencedInventoryItem);
             }
+            IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
+            {
+                ingredient_subtraction_history_id = new Guid(),
+                item_subtraction_info = dataForSubtractionHistory,
+                date_subtracted = DateTime.Now,
+            };
+            await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
 
             await _kaizenTables.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+
             await _actionLogger.LogAction(User, "POST", "Subtract ingredients of " + pastry_material_id);
             return Ok(new { message = "Ingredients sucessfully deducted." });
-        }
-        private class InventorySubtractorInfo
-        {
-
-            public string AmountQuantityType;
-            public string AmountUnit;
-            public double Amount;
-
-            public InventorySubtractorInfo() { }
-            public InventorySubtractorInfo(string amountQuantityType, string amountUnit, double amount)
-            {
-                this.AmountQuantityType = amountQuantityType;
-                this.AmountUnit = amountUnit;
-                this.Amount = amount;
-            }
         }
 
         private async Task<GetPastryMaterial> CreatePastryMaterialResponseFromDBRow(PastryMaterials data)
@@ -2168,6 +2179,5 @@ namespace BOM_API_v2.Controllers
 
             return response;
         }
-
     }
 }

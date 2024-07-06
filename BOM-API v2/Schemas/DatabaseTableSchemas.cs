@@ -2,6 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.InteropServices;
+using System;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -114,6 +115,23 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime last_modified_date { get; set; }
 
         public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
+    }
+
+    [PrimaryKey("ingredient_subtraction_history_id")]
+    public class IngredientSubtractionHistory
+    {
+        [Required][Key] public Guid ingredient_subtraction_history_id { get; set; }
+        [Required][Column(TypeName = "json")] public List<ItemSubtractionInfo> item_subtraction_info { get; set; }
+        [Required] public DateTime date_subtracted { get; set; }
+    }
+    public class ItemSubtractionInfo
+    {
+        public string item_id { get; set; }
+        public string item_name { get; set; }
+
+        public string amount_quantity_type;
+        public string amount_unit;
+        public double amount;
     }
 
     //Pastry ingredients that is made from a combination of 2 or more items

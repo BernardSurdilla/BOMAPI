@@ -164,7 +164,7 @@ namespace BillOfMaterialsAPI.Controllers
             return response;
 
         }
-        [HttpGet("pastry-materials/{pastry-material-id}/ingredients")]
+        [HttpGet("pastry-materials/{pastry_material_id}/ingredients")]
         public async Task<List<GetPastryMaterialIngredients>> GetAllPastryIngredient(string pastry_material_id)
         {
             PastryMaterials? currentPastryMat = await _context.PastryMaterials.FindAsync(pastry_material_id);
@@ -442,7 +442,7 @@ namespace BillOfMaterialsAPI.Controllers
             await _actionLogger.LogAction(User, "GET", "All deleted designs");
             return response;
         }
-        [HttpGet("designs/{design-id}")]
+        [HttpGet("designs/{design_id}")]
         public async Task<Designs> GetSpecifiedDeletedDesign(byte[] design_id)
         {
             if (design_id == null) { return new Designs(); }
