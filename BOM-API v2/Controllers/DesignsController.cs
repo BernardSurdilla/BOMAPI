@@ -99,15 +99,15 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "All Design");
             return response;
         }
-        [HttpGet("{designId}")]
-        public async Task<GetDesign> GetSpecificDesign([FromRoute]string designId)
+        [HttpGet("{design_id}")]
+        public async Task<GetDesign> GetSpecificDesign([FromRoute]string design_id)
         {
             Designs? selectedDesign;
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
             catch { return new GetDesign(); }
@@ -161,7 +161,7 @@ namespace BOM_API_v2.Controllers
 
             string[] design_ids = decodedIds.Split("/");
 
-            List<List<string>> designIdWithTags = new List<List<string>>();
+            List<List<string>> design_idWithTags = new List<List<string>>();
             foreach (string design_id in design_ids)
             {
                 DesignTags? currentTag;
@@ -169,16 +169,16 @@ namespace BOM_API_v2.Controllers
                 catch (Exception e) { return new List<GetDesign>(); }
 
                 List<DesignTagsForCakes> tagsForCakes = await _databaseContext.DesignTagsForCakes.Where(x => x.isActive == true && x.design_tag_id == currentTag.design_tag_id).ToListAsync();
-                List<string> designIdsWithCurrentTag = new List<string>();
+                List<string> design_idsWithCurrentTag = new List<string>();
                 foreach (DesignTagsForCakes designTagsForCakes in tagsForCakes)
                 {
-                    designIdsWithCurrentTag.Add(Convert.ToBase64String(designTagsForCakes.design_id));
+                    design_idsWithCurrentTag.Add(Convert.ToBase64String(designTagsForCakes.design_id));
                 }
-                designIdWithTags.Add(designIdsWithCurrentTag);
+                design_idWithTags.Add(design_idsWithCurrentTag);
             }
 
             List<string>? cakeIdList = null;
-            foreach (List<string> currentIdList in designIdWithTags)
+            foreach (List<string> currentIdList in design_idWithTags)
             {
                 if (cakeIdList == null)
                 {
@@ -205,16 +205,16 @@ namespace BOM_API_v2.Controllers
 
         }
 
-        [HttpGet("{designId}/pastry-material")]
+        [HttpGet("{design_id}/pastry-material")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<GetPastryMaterial> GetSpecificPastryMaterialByDesignId([FromRoute] string designId)
+        public async Task<GetPastryMaterial> GetSpecificPastryMaterialBydesign_id([FromRoute] string design_id)
         {
             Designs? selectedDesign;
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
             catch { return new GetPastryMaterial(); }
@@ -393,15 +393,15 @@ namespace BOM_API_v2.Controllers
         }
         [HttpPost("{design_id}/add-ons/")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AddNewAddOns([FromBody]PostDesignAddOns input, [FromRoute] string designId)
+        public async Task<IActionResult> AddNewAddOns([FromBody]PostDesignAddOns input, [FromRoute] string design_id)
         {
             Designs? selectedDesign;
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
             catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
@@ -434,15 +434,15 @@ namespace BOM_API_v2.Controllers
 
         [HttpPut("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string designId)
+        public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string design_id)
         {
             Designs? selectedDesign;
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
             catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
@@ -488,17 +488,17 @@ namespace BOM_API_v2.Controllers
 
         [HttpPatch("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute]string designId)
+        public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute]string design_id)
         {
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new {message="Invalid format in the designId value in route"}); }
+            catch { return BadRequest(new {message="Invalid format in the design_id value in route"}); }
 
             Designs? foundEntry = null;
             try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
@@ -555,21 +555,21 @@ namespace BOM_API_v2.Controllers
             await _databaseContext.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
-            return Ok(new { message = "Design " + designId.ToString() + " updated" });
+            return Ok(new { message = "Design " + design_id.ToString() + " updated" });
         }
         [HttpPatch("{design_id}/add-ons/{design_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> UpdateDesignAddOn(PatchDesignAddOns input, [FromRoute] string designId, [FromRoute] int design_add_on_id)
+        public async Task<IActionResult> UpdateDesignAddOn(PatchDesignAddOns input, [FromRoute] string design_id, [FromRoute] int design_add_on_id)
         {
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new { message = "Invalid format in the designId value in route" }); }
+            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
 
             AddOns? selectedAddOn = null;
             try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == input.add_ons_id).FirstAsync(); }
@@ -593,17 +593,17 @@ namespace BOM_API_v2.Controllers
 
         [HttpDelete("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> DeleteDesign([FromRoute] string designId)
+        public async Task<IActionResult> DeleteDesign([FromRoute] string design_id)
         {
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new { message = "Invalid format in the designId value in route" }); }
+            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
 
             Designs? foundEntry = null;
             try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
@@ -620,17 +620,17 @@ namespace BOM_API_v2.Controllers
         }
         [HttpDelete("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> RemoveDesignTag([FromRoute]string designId, [FromBody] List<Guid> tag_ids)
+        public async Task<IActionResult> RemoveDesignTag([FromRoute]string design_id, [FromBody] List<Guid> tag_ids)
         {
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new { message = "Invalid format in the designId value in route" }); }
+            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
 
             Designs? foundEntry = null;
             try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
@@ -654,17 +654,17 @@ namespace BOM_API_v2.Controllers
         }
         [HttpDelete("{design_id}/add-ons/{design_add_on_id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> DeleteDesignAddOn([FromRoute] string designId, [FromRoute] int design_add_on_id)
+        public async Task<IActionResult> DeleteDesignAddOn([FromRoute] string design_id, [FromRoute] int design_add_on_id)
         {
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new { message = "Invalid format in the designId value in route" }); }
+            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
 
             DesignAddOns? selectedAddOnForDesign = null;
             try { selectedAddOnForDesign = await _kaizenTables.DesignAddOns.Where(x => x.isActive == true && x.design_add_on_id == design_add_on_id && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
@@ -680,17 +680,17 @@ namespace BOM_API_v2.Controllers
 
         [HttpDelete("{design_id}/tags/{tag_id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> RemoveDesignTagById([FromRoute] string designId, [FromRoute] Guid tag_id)
+        public async Task<IActionResult> RemoveDesignTagById([FromRoute] string design_id, [FromRoute] Guid tag_id)
         {
-            string decodedId = designId;
+            string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
 
             try
             {
-                decodedId = Uri.UnescapeDataString(designId);
+                decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new { message = "Invalid format in the designId value in route" }); }
+            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
 
             Designs? foundEntry = null;
             try { foundEntry = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
