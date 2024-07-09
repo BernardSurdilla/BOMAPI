@@ -1,25 +1,28 @@
-﻿using CRUDFI.Models;
-using JWTAuthentication.Authentication;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
-using System.Data;
+using CRUDFI.Models;
+using System.Data.SqlTypes;
 using System.Diagnostics;
+using Microsoft.AspNetCore.Authorization;
+using JWTAuthentication.Authentication;
+using System.Data;
 using System.Globalization;
 using System.Security.Claims;
-//using BillOfMaterialsAPI.Schemas;
+using BOM_API_v2.Helpers;
+using System.Text.Json;
 
-namespace CRUDFI.Controllers
+namespace BOM_API_v2.KaizenFiles.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class AddingOrdersController : ControllerBase
+    public class OrdersController : ControllerBase
     {
         private readonly string connectionstring;
-        private readonly ILogger<AddingOrdersController> _logger;
+        private readonly ILogger<OrdersController> _logger;
 
-        public AddingOrdersController(IConfiguration configuration, ILogger<AddingOrdersController> logger)
+        public OrdersController(IConfiguration configuration, ILogger<OrdersController> logger)
         {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
@@ -424,7 +427,7 @@ namespace CRUDFI.Controllers
         }
 
         [HttpGet("for_confirmation_orders_by_customer")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerId()
         {
             try
@@ -980,7 +983,7 @@ namespace CRUDFI.Controllers
 
 
         [HttpGet("final_order_details/{orderIdHex}")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
         {
             try
@@ -1407,7 +1410,7 @@ namespace CRUDFI.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (2, 3, 4)";
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (2, 3)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3605,9 +3608,5 @@ namespace CRUDFI.Controllers
             }
         }
 
-
-
     }
-
 }
-
