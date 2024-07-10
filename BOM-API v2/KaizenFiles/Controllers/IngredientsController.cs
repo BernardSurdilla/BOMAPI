@@ -10,19 +10,21 @@ using MySql.Data.MySqlClient;
 using System.Diagnostics;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
+using BOM_API_v2.Helpers;
+using System.Text.Json;
 
-namespace CRUDFI.Controllers
+namespace BOM_API_v2.KaizenFiles.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     [Authorize]
-    public class AddingIngridientsController : ControllerBase
+    public class IngredientsController : ControllerBase
     {
         private readonly string connectionstring;
-        private readonly ILogger<AddingIngridientsController> _logger;
+        private readonly ILogger<IngredientsController> _logger;
         private readonly IActionLogger dbLogger;
 
-        public AddingIngridientsController(IConfiguration configuration, ILogger<AddingIngridientsController> logger, IActionLogger dbLogger)
+        public IngredientsController(IConfiguration configuration, ILogger<IngredientsController> logger, IActionLogger dbLogger)
         {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
@@ -502,7 +504,7 @@ namespace CRUDFI.Controllers
         }
 
 
-        [HttpDelete]
+        [HttpDelete("Ingredients/{id}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult DeleteIngredient([FromQuery] int id)
         {
@@ -890,8 +892,5 @@ namespace CRUDFI.Controllers
                 }
             }
         }
-
-
     }
 }
-
