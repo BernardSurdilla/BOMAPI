@@ -21,7 +21,7 @@ namespace BillOfMaterialsAPI.Models
 
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
         public DbSet<Ingredients> Ingredients { get; set; }
-        public DbSet<PastyMaterialAddOns> PastyMaterialAddOns { get; set; }
+        public DbSet<PastryMaterialAddOns> PastryMaterialAddOns { get; set; }
 
         public DbSet<PastryMaterialSubVariants> PastryMaterialSubVariants { get; set; }
         public DbSet<PastryMaterialSubVariantIngredients> PastryMaterialSubVariantIngredients { get; set; }

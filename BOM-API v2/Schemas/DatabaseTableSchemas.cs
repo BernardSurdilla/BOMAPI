@@ -54,7 +54,7 @@ namespace BillOfMaterialsAPI.Schemas
 
     }
     [PrimaryKey("pastry_material_add_on_id")]
-    public class PastyMaterialAddOns
+    public class PastryMaterialAddOns
     {
         [Required][Key][MaxLength(29)] public string pastry_material_add_on_id { get; set; }
         [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }

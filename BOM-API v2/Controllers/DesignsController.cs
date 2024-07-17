@@ -731,7 +731,7 @@ namespace BOM_API_v2.Controllers
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await _databaseContext.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
-            List<PastyMaterialAddOns> currentPastryMaterialAddOns = await _databaseContext.PastyMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastryMaterialAddOns> currentPastryMaterialAddOns = await _databaseContext.PastryMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
 
             Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
@@ -1011,7 +1011,7 @@ namespace BOM_API_v2.Controllers
                 }
                 responsePastryMaterialList.Add(newSubIngredientListEntry);
             }
-            foreach (PastyMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
+            foreach (PastryMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
             {
                 AddOns? referencedAddOns = null;
                 try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentAddOn.add_ons_id).FirstAsync(); }

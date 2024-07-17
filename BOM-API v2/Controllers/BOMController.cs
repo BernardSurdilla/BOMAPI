@@ -32,6 +32,7 @@ namespace API_TEST.Controllers
             _actionLogger = logger;
             _kaizenTables = kaizenTables;
         }
+
     }
 
     [ApiController]
