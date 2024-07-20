@@ -66,6 +66,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         public PastryMaterials PastryMaterials { get; set; }
     }
+
     [PrimaryKey("pastry_material_sub_variant_id")]
     public class PastryMaterialSubVariants
     {
@@ -116,7 +117,15 @@ namespace BillOfMaterialsAPI.Schemas
 
         public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
     }
+    [PrimaryKey("order_ingredient_subtraction_log_id")]
+    public class OrderIngredientSubtractionLog
+    {
+        [Required][Key] public Guid order_ingredient_subtraction_log_id { get; set; }
+        [Required] public Guid order_id { get; set; }
+        [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
 
+        public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
+    }
     [PrimaryKey("ingredient_subtraction_history_id")]
     public class IngredientSubtractionHistory
     {

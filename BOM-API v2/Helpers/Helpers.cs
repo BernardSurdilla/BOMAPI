@@ -8,19 +8,64 @@ using UnitsNet;
 
 namespace BillOfMaterialsAPI.Helpers
 {
+    //Loosely Coupled
+    public static class IdPrefix
+    {
+        public const string Material = "MID";
+        public const string MaterialIngredient = "MIID";
+
+        public const string PastryMaterial = "PMID";
+        public const string Ingredient = "IID";
+        public const string PastryMaterialAddOn = "PMAOID";
+        public const string PastryMaterialSubVariant = "SVID";
+        public const string PastryMaterialSubVariantIngredient = "SVIID";
+        public const string PastryMaterialSubVariantAddOn = "SVAOID";
+
+        public const string Logs = "LOG";
+    }
+    public static class PastryMaterialIngredientImportance
+    {
+        public const int Critical = 5;
+        public const int High = 4;
+        public const int Normal = 3;
+        public const int Low = 2;
+        public const int Ignorable = 1;
+    }
+    public class Page
+    {
+        public static int DefaultStartingPageNumber = 1;
+        public static int DefaultNumberOfEntriesPerPage = 10;
+    }
+    public class Iterators
+    {
+        public static IEnumerable<DateTime> LoopThroughMonths(DateTime start, DateTime end)
+        {
+            DateTime startDate = new DateTime(start.Year, start.Month, 1);
+            DateTime endDate = new DateTime(end.Year, end.Month, 1);
+
+            for (DateTime i = startDate; i <= endDate; i.AddMonths(1)) yield return i;
+        }
+    }
+
+    //Tightly Coupled
+    public class InventorySubtractorInfo
+    {
+
+        public string AmountQuantityType;
+        public string AmountUnit;
+        public double Amount;
+
+        public InventorySubtractorInfo() { }
+        public InventorySubtractorInfo(string amountQuantityType, string amountUnit, double amount)
+        {
+            this.AmountQuantityType = amountQuantityType;
+            this.AmountUnit = amountUnit;
+            this.Amount = amount;
+        }
+    }
     public class IdFormat
     {
-        public static string materialIdFormat = "MID";
-        public static string materialIngredientIdFormat = "MIID";
-
-        public static string pastryMaterialIdFormat = "PMID";
-        public static string ingredientIdFormat = "IID";
-        public static string pastryMaterialAddOnIdFormat = "PMAOID";
-        public static string pastryMaterialSubVariantIdFormat = "SVID";
-        public static string pastryMaterialSubVariantIngredientIdFormat = "SVIID";
-        public static string pastryMaterialSubVariantAddOnIdFormat = "SVAOID";
-        public static string logsIdFormat = "LOG";
-        public static int idNumLength = 12;
+        public const int IdNumbersLength = 12;
 
         public static string IncrementId(string idStringBuffer, int idNumberLength, string idString)
         {
@@ -48,11 +93,11 @@ namespace BillOfMaterialsAPI.Helpers
             try { PastryMaterials x = await context.PastryMaterials.OrderByDescending(x => x.pastry_material_id).FirstAsync(); lastPastryMaterialId = x.pastry_material_id; }
             catch (Exception ex)
             {
-                newPastryMaterialId = IdFormat.pastryMaterialIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialId += "0"; }
+                newPastryMaterialId = IdPrefix.PastryMaterial;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newPastryMaterialId += "0"; }
                 lastPastryMaterialId = newPastryMaterialId;
             }
-            newPastryMaterialId = IdFormat.IncrementId(IdFormat.pastryMaterialIdFormat, IdFormat.idNumLength, lastPastryMaterialId);
+            newPastryMaterialId = IdFormat.IncrementId(IdPrefix.PastryMaterial, IdFormat.IdNumbersLength, lastPastryMaterialId);
 
             return newPastryMaterialId;
         }
@@ -63,11 +108,11 @@ namespace BillOfMaterialsAPI.Helpers
             try { Ingredients x = await context.Ingredients.OrderByDescending(x => x.ingredient_id).FirstAsync(); lastIngredientId = x.ingredient_id; }
             catch (Exception ex)
             {
-                newIngredientId = IdFormat.ingredientIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newIngredientId += "0"; }
+                newIngredientId = IdPrefix.Ingredient;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newIngredientId += "0"; }
                 lastIngredientId = newIngredientId;
             }
-            newIngredientId = IdFormat.IncrementId(IdFormat.ingredientIdFormat, IdFormat.idNumLength, lastIngredientId);
+            newIngredientId = IdFormat.IncrementId(IdPrefix.Ingredient, IdFormat.IdNumbersLength, lastIngredientId);
             return newIngredientId;
         }
         public static async Task<string> GetNewestPastryMaterialAddOnId(DatabaseContext context)
@@ -78,11 +123,11 @@ namespace BillOfMaterialsAPI.Helpers
             try { PastryMaterialAddOns x = await context.PastryMaterialAddOns.OrderByDescending(x => x.pastry_material_add_on_id).FirstAsync(); lastPastryMaterialAddOnId = x.pastry_material_add_on_id; }
             catch (Exception ex)
             {
-                newPastryMaterialAddOnId = IdFormat.pastryMaterialAddOnIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialAddOnId += "0"; }
+                newPastryMaterialAddOnId = IdPrefix.PastryMaterialAddOn;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newPastryMaterialAddOnId += "0"; }
                 lastPastryMaterialAddOnId = newPastryMaterialAddOnId;
             }
-            newPastryMaterialAddOnId = IdFormat.IncrementId(IdFormat.pastryMaterialAddOnIdFormat, IdFormat.idNumLength, lastPastryMaterialAddOnId);
+            newPastryMaterialAddOnId = IdFormat.IncrementId(IdPrefix.PastryMaterialAddOn, IdFormat.IdNumbersLength, lastPastryMaterialAddOnId);
             return newPastryMaterialAddOnId;
         }
 
@@ -94,11 +139,11 @@ namespace BillOfMaterialsAPI.Helpers
             try { PastryMaterialSubVariants x = await context.PastryMaterialSubVariants.OrderByDescending(x => x.pastry_material_sub_variant_id).FirstAsync(); lastPastryMaterialSubVariantId = x.pastry_material_sub_variant_id; }
             catch (Exception ex)
             {
-                newPastryMaterialSubVariantId = IdFormat.pastryMaterialSubVariantIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newPastryMaterialSubVariantId += "0"; }
+                newPastryMaterialSubVariantId = IdPrefix.PastryMaterialSubVariant;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newPastryMaterialSubVariantId += "0"; }
                 lastPastryMaterialSubVariantId = newPastryMaterialSubVariantId;
             }
-            newPastryMaterialSubVariantId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIdFormat, IdFormat.idNumLength, lastPastryMaterialSubVariantId);
+            newPastryMaterialSubVariantId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariant, IdFormat.IdNumbersLength, lastPastryMaterialSubVariantId);
             return newPastryMaterialSubVariantId;
         }
         public static async Task<string> GetNewestPastryMaterialSubVariantIngredientId(DatabaseContext context)
@@ -109,11 +154,11 @@ namespace BillOfMaterialsAPI.Helpers
             try { PastryMaterialSubVariantIngredients x = await context.PastryMaterialSubVariantIngredients.OrderByDescending(x => x.pastry_material_sub_variant_ingredient_id).FirstAsync(); lastSubVariantIngredientId = x.pastry_material_sub_variant_ingredient_id; }
             catch (Exception ex)
             {
-                newSubVariantIngredientId = IdFormat.pastryMaterialSubVariantIngredientIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantIngredientId += "0"; }
+                newSubVariantIngredientId = IdPrefix.PastryMaterialSubVariantIngredient;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newSubVariantIngredientId += "0"; }
                 lastSubVariantIngredientId = newSubVariantIngredientId;
             }
-            newSubVariantIngredientId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantIngredientIdFormat, IdFormat.idNumLength, lastSubVariantIngredientId);
+            newSubVariantIngredientId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantIngredient, IdFormat.IdNumbersLength, lastSubVariantIngredientId);
             return newSubVariantIngredientId;
         }
         public static async Task<string> GetNewestPastryMaterialSubVariantAddOnId(DatabaseContext context)
@@ -124,32 +169,15 @@ namespace BillOfMaterialsAPI.Helpers
             try { PastryMaterialSubVariantAddOns x = await context.PastryMaterialSubVariantAddOns.OrderByDescending(x => x.pastry_material_sub_variant_add_on_id).FirstAsync(); lastSubVariantAddOnId = x.pastry_material_sub_variant_add_on_id; }
             catch (Exception ex)
             {
-                newSubVariantAddOnId = IdFormat.pastryMaterialSubVariantAddOnIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newSubVariantAddOnId += "0"; }
+                newSubVariantAddOnId = IdPrefix.PastryMaterialSubVariantAddOn;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newSubVariantAddOnId += "0"; }
                 lastSubVariantAddOnId = newSubVariantAddOnId;
             }
-            newSubVariantAddOnId = IdFormat.IncrementId(IdFormat.pastryMaterialSubVariantAddOnIdFormat, IdFormat.idNumLength, lastSubVariantAddOnId);
+            newSubVariantAddOnId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantAddOn, IdFormat.IdNumbersLength, lastSubVariantAddOnId);
             return newSubVariantAddOnId;
         }
-
-
-    }
-    public class Iterators
-    {
-        public static IEnumerable<DateTime> LoopThroughMonths(DateTime start, DateTime end)
-        {
-            DateTime startDate = new DateTime(start.Year, start.Month, 1);
-            DateTime endDate = new DateTime(end.Year, end.Month, 1);
-
-            for (DateTime i = startDate; i <= endDate; i.AddMonths(1)) yield return i;
-        }
     }
 
-    public class Page
-    {
-        public static int DefaultStartingPageNumber = 1;
-        public static int DefaultNumberOfEntriesPerPage = 10;
-    }
     public class ValidUnits
     {
         public static Dictionary<string, List<string>> ValidMeasurementUnits()
@@ -223,23 +251,6 @@ namespace BillOfMaterialsAPI.Helpers
             return "";
         }
     }
-
-    public class InventorySubtractorInfo
-    {
-
-        public string AmountQuantityType;
-        public string AmountUnit;
-        public double Amount;
-
-        public InventorySubtractorInfo() { }
-        public InventorySubtractorInfo(string amountQuantityType, string amountUnit, double amount)
-        {
-            this.AmountQuantityType = amountQuantityType;
-            this.AmountUnit = amountUnit;
-            this.Amount = amount;
-        }
-    }
-
     public class DataVerification
     {
         public static async Task<bool> PastryMaterialExistsAsync(string pastry_material_id, DatabaseContext context)
@@ -485,7 +496,6 @@ namespace BillOfMaterialsAPI.Helpers
         }
 
     }
-
     public class DataParser
     {
         public static async Task<GetPastryMaterial> CreatePastryMaterialResponseFromDBRow(PastryMaterials data, DatabaseContext context, KaizenTables kaizenTables)
@@ -555,9 +565,8 @@ namespace BillOfMaterialsAPI.Helpers
                     case IngredientType.InventoryItem:
                         {
                             Item? currentInventoryItemI = null;
-                            try { currentInventoryItemI = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(currentIngredient.item_id)).FirstAsync(); }
+                            try { currentInventoryItemI = await DataRetrieval.GetInventoryItemAsync(currentIngredient.item_id, kaizenTables); }
                             catch { continue; }
-                            if (currentInventoryItemI == null) { continue; }
 
                             newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
                             newSubIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
@@ -615,8 +624,9 @@ namespace BillOfMaterialsAPI.Helpers
                                     {
                                         case IngredientType.InventoryItem:
                                             Item? currentSubMaterialReferencedInventoryItem = null;
-                                            try { currentSubMaterialReferencedInventoryItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                                            try { currentSubMaterialReferencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(materialIngredients.item_id, kaizenTables); }
                                             catch { continue; }
+
                                             if (currentSubMaterialReferencedInventoryItem == null) { continue; }
                                             else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; }
                                             break;
@@ -650,8 +660,8 @@ namespace BillOfMaterialsAPI.Helpers
                             foreach (MaterialIngredients subIng in subIngredientsForCurrentIngredient)
                             {
                                 Item? currentReferencedIngredientM = null;
-                                try { currentReferencedIngredientM = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
-                                catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+                                try { currentReferencedIngredientM = await DataRetrieval.GetInventoryItemAsync(subIng.item_id, kaizenTables); }
+                                catch { continue; }
 
                                 string currentIngredientStringId = Convert.ToString(currentReferencedIngredientM.id);
                                 double currentRefItemPrice = currentReferencedIngredientM.price;
@@ -723,9 +733,11 @@ namespace BillOfMaterialsAPI.Helpers
                                     switch (subMaterialIngredientsRow.ingredient_type)
                                     {
                                         case IngredientType.InventoryItem:
+
                                             Item? refItemForSubMatIng = null;
-                                            try { refItemForSubMatIng = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
-                                            catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+                                            try { refItemForSubMatIng = await DataRetrieval.GetInventoryItemAsync(subMaterialIngredientsRow.item_id, kaizenTables); }
+                                            catch (Exception e) { continue; }
+
                                             string currentIngredientStringId = Convert.ToString(refItemForSubMatIng.id);
 
                                             string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
@@ -870,9 +882,8 @@ namespace BillOfMaterialsAPI.Helpers
                         case IngredientType.InventoryItem:
                             {
                                 Item? currentInventoryItemI = null;
-                                try { currentInventoryItemI = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(currentSubVariantIngredient.item_id)).FirstAsync(); }
+                                try { currentInventoryItemI = await DataRetrieval.GetInventoryItemAsync(currentSubVariantIngredient.item_id, kaizenTables); }
                                 catch { continue; }
-                                if (currentInventoryItemI == null) { continue; }
 
                                 newSubVariantIngredientListEntry.item_name = currentInventoryItemI.item_name;
                                 newSubVariantIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
@@ -930,10 +941,9 @@ namespace BillOfMaterialsAPI.Helpers
                                         {
                                             case IngredientType.InventoryItem:
                                                 Item? currentSubMaterialReferencedInventoryItem = null;
-                                                try { currentSubMaterialReferencedInventoryItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                                                try { currentSubMaterialReferencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(materialIngredients.item_id, kaizenTables); }
                                                 catch { continue; }
-                                                if (currentSubMaterialReferencedInventoryItem == null) { continue; }
-                                                else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; }
+                                                newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; 
                                                 break;
                                             case IngredientType.Material:
                                                 Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.isActive == true).FirstAsync();
@@ -965,8 +975,8 @@ namespace BillOfMaterialsAPI.Helpers
                                 foreach (MaterialIngredients subIng in subIngredientsForcurrentSubVariantIngredient)
                                 {
                                     Item? currentReferencedIngredientM = null;
-                                    try { currentReferencedIngredientM = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subIng.item_id)).FirstAsync(); }
-                                    catch (Exception e) { Console.WriteLine("Error in retrieving " + subIng.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+                                    try { currentReferencedIngredientM = await DataRetrieval.GetInventoryItemAsync(subIng.item_id, kaizenTables); }
+                                    catch (Exception e) { continue; }
 
                                     string currentIngredientStringId = Convert.ToString(currentReferencedIngredientM.id);
                                     double currentRefItemPrice = currentReferencedIngredientM.price;
@@ -1039,8 +1049,9 @@ namespace BillOfMaterialsAPI.Helpers
                                         {
                                             case IngredientType.InventoryItem:
                                                 Item? refItemForSubMatIng = null;
-                                                try { refItemForSubMatIng = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(subMaterialIngredientsRow.item_id)).FirstAsync(); }
-                                                catch (Exception e) { Console.WriteLine("Error in retrieving " + subMaterialIngredientsRow.item_id + " on inventory: " + e.GetType().ToString()); continue; }
+                                                try { refItemForSubMatIng = await DataRetrieval.GetInventoryItemAsync(subMaterialIngredientsRow.item_id, kaizenTables); }
+                                                catch (Exception e) { continue; }
+
                                                 string currentIngredientStringId = Convert.ToString(refItemForSubMatIng.id);
 
                                                 string subMatIngRowMeasurement = subMaterialIngredientsRow.amount_measurement;
@@ -1135,6 +1146,39 @@ namespace BillOfMaterialsAPI.Helpers
             response.add_ons = responsePastryMaterialAddOns;
             response.sub_variants = responsePastryMaterialSubVariants;
             response.cost_estimate = calculatedCost;
+
+            return response;
+        }
+        public static async Task<GetDesign> CreateGetDesignResponseFromDbRow(Designs data, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            GetDesign response = new GetDesign();
+
+            response.design_id = data.design_id;
+            response.display_name = data.display_name;
+            response.design_picture_url = data.display_picture_url;
+            response.cake_description = data.cake_description;
+            response.design_tags = new List<GetDesignTag>();
+            response.design_add_ons = new List<GetDesignAddOns>();
+
+            List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == data.design_id && x.DesignTags.isActive == true).ToListAsync();
+            List<DesignAddOns> cakeAddOns = await kaizenTables.DesignAddOns.Include(x => x.AddOns).Where(x => x.isActive == true && x.AddOns.isActive == true && x.design_id.SequenceEqual(data.design_id)).ToListAsync();
+            DesignImage? image;
+            try { image = await context.DesignImage.Where(x => x.isActive == true && x.design_id == data.design_id).FirstAsync(); }
+            catch { image = null; }
+
+            foreach (DesignTagsForCakes currentTag in cakeTags)
+            {
+                if (currentTag.DesignTags != null)
+                {
+                    response.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
+                }
+            }
+            foreach (DesignAddOns currentAddOn in cakeAddOns)
+            {
+                response.design_add_ons.Add(new GetDesignAddOns { add_ons_id = currentAddOn.add_ons_id, add_on_name = currentAddOn.add_on_name, design_add_on_id = currentAddOn.design_add_on_id, price = currentAddOn.price, quantity = currentAddOn.quantity });
+            }
+            if (image != null) { response.display_picture_data = image.picture_data; }
+            else { response.display_picture_data = null; };
 
             return response;
         }
