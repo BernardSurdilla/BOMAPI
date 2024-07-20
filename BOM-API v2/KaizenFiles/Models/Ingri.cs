@@ -4,7 +4,7 @@
     {
         public int Id { get; set; }
 
-        public string itemName { get; set; } = "";
+        public string name { get; set; } = "";
 
 
         public double quantity { get; set; }
@@ -31,13 +31,13 @@
     }
     public class ItemUpdateRequest
     {
-        public string ItemName { get; set; } = "";
+        public string name { get; set; } = "";
         public int QuantityToSubtract { get; set; }
     }
     public class IngriDTO
     {
 
-        public string itemName { get; set; } = "";
+        public string name { get; set; } = "";
 
         public double quantity { get; set; }
 
@@ -53,7 +53,7 @@
     {
         public int Id { get; set; }
 
-        public string itemName { get; set; } = "";
+        public string name { get; set; } = "";
 
         public double quantity { get; set; }
 

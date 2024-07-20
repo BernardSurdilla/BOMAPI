@@ -183,14 +183,6 @@ namespace CRUDFI.Models
         public DateTime? LastModifiedDate { get; set; }
         public bool IsActive { get; set; }
     }
-    public class AddOnDetails
-    {
-        public string name { get; set; }
-        public double pricePerUnit { get; set; }
-        public int quantity { get; set; }
-        public double size { get; set; }
-
-    }
     public class AddOnDetails2
     {
         public string name { get; set; }

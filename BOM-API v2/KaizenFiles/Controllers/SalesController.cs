@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     public class SalesController : ControllerBase
     {
