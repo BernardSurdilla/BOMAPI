@@ -29,7 +29,13 @@ namespace BillOfMaterialsAPI.Helpers
         public const int High = 4;
         public const int Normal = 3;
         public const int Low = 2;
-        public const int Ignorable = 1;
+        public const int VeryLow = 1;
+    }
+    public static class PastryMaterialRecipeStatus
+    {
+        public const int AllIngredientsAvailable = 1;
+        public const int OneIngredientOutOfStock = 2;
+        public const int TwoOrMoreIngredientsOutOfStock = 2;
     }
     public class Page
     {
@@ -51,9 +57,9 @@ namespace BillOfMaterialsAPI.Helpers
     public class InventorySubtractorInfo
     {
 
-        public string AmountQuantityType;
-        public string AmountUnit;
-        public double Amount;
+        public string AmountQuantityType { get; set; }
+        public string AmountUnit { get; set; }
+        public double Amount { get; set; }
 
         public InventorySubtractorInfo() { }
         public InventorySubtractorInfo(string amountQuantityType, string amountUnit, double amount)
@@ -314,6 +320,33 @@ namespace BillOfMaterialsAPI.Helpers
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
             catch (InvalidOperationException exO) { return false; }
+        }
+
+        //Used to check the status of the recipe
+        public static async Task<int[]> PastryMaterialRecipeStatus(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            int[] response = [];
+
+            PastryMaterials? selectedPastryMaterial = null;
+            PastryMaterialSubVariants? selectedPastryMaterialSubVariant = null;
+
+            try { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(variant_id, context); }
+            catch (NotFoundInDatabaseException e) { }
+            try { selectedPastryMaterialSubVariant = await DataRetrieval.GetPastryMaterialSubVariantAsync(variant_id, context); }
+            catch (NotFoundInDatabaseException e) { }
+
+            if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant == null) { throw new NotFoundInDatabaseException(variant_id + " does not exist in both pastry material and the subvariant tables"); }
+
+            if (selectedPastryMaterialSubVariant != null)
+            {
+
+            }
+            else
+            {
+                
+            }
+
+            return response;
         }
     }
     public class DataRetrieval
@@ -1182,8 +1215,274 @@ namespace BillOfMaterialsAPI.Helpers
 
             return response;
         }
+        public static async Task<Dictionary<string, InventorySubtractorInfo>> GetTotalIngredientAmountList(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            Dictionary<string, InventorySubtractorInfo> response = new Dictionary<string, InventorySubtractorInfo>();
+
+            PastryMaterials? selectedPastryMaterial = null;
+            PastryMaterialSubVariants? selectedPastryMaterialSubVariant = null;
+
+            try { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(variant_id, context); }
+            catch (NotFoundInDatabaseException e) { }
+            try { selectedPastryMaterialSubVariant = await DataRetrieval.GetPastryMaterialSubVariantAsync(variant_id, context); }
+            catch (NotFoundInDatabaseException e) { }
+
+            if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant == null) { throw new NotFoundInDatabaseException(variant_id + " does not exist in both pastry material and the subvariant tables"); }
+            if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant != null) { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(selectedPastryMaterialSubVariant.pastry_material_id, context); }
+            if (selectedPastryMaterial == null) { throw new NotFoundInDatabaseException(variant_id + " exist in subvariant table, but the base pastry material it points to does not exist"); }
+
+            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
+
+            List<Ingredients> baseIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
+            foreach (Ingredients currentBaseIngredient in baseIngredients)
+            {
+                //Check if the measurement unit in the ingredient record is valid
+                //If not found, skip current ingredient
+                string? amountQuantityType = null;
+                string? amountUnitMeasurement = null;
+
+                bool isAmountMeasurementValid = false;
+                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                {
+                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(currentBaseIngredient.amount_measurement));
+
+                    if (currentMeasurement == null) { continue; }
+                    else
+                    {
+                        isAmountMeasurementValid = true;
+                        amountQuantityType = unitQuantity;
+                        amountUnitMeasurement = currentMeasurement;
+                    }
+
+                }
+                if (isAmountMeasurementValid == false) { throw new AmountMeasurementInvalidException("The measurement of the pastry ingredient with the id " + currentBaseIngredient.ingredient_id + " is not valid."); }
+
+                switch (currentBaseIngredient.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        {
+                            //Find the referred item
+                            Item? currentRefInvItem = null;
+                            try
+                            { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentBaseIngredient.item_id, kaizenTables); }
+                            catch (FormatException e) { throw new FormatException("The pastry ingredient with the type of " + IngredientType.InventoryItem + " and the ingredient id " + currentBaseIngredient.ingredient_id + " cannot be parsed as an integer"); }
+                            catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The pastry ingredient with the type of " + IngredientType.InventoryItem + " and the item id " + currentBaseIngredient.item_id + " does not exist in the inventory"); }
+
+                            string currentItemMeasurement = currentBaseIngredient.amount_measurement;
+                            double currentItemAmount = currentBaseIngredient.amount;
+
+                            //Calculate the value to subtract here
+                            InventorySubtractorInfo? inventorySubtractorInfoForCurrentBaseIngredient = null;
+                            response.TryGetValue(currentBaseIngredient.item_id, out inventorySubtractorInfoForCurrentBaseIngredient);
+
+                            if (inventorySubtractorInfoForCurrentBaseIngredient == null)
+                            {
+                                response.Add(currentBaseIngredient.item_id, new InventorySubtractorInfo(amountQuantityType, amountUnitMeasurement, currentBaseIngredient.amount));
+                            }
+                            else
+                            {
+                                if (inventorySubtractorInfoForCurrentBaseIngredient.AmountUnit == currentItemMeasurement) { inventorySubtractorInfoForCurrentBaseIngredient.Amount += currentItemAmount; }
+                                else
+                                {
+                                    double amountInRecordedUnit = UnitConverter.ConvertByName(currentItemAmount, inventorySubtractorInfoForCurrentBaseIngredient.AmountQuantityType, currentItemMeasurement, inventorySubtractorInfoForCurrentBaseIngredient.AmountUnit);
+                                    inventorySubtractorInfoForCurrentBaseIngredient.Amount += amountInRecordedUnit;
+                                }
+                            }
+                            break;
+                        }
+                    case IngredientType.Material:
+                        {
+                            List<MaterialIngredients> currentMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentBaseIngredient.item_id).ToListAsync();
+
+                            //This block loops thru the retrieved ingredients above
+                            //And adds all sub-ingredients for the "MAT" type entries
+                            int currentIndex = 0;
+                            bool running = true;
+                            while (running)
+                            {
+                                MaterialIngredients? currentMatIngInLoop = null;
+                                try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
+                                catch { running = false; break; }
+
+                                if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
+                                {
+                                    List<MaterialIngredients> newEntriesToLoopThru = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_ingredient_id == currentMatIngInLoop.material_ingredient_id).ToListAsync();
+                                    currentMaterialIngredients.AddRange(newEntriesToLoopThru);
+                                }
+                                currentIndex += 1;
+                            }
+
+                            //Removes all the entries for the material
+                            //As the sub-ingredients for them is already in the list
+                            currentMaterialIngredients.RemoveAll(x => x.ingredient_type == IngredientType.Material);
+
+                            //Loop through the retrieved ingredients, then add them into the list of items to be subtracted in the inventory
+                            foreach (MaterialIngredients currentMaterialIngredient in currentMaterialIngredients)
+                            {
+                                //Find the referred item
+                                Item? currentRefInvItem = null;
+                                try
+                                { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentMaterialIngredient.item_id, kaizenTables); }
+                                catch (FormatException e) { throw new FormatException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ", failed to parse its item id " + currentMaterialIngredient.item_id + " as an integer"); }
+                                catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ",  its item id " + currentMaterialIngredient.item_id + " does not refer to any active inventory record"); }
+
+                                string currentItemMeasurement = currentMaterialIngredient.amount_measurement;
+                                double currentItemAmount = currentMaterialIngredient.amount;
+
+                                //Calculate the value to subtract here
+                                InventorySubtractorInfo? inventorySubtractorInfoForCurrentBaseIngredient = null;
+                                response.TryGetValue(currentBaseIngredient.item_id, out inventorySubtractorInfoForCurrentBaseIngredient);
+                                if (inventorySubtractorInfoForCurrentBaseIngredient == null)
+                                {
+                                    response.Add(currentBaseIngredient.item_id, new InventorySubtractorInfo(amountQuantityType, amountUnitMeasurement, currentBaseIngredient.amount));
+                                }
+                                else
+                                {
+                                    if (inventorySubtractorInfoForCurrentBaseIngredient.AmountUnit == currentItemMeasurement) { inventorySubtractorInfoForCurrentBaseIngredient.Amount += currentItemAmount; }
+                                    else
+                                    {
+                                        double amountInRecordedUnit = UnitConverter.ConvertByName(currentItemAmount, inventorySubtractorInfoForCurrentBaseIngredient.AmountQuantityType, currentItemMeasurement, inventorySubtractorInfoForCurrentBaseIngredient.AmountUnit);
+                                        inventorySubtractorInfoForCurrentBaseIngredient.Amount += amountInRecordedUnit;
+                                    }
+                                }
+                                break;
+                            }
+                            break;
+                        }
+                }
+            }
+
+            if (selectedPastryMaterialSubVariant != null)
+            {
+                List<PastryMaterialSubVariantIngredients> currentVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == selectedPastryMaterialSubVariant.pastry_material_sub_variant_id).ToListAsync();
+
+                foreach (PastryMaterialSubVariantIngredients currentSubVariantIngredient in currentVariantIngredients)
+                {
+                    //Check if the measurement unit in the ingredient record is valid
+                    //If not found, skip current ingredient
+                    string? amountQuantityType = null;
+                    string? amountUnitMeasurement = null;
+
+                    bool isAmountMeasurementValid = false;
+                    foreach (string unitQuantity in validMeasurementUnits.Keys)
+                    {
+                        List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                        string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(currentSubVariantIngredient.amount_measurement));
+
+                        if (currentMeasurement == null) { continue; }
+                        else
+                        {
+                            isAmountMeasurementValid = true;
+                            amountQuantityType = unitQuantity;
+                            amountUnitMeasurement = currentMeasurement;
+                        }
+                    }
+                    if (isAmountMeasurementValid == false) { throw new AmountMeasurementInvalidException("The measurement of the pastry material sub variant ingredient with the id " + currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id + " is not valid."); }
+
+                    switch (currentSubVariantIngredient.ingredient_type)
+                    {
+                        case IngredientType.InventoryItem:
+                            {
+                                //Find the referred item
+                                Item? currentRefInvItem = null;
+                                try
+                                { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentSubVariantIngredient.item_id, kaizenTables); }
+                                catch (FormatException e) { throw new FormatException("The pastry sub variant ingredient with the type of " + IngredientType.InventoryItem + " and the ingredient id " + currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id + " cannot be parsed as an integer"); }
+                                catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The pastry sub variant ingredient with the type of " + IngredientType.InventoryItem + " and the item id " + currentSubVariantIngredient.item_id + " does not exist in the inventory"); }
+
+                                string currentItemMeasurement = currentSubVariantIngredient.amount_measurement;
+                                double currentItemAmount = currentSubVariantIngredient.amount;
+
+                                //Calculate the value to subtract here
+                                InventorySubtractorInfo? inventorySubtractorInfoForCurrentIngredient = null;
+                                response.TryGetValue(currentSubVariantIngredient.item_id, out inventorySubtractorInfoForCurrentIngredient);
+
+                                if (inventorySubtractorInfoForCurrentIngredient == null)
+                                {
+                                    response.Add(currentSubVariantIngredient.item_id, new InventorySubtractorInfo(amountQuantityType, amountUnitMeasurement, currentSubVariantIngredient.amount));
+                                }
+                                else
+                                {
+                                    if (inventorySubtractorInfoForCurrentIngredient.AmountUnit == currentItemMeasurement) { inventorySubtractorInfoForCurrentIngredient.Amount += currentItemAmount; }
+                                    else
+                                    {
+                                        double amountInRecordedUnit = UnitConverter.ConvertByName(currentItemAmount, inventorySubtractorInfoForCurrentIngredient.AmountQuantityType, currentItemMeasurement, inventorySubtractorInfoForCurrentIngredient.AmountUnit);
+                                        inventorySubtractorInfoForCurrentIngredient.Amount += amountInRecordedUnit;
+                                    }
+                                }
+                                break;
+                            }
+                        case IngredientType.Material:
+                            {
+                                List<MaterialIngredients> currentMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentSubVariantIngredient.item_id).ToListAsync();
+
+                                //This block loops thru the retrieved ingredients above
+                                //And adds all sub-ingredients for the "MAT" type entries
+                                int currentIndex = 0;
+                                bool running = true;
+                                while (running)
+                                {
+                                    MaterialIngredients? currentMatIngInLoop = null;
+                                    try { currentMatIngInLoop = currentMaterialIngredients.ElementAt(currentIndex); }
+                                    catch { running = false; break; }
+
+                                    if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
+                                    {
+                                        List<MaterialIngredients> newEntriesToLoopThru = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_ingredient_id == currentMatIngInLoop.material_ingredient_id).ToListAsync();
+                                        currentMaterialIngredients.AddRange(newEntriesToLoopThru);
+                                    }
+                                    currentIndex += 1;
+                                }
+
+                                //Removes all the entries for the material
+                                //As the sub-ingredients for them is already in the list
+                                currentMaterialIngredients.RemoveAll(x => x.ingredient_type == IngredientType.Material);
+
+                                //Loop through the retrieved ingredients, then add them into the list of items to be subtracted in the inventory
+                                foreach (MaterialIngredients currentMaterialIngredient in currentMaterialIngredients)
+                                {
+                                    //Find the referred item
+                                    Item? currentRefInvItem = null;
+                                    try
+                                    { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentMaterialIngredient.item_id, kaizenTables); }
+                                    catch (FormatException e) { throw new FormatException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ", failed to parse its item id " + currentMaterialIngredient.item_id + " as an integer"); }
+                                    catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ",  its item id " + currentMaterialIngredient.item_id + " does not refer to any active inventory record" ); }
+
+                                    string currentItemMeasurement = currentMaterialIngredient.amount_measurement;
+                                    double currentItemAmount = currentMaterialIngredient.amount;
+
+                                    //Calculate the value to subtract here
+                                    InventorySubtractorInfo? inventorySubtractorInfoForCurrentIngredient = null;
+                                    response.TryGetValue(currentSubVariantIngredient.item_id, out inventorySubtractorInfoForCurrentIngredient);
+                                    if (inventorySubtractorInfoForCurrentIngredient == null)
+                                    {
+                                        response.Add(currentSubVariantIngredient.item_id, new InventorySubtractorInfo(amountQuantityType, amountUnitMeasurement, currentSubVariantIngredient.amount));
+                                    }
+                                    else
+                                    {
+                                        if (inventorySubtractorInfoForCurrentIngredient.AmountUnit == currentItemMeasurement) { inventorySubtractorInfoForCurrentIngredient.Amount += currentItemAmount; }
+                                        else
+                                        {
+                                            double amountInRecordedUnit = UnitConverter.ConvertByName(currentItemAmount, inventorySubtractorInfoForCurrentIngredient.AmountQuantityType, currentItemMeasurement, inventorySubtractorInfoForCurrentIngredient.AmountUnit);
+                                            inventorySubtractorInfoForCurrentIngredient.Amount += amountInRecordedUnit;
+                                        }
+                                    }
+                                    break;
+                                }
+                                break;
+                            }
+                    }
+                }
+            }
+
+            return response;
+        }
     }
 
     //Exceptions
     public class NotFoundInDatabaseException : Exception { public NotFoundInDatabaseException(string message) : base(message) { } }
+    public class AmountMeasurementInvalidException : Exception { public AmountMeasurementInvalidException(string message) : base(message) { } }
 }

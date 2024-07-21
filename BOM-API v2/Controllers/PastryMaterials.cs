@@ -27,9 +27,8 @@ namespace BOM_API_v2.Controllers
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
         private readonly IActionLogger _actionLogger;
-        private readonly ICakePriceCalculator _cakePriceCalculator;
 
-        public PastryMaterialController(DatabaseContext context, KaizenTables kaizen, IActionLogger logs, ICakePriceCalculator cakePriceCalculator) { _context = context; _actionLogger = logs; _kaizenTables = kaizen; _cakePriceCalculator = cakePriceCalculator; }
+        public PastryMaterialController(DatabaseContext context, KaizenTables kaizen, IActionLogger logs, ICakePriceCalculator cakePriceCalculator) { _context = context; _actionLogger = logs; _kaizenTables = kaizen; }
 
         //GET
         [HttpGet]
