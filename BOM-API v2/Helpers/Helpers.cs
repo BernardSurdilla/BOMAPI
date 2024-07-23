@@ -23,7 +23,7 @@ namespace BillOfMaterialsAPI.Helpers
 
         public const string Logs = "LOG";
     }
-    public static class PastryMaterialIngredientImportance
+    public static class PastryMaterialIngredientImportanceCode
     {
         public const int Critical = 5;
         public const int High = 4;
@@ -34,8 +34,25 @@ namespace BillOfMaterialsAPI.Helpers
     public static class PastryMaterialRecipeStatus
     {
         public const int AllIngredientsAvailable = 1;
+
         public const int OneIngredientOutOfStock = 2;
-        public const int TwoOrMoreIngredientsOutOfStock = 2;
+        public const int TwoOrMoreIngredientsOutOfStock = 3;
+
+        public const int OneCriticalImportanceIngredientLowOnStock = 4;
+        public const int TwoOrMoreCriticalImportanceIngredientsLowOnStock = 5;
+
+        public const int OneHighImportanceIngredientLowOnStock = 6;
+        public const int TwoOrMoreHighImportanceIngredientsLowOnStock = 7;
+
+        public const int OneNormalImportanceIngredientLowOnStock = 8;
+        public const int TwoOrMoreNormalImportanceIngredientsLowOnStock = 9;
+
+        public const int OneLowImportanceIngredientLowOnStock = 10;
+        public const int TwoOrMoreLowImportanceIngredientsLowOnStock = 11;
+
+        public const int OneVeryLowImportanceIngredientLowOnStock = 12;
+        public const int TwoOrMoreVeryLowImportanceIngredientsLowOnStock = 13;
+
     }
     public class Page
     {
@@ -336,16 +353,227 @@ namespace BillOfMaterialsAPI.Helpers
             catch (NotFoundInDatabaseException e) { }
 
             if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant == null) { throw new NotFoundInDatabaseException(variant_id + " does not exist in both pastry material and the subvariant tables"); }
+            if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant != null) { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(selectedPastryMaterialSubVariant.pastry_material_id, context); }
+            if (selectedPastryMaterial == null) { throw new NotFoundInDatabaseException(variant_id + " exist in subvariant table, but the base pastry material it points to does not exist"); }
 
-            if (selectedPastryMaterialSubVariant != null)
+            List<Ingredients> baseIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
+            List<PastryMaterialSubVariantIngredients>? subVariantIngredients = selectedPastryMaterialSubVariant == null ? 
+                null : 
+                await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == selectedPastryMaterialSubVariant.pastry_material_sub_variant_id).ToListAsync();
+
+            List<PastryMaterialIngredientImportance> ingredientImportanceList = await context.PastryMaterialIngredientImportance.Where(x => x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
+
+            //Code to add PastryMaterialRecipeStatus codes to response here
+
+
+            return response;
+        }
+    }
+    public class DataInsertion
+    {
+        public static async Task<string> AddPastryMaterialIngredient(string pastry_material_id, PostIngredients data, DatabaseContext context)
+        {
+            string response = "";
+
+            string lastPastryMaterialIngredientId = await IdFormat.GetNewestIngredientId(context);
+            await TrackPastryMaterialIngredientForInsertion(lastPastryMaterialIngredientId, pastry_material_id, data, context);
+            response = lastPastryMaterialIngredientId;
+
+            return response;
+        }
+        public static async Task<string> AddPastryMaterialAddOns(string pastry_material_id, PostPastryMaterialAddOns data, DatabaseContext context)
+        {
+            string response = "";
+
+            string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(context);
+            await TrackPastryMaterialAddOnForInsertion(lastPastryMaterialAddOnId, pastry_material_id, data, context);
+            response = lastPastryMaterialAddOnId;
+
+            return response;
+        }
+        public static async Task<string> AddPastryMaterialSubVariantIngredient(string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients data, DatabaseContext context)
+        {
+            string response = "";
+
+            string lastPastryMaterialSubVariantIngredientId = await IdFormat.GetNewestPastryMaterialSubVariantIngredientId(context);
+            await TrackPastyMaterialSubVariantIngredientForInsertion(lastPastryMaterialSubVariantIngredientId, pastry_material_sub_variant_id, data, context);
+            response = lastPastryMaterialSubVariantIngredientId;
+
+            return response;
+        }
+        public static async Task<string> AddPastryMaterialSubVariantAddOn(string pastry_material_sub_variant_id, PostPastryMaterialSubVariantAddOns data, DatabaseContext context)
+        {
+            string response = "";
+
+            string lastPastryMaterialSubVariantAddOnId = await IdFormat.GetNewestPastryMaterialSubVariantAddOnId(context);
+            await TrackPastyMaterialSubVariantAddOnForInsertion(lastPastryMaterialSubVariantAddOnId, pastry_material_sub_variant_id, data, context);
+            response = lastPastryMaterialSubVariantAddOnId;
+
+            return response;
+        }
+
+        public static async Task<List<string>> AddPastryMaterialIngredient(string pastry_material_id, List<PostIngredients> data, DatabaseContext context)
+        {
+            List<string> response = new List<string>();
+            if (data.IsNullOrEmpty()) { return response; }
+
+            string lastPastryMaterialIngredientId = await IdFormat.GetNewestIngredientId(context);
+            response.Add(lastPastryMaterialIngredientId);
+            foreach (PostIngredients ingredient in data)
             {
+                string newId = await TrackPastryMaterialIngredientForInsertion(lastPastryMaterialIngredientId, pastry_material_id, ingredient, context);
+                lastPastryMaterialIngredientId = newId;
 
+                response.Add(newId);
             }
-            else
+
+            return response;
+        }
+        public static async Task<List<string>> AddPastryMaterialAddOns(string pastry_material_id, List<PostPastryMaterialAddOns> data, DatabaseContext context)
+        {
+            List<string> response = new List<string>();
+            if (data.IsNullOrEmpty()) { return response; }
+
+            string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(context);
+            response.Add(lastPastryMaterialAddOnId);
+            foreach (PostPastryMaterialAddOns addOn in data)
             {
-                
+                string newId = await TrackPastryMaterialAddOnForInsertion(lastPastryMaterialAddOnId, pastry_material_id, addOn, context);
+                lastPastryMaterialAddOnId = newId;
+
+                response.Add(newId);
             }
 
+            return response;
+        }
+        public static async Task<List<string>> AddPastryMaterialSubVariantIngredient(string pastry_material_sub_variant_id, List<PostPastryMaterialSubVariantIngredients> data, DatabaseContext context)
+        {
+            List<string> response = new List<string>();
+            if (data.IsNullOrEmpty()) { return response; }
+
+            string lastPastryMaterialSubVariantIngredientId = await IdFormat.GetNewestPastryMaterialSubVariantIngredientId(context);
+            response.Add(lastPastryMaterialSubVariantIngredientId);
+            foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in data)
+            {
+                string newId = await TrackPastyMaterialSubVariantIngredientForInsertion(lastPastryMaterialSubVariantIngredientId, pastry_material_sub_variant_id, subVariantIngredient, context);
+                lastPastryMaterialSubVariantIngredientId = newId;
+
+                response.Add(newId);
+            }
+
+            return response;
+        }
+        public static async Task<List<string>> AddPastryMaterialSubVariantAddOn(string pastry_material_sub_variant_id, List<PostPastryMaterialSubVariantAddOns> data, DatabaseContext context)
+        {
+            List<string> response = new List<string>();
+            if (data.IsNullOrEmpty()) { return response; }
+
+            string lastPastryMaterialSubVariantAddOnId = await IdFormat.GetNewestPastryMaterialSubVariantAddOnId(context);
+            response.Add(lastPastryMaterialSubVariantAddOnId);
+            foreach (PostPastryMaterialSubVariantAddOns subVariantAddOn in data)
+            {
+                string newId = await TrackPastyMaterialSubVariantAddOnForInsertion(lastPastryMaterialSubVariantAddOnId, pastry_material_sub_variant_id, subVariantAddOn, context);
+                lastPastryMaterialSubVariantAddOnId = newId;
+
+                response.Add(newId);
+            }
+
+            return response;
+        }
+
+        private static async Task<string> TrackPastryMaterialIngredientForInsertion(string ingredient_id, string pastry_material_id, PostIngredients data, DatabaseContext context)
+        {
+            string response = "";
+
+            Ingredients newIngredientsEntry = new Ingredients();
+            DateTime currentTime = DateTime.Now;
+
+            newIngredientsEntry.ingredient_id = ingredient_id;
+
+            newIngredientsEntry.pastry_material_id = pastry_material_id;
+
+            newIngredientsEntry.item_id = data.item_id;
+            newIngredientsEntry.ingredient_type = data.ingredient_type;
+
+            newIngredientsEntry.amount = data.amount;
+            newIngredientsEntry.amount_measurement = data.amount_measurement;
+            newIngredientsEntry.isActive = true;
+            newIngredientsEntry.date_added = currentTime;
+            newIngredientsEntry.last_modified_date = currentTime;
+
+            await context.Ingredients.AddAsync(newIngredientsEntry);
+
+            response = IdFormat.IncrementId(IdPrefix.Ingredient, IdFormat.IdNumbersLength, ingredient_id);
+            return response;
+        }
+        private static async Task<string> TrackPastryMaterialAddOnForInsertion(string pastry_material_add_on_id, string pastry_material_id, PostPastryMaterialAddOns data, DatabaseContext context)
+        {
+            string response = "";
+
+            PastryMaterialAddOns newAddOnEntry = new PastryMaterialAddOns();
+            DateTime currentTime = DateTime.Now;
+
+            newAddOnEntry.pastry_material_add_on_id = pastry_material_add_on_id;
+
+            newAddOnEntry.pastry_material_id = pastry_material_id;
+            newAddOnEntry.add_ons_id = data.add_ons_id;
+            newAddOnEntry.amount = data.amount;
+
+            newAddOnEntry.isActive = true;
+            newAddOnEntry.date_added = currentTime;
+            newAddOnEntry.last_modified_date = currentTime;
+
+            await context.PastryMaterialAddOns.AddAsync(newAddOnEntry);
+
+            response = IdFormat.IncrementId(IdPrefix.PastryMaterialAddOn, IdFormat.IdNumbersLength, pastry_material_add_on_id);
+            return response;
+        }
+        private static async Task<string> TrackPastyMaterialSubVariantIngredientForInsertion(string pastry_material_sub_variant_ingredient_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients data, DatabaseContext context)
+        {
+            string response = "";
+
+            PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
+            DateTime currentTime = DateTime.Now;
+
+            newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = pastry_material_sub_variant_ingredient_id;
+
+            newSubVariantIngredient.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
+
+            newSubVariantIngredient.item_id = data.item_id;
+            newSubVariantIngredient.ingredient_type = data.ingredient_type;
+            newSubVariantIngredient.amount = data.amount;
+            newSubVariantIngredient.amount_measurement = data.amount_measurement;
+
+            newSubVariantIngredient.date_added = currentTime;
+            newSubVariantIngredient.last_modified_date = currentTime;
+            newSubVariantIngredient.isActive = true;
+
+
+            await context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
+
+            response = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantIngredient, IdFormat.IdNumbersLength, pastry_material_sub_variant_ingredient_id);
+            return response;
+        }
+        private static async Task<string> TrackPastyMaterialSubVariantAddOnForInsertion(string pastry_material_sub_variant_add_on_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantAddOns data, DatabaseContext context)
+        {
+            string response = "";
+
+            PastryMaterialSubVariantAddOns newSubVariantAddOn = new PastryMaterialSubVariantAddOns();
+            DateTime currentTime = DateTime.Now;
+
+            newSubVariantAddOn.pastry_material_sub_variant_add_on_id = pastry_material_sub_variant_add_on_id;
+            newSubVariantAddOn.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
+
+            newSubVariantAddOn.add_ons_id = data.add_ons_id;
+            newSubVariantAddOn.amount = data.amount;
+
+            newSubVariantAddOn.date_added = currentTime;
+            newSubVariantAddOn.last_modified_date = currentTime;
+            newSubVariantAddOn.isActive = true;
+
+            await context.PastryMaterialSubVariantAddOns.AddAsync(newSubVariantAddOn);
+
+            response = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantAddOn, IdFormat.IdNumbersLength, pastry_material_sub_variant_add_on_id);
             return response;
         }
     }
@@ -527,7 +755,6 @@ namespace BillOfMaterialsAPI.Helpers
             catch { throw new NotFoundInDatabaseException("Add on with the id " + Convert.ToString(add_ons_id) + " does not exist."); }
             
         }
-
     }
     public class DataParser
     {
@@ -1215,6 +1442,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             return response;
         }
+
         public static async Task<Dictionary<string, InventorySubtractorInfo>> GetTotalIngredientAmountList(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
         {
             Dictionary<string, InventorySubtractorInfo> response = new Dictionary<string, InventorySubtractorInfo>();

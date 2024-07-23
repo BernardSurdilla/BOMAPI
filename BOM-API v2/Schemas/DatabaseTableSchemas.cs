@@ -67,6 +67,7 @@ namespace BillOfMaterialsAPI.Schemas
         public PastryMaterials PastryMaterials { get; set; }
     }
 
+
     [PrimaryKey("pastry_material_sub_variant_id")]
     public class PastryMaterialSubVariants
     {
@@ -117,6 +118,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
     }
+
     [PrimaryKey("order_ingredient_subtraction_log_id")]
     public class OrderIngredientSubtractionLog
     {
@@ -141,6 +143,22 @@ namespace BillOfMaterialsAPI.Schemas
         public string amount_quantity_type;
         public string amount_unit;
         public double amount;
+    }
+
+    [PrimaryKey("pastry_material_ingredient_importance_id")]
+    public class PastryMaterialIngredientImportance
+    {
+        [Required][Key] public Guid pastry_material_ingredient_importance_id { get; set; }
+        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
+
+        [Required] public string item_id { get; set; }
+        [Required] public string ingredient_type { get; set; }
+        [Required] public int importance { get; set; }
+
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+
+        public PastryMaterials PastryMaterials { get; set; }
     }
 
     //Pastry ingredients that is made from a combination of 2 or more items

@@ -273,51 +273,10 @@ namespace BOM_API_v2.Controllers
             await _context.PastryMaterials.AddAsync(newPastryMaterialEntry);
             await _context.SaveChangesAsync();
 
-            string lastIngredientId = await IdFormat.GetNewestIngredientId(_context);
-            string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(_context); 
+            string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(_context);
 
-            foreach (PostIngredients entry in newEntry.ingredients)
-            {
-                Ingredients newIngredientsEntry = new Ingredients();
-
-                newIngredientsEntry.ingredient_id = lastIngredientId;
-                string newId = IdFormat.IncrementId(IdPrefix.Ingredient, IdFormat.IdNumbersLength, lastIngredientId);
-                lastIngredientId = newId;
-
-                newIngredientsEntry.pastry_material_id = newPastryMaterialId;
-
-                newIngredientsEntry.item_id = entry.item_id;
-                newIngredientsEntry.ingredient_type = entry.ingredient_type;
-
-                newIngredientsEntry.amount = entry.amount;
-                newIngredientsEntry.amount_measurement = entry.amount_measurement;
-                newIngredientsEntry.isActive = true;
-                newIngredientsEntry.date_added = currentTime;
-                newIngredientsEntry.last_modified_date = currentTime;
-
-                await _context.Ingredients.AddAsync(newIngredientsEntry);
-            }
-            if (newEntry.add_ons != null)
-            {
-                foreach (PostPastryMaterialAddOns entryAddOn in newEntry.add_ons)
-                {
-                    PastryMaterialAddOns newAddOnEntry = new PastryMaterialAddOns();
-
-                    newAddOnEntry.pastry_material_add_on_id = lastPastryMaterialAddOnId;
-                    string newId = IdFormat.IncrementId(IdPrefix.PastryMaterialAddOn, IdFormat.IdNumbersLength, lastPastryMaterialAddOnId);
-                    lastPastryMaterialAddOnId = newId;
-
-                    newAddOnEntry.pastry_material_id = newPastryMaterialId;
-                    newAddOnEntry.add_ons_id = entryAddOn.add_ons_id;
-                    newAddOnEntry.amount = entryAddOn.amount;
-
-                    newAddOnEntry.isActive = true;
-                    newAddOnEntry.date_added = currentTime;
-                    newAddOnEntry.last_modified_date = currentTime;
-
-                    await _context.PastryMaterialAddOns.AddAsync(newAddOnEntry);
-                }
-            }
+            await DataInsertion.AddPastryMaterialIngredient(newPastryMaterialId, newEntry.ingredients, _context);
+            if (newEntry.add_ons.IsNullOrEmpty() == false) await DataInsertion.AddPastryMaterialAddOns(newPastryMaterialId, newEntry.add_ons, _context);
 
             await _context.SaveChangesAsync();
 
@@ -338,53 +297,9 @@ namespace BOM_API_v2.Controllers
                     await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
                     await _context.SaveChangesAsync();
 
-                    string lastSubVariantIngredientId = await IdFormat.GetNewestPastryMaterialSubVariantIngredientId(_context);
-                    string lastSubVariantAddOnId = await IdFormat.GetNewestPastryMaterialSubVariantAddOnId(_context);
-
-                    foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry_sub_variant.sub_variant_ingredients)
-                    {
-                        PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
-
-                        newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = lastSubVariantIngredientId;
-                        string newId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantIngredient, IdFormat.IdNumbersLength, lastSubVariantIngredientId);
-                        lastSubVariantIngredientId = newId;
-
-                        newSubVariantIngredient.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
-
-                        newSubVariantIngredient.item_id = subVariantIngredient.item_id;
-                        newSubVariantIngredient.ingredient_type = subVariantIngredient.ingredient_type;
-                        newSubVariantIngredient.amount = subVariantIngredient.amount;
-                        newSubVariantIngredient.amount_measurement = subVariantIngredient.amount_measurement;
-
-                        newSubVariantIngredient.date_added = currentTime;
-                        newSubVariantIngredient.last_modified_date = currentTime;
-                        newSubVariantIngredient.isActive = true;
-
-
-                        await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
-                    }
-                    if (entry_sub_variant.sub_variant_add_ons != null)
-                    {
-                        foreach (PostPastryMaterialSubVariantAddOns subVariantAddOn in entry_sub_variant.sub_variant_add_ons)
-                        {
-                            PastryMaterialSubVariantAddOns newSubVariantAddOn = new PastryMaterialSubVariantAddOns();
-
-                            newSubVariantAddOn.pastry_material_sub_variant_add_on_id = lastSubVariantAddOnId;
-                            string newId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantAddOn, IdFormat.IdNumbersLength, lastSubVariantAddOnId);
-                            lastSubVariantAddOnId = newId;
-
-                            newSubVariantAddOn.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
-
-                            newSubVariantAddOn.add_ons_id = subVariantAddOn.add_ons_id;
-                            newSubVariantAddOn.amount = subVariantAddOn.amount;
-
-                            newSubVariantAddOn.date_added = currentTime;
-                            newSubVariantAddOn.last_modified_date = currentTime;
-                            newSubVariantAddOn.isActive = true;
-
-                            await _context.PastryMaterialSubVariantAddOns.AddAsync(newSubVariantAddOn);
-                        }
-                    }
+                    await DataInsertion.AddPastryMaterialSubVariantIngredient(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_ingredients, _context);
+                    if (entry_sub_variant.sub_variant_add_ons.IsNullOrEmpty() == false) await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_add_ons, _context);
+                    
                 }
             }
             await _context.SaveChangesAsync();
@@ -427,27 +342,11 @@ namespace BOM_API_v2.Controllers
                 default:
                     return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
             }
-            string lastIngredientId = await IdFormat.GetNewestIngredientId(_context);
 
-            Ingredients newIngredientsEntry = new Ingredients();
-            DateTime currentTime = DateTime.Now;
-
-            newIngredientsEntry.ingredient_id = IdFormat.IncrementId(IdPrefix.Ingredient, IdFormat.IdNumbersLength, lastIngredientId);
-            newIngredientsEntry.pastry_material_id = pastry_material_id;
-
-            newIngredientsEntry.item_id = entry.item_id;
-            newIngredientsEntry.ingredient_type = entry.ingredient_type;
-
-            newIngredientsEntry.amount = entry.amount;
-            newIngredientsEntry.amount_measurement = entry.amount_measurement;
-            newIngredientsEntry.isActive = true;
-            newIngredientsEntry.date_added = currentTime;
-            newIngredientsEntry.last_modified_date = currentTime;
-
-            await _context.Ingredients.AddAsync(newIngredientsEntry);
+            string newIngredientId = await DataInsertion.AddPastryMaterialIngredient(currentPastryMaterial.pastry_material_id, entry, _context);
             await _context.SaveChangesAsync();
 
-            await _actionLogger.LogAction(User, "POST", "Add Ingredient " + newIngredientsEntry.ingredient_id + " to " + pastry_material_id);
+            await _actionLogger.LogAction(User, "POST", "Add Ingredient " + newIngredientId + " to " + pastry_material_id);
             return Ok(new { message = "Data inserted to the database." });
 
         }
@@ -463,21 +362,7 @@ namespace BOM_API_v2.Controllers
             try { selectedAddOn = await DataRetrieval.GetAddOnItemAsync(entry.add_ons_id, _kaizenTables); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(_context);
-
-            PastryMaterialAddOns newAddOnEntry = new PastryMaterialAddOns();
-            DateTime currentTime = DateTime.Now;
-
-            newAddOnEntry.pastry_material_add_on_id = lastPastryMaterialAddOnId;
-            newAddOnEntry.pastry_material_id = currentPastryMaterial.pastry_material_id;
-            newAddOnEntry.add_ons_id = selectedAddOn.add_ons_id;
-            newAddOnEntry.amount = entry.amount;
-
-            newAddOnEntry.isActive = true;
-            newAddOnEntry.date_added = currentTime;
-            newAddOnEntry.last_modified_date = currentTime;
-
-            await _context.PastryMaterialAddOns.AddAsync(newAddOnEntry);
+            string newAddOnId = await DataInsertion.AddPastryMaterialAddOns(pastry_material_id, entry, _context);
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "New add on added to " + pastry_material_id });
@@ -547,51 +432,9 @@ namespace BOM_API_v2.Controllers
             await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
             await _context.SaveChangesAsync();
 
-            string lastSubVariantIngredientId = await IdFormat.GetNewestPastryMaterialSubVariantIngredientId(_context);
-            string lastSubVariantAddOnId = await IdFormat.GetNewestPastryMaterialSubVariantAddOnId(_context);
+            await DataInsertion.AddPastryMaterialSubVariantIngredient(lastPastryMaterialSubVariantId, entry.sub_variant_ingredients, _context);
+            if (entry.sub_variant_add_ons.IsNullOrEmpty() == false) { await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry.sub_variant_add_ons, _context); }
 
-            foreach (PostPastryMaterialSubVariantIngredients subVariantIngredient in entry.sub_variant_ingredients)
-            {
-                PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
-
-                newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = lastSubVariantIngredientId;
-                string newId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantIngredient, IdFormat.IdNumbersLength, lastSubVariantIngredientId);
-                lastSubVariantIngredientId = newId;
-
-                newSubVariantIngredient.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
-
-                newSubVariantIngredient.date_added = currentTime;
-                newSubVariantIngredient.last_modified_date = currentTime;
-                newSubVariantIngredient.isActive = true;
-
-                newSubVariantIngredient.item_id = subVariantIngredient.item_id;
-                newSubVariantIngredient.ingredient_type = subVariantIngredient.ingredient_type;
-                newSubVariantIngredient.amount = subVariantIngredient.amount;
-                newSubVariantIngredient.amount_measurement = subVariantIngredient.amount_measurement;
-
-                await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
-            }
-            if (entry.sub_variant_add_ons != null)
-            {
-                foreach (PostPastryMaterialSubVariantAddOns subVariantAddOn in entry.sub_variant_add_ons)
-                {
-                    PastryMaterialSubVariantAddOns newSubVariantAddOn = new PastryMaterialSubVariantAddOns();
-                    newSubVariantAddOn.pastry_material_sub_variant_add_on_id = lastSubVariantAddOnId;
-                    string newId = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantAddOn, IdFormat.IdNumbersLength, lastSubVariantAddOnId);
-                    lastSubVariantAddOnId = newId;
-
-                    newSubVariantAddOn.pastry_material_sub_variant_id = lastPastryMaterialSubVariantId;
-
-                    newSubVariantAddOn.add_ons_id = subVariantAddOn.add_ons_id;
-                    newSubVariantAddOn.amount = subVariantAddOn.amount;
-
-                    newSubVariantAddOn.date_added = currentTime;
-                    newSubVariantAddOn.last_modified_date = currentTime;
-                    newSubVariantAddOn.isActive = true;
-
-                    await _context.PastryMaterialSubVariantAddOns.AddAsync(newSubVariantAddOn);
-                }
-            }
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "POST", "Add Sub variant " + lastPastryMaterialSubVariantId + " for " + pastry_material_id);
@@ -637,26 +480,7 @@ namespace BOM_API_v2.Controllers
                     return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
             }
 
-            string lastSubVariantIngredientId = await IdFormat.GetNewestPastryMaterialSubVariantIngredientId(_context);
-
-            PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
-
-            DateTime currentTime = DateTime.Now;
-
-            PastryMaterialSubVariantIngredients newSubVariantIngredientEntry = new PastryMaterialSubVariantIngredients();
-            newSubVariantIngredientEntry.pastry_material_sub_variant_ingredient_id = lastSubVariantIngredientId;
-            newSubVariantIngredientEntry.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
-
-            newSubVariantIngredientEntry.item_id = entry.item_id;
-            newSubVariantIngredientEntry.ingredient_type = entry.ingredient_type;
-            newSubVariantIngredientEntry.amount = entry.amount;
-            newSubVariantIngredientEntry.amount_measurement = entry.amount_measurement;
-
-            newSubVariantIngredientEntry.date_added = currentTime;
-            newSubVariantIngredientEntry.last_modified_date = currentTime;
-            newSubVariantIngredientEntry.isActive = true;
-
-            await _context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredientEntry);
+            await DataInsertion.AddPastryMaterialSubVariantIngredient(currentPastryMaterialSubVariant.pastry_material_sub_variant_id, entry, _context);
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "POST", "Add Sub variant ingredient for " + pastry_material_sub_variant_id + " of " + pastry_material_id);
@@ -678,24 +502,8 @@ namespace BOM_API_v2.Controllers
             try { selectedAddOn = await DataRetrieval.GetAddOnItemAsync(entry.add_ons_id, _kaizenTables); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            string lastSubVariantAddOnId = await IdFormat.GetNewestPastryMaterialSubVariantAddOnId(_context);
-
-            DateTime currentTime = DateTime.Now;
-
-            PastryMaterialSubVariantAddOns newPastryMaterialSubVariantAddOn = new PastryMaterialSubVariantAddOns();
-            newPastryMaterialSubVariantAddOn.pastry_material_sub_variant_id = currentPastryMaterialSubVariant.pastry_material_sub_variant_id;
-            newPastryMaterialSubVariantAddOn.pastry_material_sub_variant_add_on_id = lastSubVariantAddOnId;
-
-            newPastryMaterialSubVariantAddOn.add_ons_id = selectedAddOn.add_ons_id;
-            newPastryMaterialSubVariantAddOn.amount = entry.amount;
-
-            newPastryMaterialSubVariantAddOn.isActive = true;
-            newPastryMaterialSubVariantAddOn.date_added = currentTime;
-            newPastryMaterialSubVariantAddOn.last_modified_date = currentTime;
-
-            await _context.PastryMaterialSubVariantAddOns.AddAsync(newPastryMaterialSubVariantAddOn);
+            await DataInsertion.AddPastryMaterialSubVariantAddOn(currentPastryMaterialSubVariant.pastry_material_sub_variant_id, entry, _context);
             await _context.SaveChangesAsync();
-
 
             return Ok(new { message = "New add on inserted to " + pastry_material_sub_variant_id });
         }

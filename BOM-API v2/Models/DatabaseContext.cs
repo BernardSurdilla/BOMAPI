@@ -29,6 +29,7 @@ namespace BillOfMaterialsAPI.Models
 
         public DbSet<IngredientSubtractionHistory> IngredientSubtractionHistory { get; set; }
         public DbSet<OrderIngredientSubtractionLog> OrderIngredientSubtractionLog { get; set; }
+        public DbSet<PastryMaterialIngredientImportance> PastryMaterialIngredientImportance { get; set; }
 
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
