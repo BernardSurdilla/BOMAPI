@@ -258,7 +258,6 @@ namespace BillOfMaterialsAPI.Schemas
 
         public string? design_picture_url { get; set; }
         public byte[]? display_picture_data { get; set; }
-        public List<GetDesignAddOns>? design_add_ons { get; set; }
 
         public List<GetDesignTag>? design_tags { get; set; }
     }
@@ -286,14 +285,6 @@ namespace BillOfMaterialsAPI.Schemas
     public class GetTag
     {
         public string design_tag_name { get; set; }
-    }
-    public class GetDesignAddOns
-    {
-        public int design_add_on_id { get; set; }
-        public int add_ons_id { get; set; }
-        public string add_on_name { get; set; }
-        public int quantity { get; set; }
-        public double price { get; set; }
     }
 
     //UI Helpers

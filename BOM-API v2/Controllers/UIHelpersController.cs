@@ -1,14 +1,9 @@
 ﻿using BillOfMaterialsAPI.Helpers;
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using System.Text.Json;
-using UnitsNet;
-using ZstdSharp.Unsafe;
 
 namespace BOM_API_v2.Controllers
 {

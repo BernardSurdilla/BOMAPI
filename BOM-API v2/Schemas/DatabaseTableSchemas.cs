@@ -280,23 +280,6 @@ namespace BillOfMaterialsAPI.Schemas
 
         public string measurements { get; set; }
     }
-    [PrimaryKey("design_add_on_id")]
-    [Table("DesignAddOns")]
-    public class DesignAddOns
-    {
-        [Column("DesignAddOnId")][Key] public int design_add_on_id { get; set; }
-        [Column("DesignId")][ForeignKey("Designs")] public byte[] design_id { get; set; }
-        [Column("AddOnsId")][ForeignKey("AddOns")] public int add_ons_id { get; set; }
-        [Column("AddOnName")] public string add_on_name { get; set; }
-        [Column("Quantity")] public int quantity { get; set; }
-        [Column("Price")] public double price { get; set; }
-        [Column("DateAdded")] public DateTime date_added { get; set; }
-        [Column("LastModifiedDate")] public DateTime last_modified_date { get; set; }
-        public bool isActive { get; set; }
-
-        public Designs Designs { get; set; }
-        public AddOns AddOns { get; set; }
-    }
     [PrimaryKey("add_ons_id")]
     [Table("addOns")]
     public class AddOns

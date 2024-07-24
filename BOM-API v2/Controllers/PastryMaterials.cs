@@ -7,15 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Diagnostics;
-using System.Text;
-using UnitsNet;
 using BOM_API_v2.Services;
-using System.Runtime.CompilerServices;
-using Castle.Components.DictionaryAdapter.Xml;
-using System.Text.Json;
-using Microsoft.Identity.Client;
-using ZstdSharp.Unsafe;
 
 namespace BOM_API_v2.Controllers
 {

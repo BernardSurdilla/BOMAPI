@@ -7,17 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Linq.Expressions;
-using Microsoft.AspNetCore.Components.Forms;
-using Microsoft.AspNetCore.Components.Web;
-using System.Diagnostics;
 using BOM_API_v2.Services;
-using System.Linq;
-using System.Text;
-using Microsoft.EntityFrameworkCore.Internal;
-using UnitsNet;
-using System.Text.Json;
-
 
 namespace BOM_API_v2.Controllers
 {
@@ -235,7 +225,6 @@ namespace BOM_API_v2.Controllers
             return response;
 
         }
-
         [HttpGet("without-pastry-material")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetDesignWithoutPastryMaterial>> GetDesignsWithoutPastryMaterial()
@@ -293,7 +282,6 @@ namespace BOM_API_v2.Controllers
             newEntry.isActive = true;
 
             List<DesignTagsForCakes> newTagRelationships = new List<DesignTagsForCakes>();
-            List<DesignAddOns> newAddOnsRelationships = new List<DesignAddOns>();
             if (input.design_tag_ids != null)
             {
                 foreach (Guid tagId in input.design_tag_ids)
@@ -312,31 +300,6 @@ namespace BOM_API_v2.Controllers
                     }
                 }
             }
-            if (input.design_add_ons != null)
-            {
-                foreach (PostDesignAddOns currentEntryAddOnInfo in input.design_add_ons)
-                {
-                    AddOns? selectedAddOn = null;
-                    try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentEntryAddOnInfo.add_ons_id).FirstAsync(); }
-                    catch { continue; }
-                    if (selectedAddOn == null) { continue; }
-                    else
-                    {
-                        DesignAddOns newAddOnConnection = new DesignAddOns();
-                        newAddOnConnection.design_id = newEntryId;
-                        newAddOnConnection.add_ons_id = selectedAddOn.add_ons_id;
-                        newAddOnConnection.add_on_name = currentEntryAddOnInfo.add_on_name;
-                        newAddOnConnection.quantity = currentEntryAddOnInfo.quantity;
-                        newAddOnConnection.price = currentEntryAddOnInfo.price;
-
-                        newAddOnConnection.last_modified_date = currentTime;
-                        newAddOnConnection.date_added = currentTime;
-                        newAddOnConnection.isActive = true;
-
-                        newAddOnsRelationships.Add(newAddOnConnection);
-                    }
-                }
-            }
             DesignImage? newDesignImage = null;
             if (input.display_picture_data != null)
             {
@@ -351,53 +314,12 @@ namespace BOM_API_v2.Controllers
             _databaseContext.SaveChanges();
 
             if (newTagRelationships.IsNullOrEmpty() == false) { await _databaseContext.DesignTagsForCakes.AddRangeAsync(newTagRelationships); await _databaseContext.SaveChangesAsync(); }
-            if (newAddOnsRelationships.IsNullOrEmpty() == false) { await _kaizenTables.DesignAddOns.AddRangeAsync(newAddOnsRelationships); await _kaizenTables.SaveChangesAsync(); }
             if (newDesignImage != null) { await _databaseContext.DesignImage.AddAsync(newDesignImage); await _databaseContext.SaveChangesAsync(); }
 
             await _actionLogger.LogAction(User, "POST", "Add new design " + newEntryId.ToString());
             return Ok(new { message = "Design " + Convert.ToBase64String(newEntryId) + " added", id = Convert.ToBase64String(newEntryId) });
         }
-        [HttpPost("{design_id}/add-ons/")]
-        [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AddNewAddOns([FromBody]PostDesignAddOns input, [FromRoute] string design_id)
-        {
-            Designs? selectedDesign;
-            string decodedId = design_id;
-            byte[]? byteArrEncodedId = null;
-
-            try
-            {
-                decodedId = Uri.UnescapeDataString(design_id);
-                byteArrEncodedId = Convert.FromBase64String(decodedId);
-            }
-            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
-
-            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
-            catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
-
-            if (input == null) { return BadRequest(new { message = "Input is null" }); }
-            AddOns? selectedAddOn = null;
-            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == input.add_ons_id).FirstAsync(); }
-            catch { return NotFound(new { message = "Add on with the specified id not found" }); ; }
-
-            DateTime currentTime = DateTime.Now;
-            DesignAddOns newAddOnConnection = new DesignAddOns();
-            newAddOnConnection.design_id = byteArrEncodedId;
-            newAddOnConnection.add_ons_id = selectedAddOn.add_ons_id;
-            newAddOnConnection.add_on_name = input.add_on_name;
-            newAddOnConnection.quantity = input.quantity;
-            newAddOnConnection.price = input.price;
-
-            newAddOnConnection.last_modified_date = currentTime;
-            newAddOnConnection.date_added = currentTime;
-            newAddOnConnection.isActive = true;
-
-            await _kaizenTables.DesignAddOns.AddAsync(newAddOnConnection);
-            await _kaizenTables.SaveChangesAsync();
-
-            return Ok(new {message = "New add on added for " + decodedId});
-        }
-
+        
         [HttpPut("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string design_id)
@@ -523,39 +445,6 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
             return Ok(new { message = "Design " + design_id.ToString() + " updated" });
         }
-        [HttpPatch("{design_id}/add-ons/{design_add_on_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> UpdateDesignAddOn(PatchDesignAddOns input, [FromRoute] string design_id, [FromRoute] int design_add_on_id)
-        {
-            string decodedId = design_id;
-            byte[]? byteArrEncodedId = null;
-
-            try
-            {
-                decodedId = Uri.UnescapeDataString(design_id);
-                byteArrEncodedId = Convert.FromBase64String(decodedId);
-            }
-            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
-
-            AddOns? selectedAddOn = null;
-            try { selectedAddOn = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == input.add_ons_id).FirstAsync(); }
-            catch { return NotFound(new { message = "Design add on with the id " + design_add_on_id + " not found" }); }
-            if (selectedAddOn == null) { return NotFound(new { message = "Design add on with the id " + design_add_on_id + " not found" }); }
-
-            DesignAddOns? selectedAddOnForDesign = null;
-            try { selectedAddOnForDesign = await _kaizenTables.DesignAddOns.Where(x => x.isActive == true && x.design_add_on_id == design_add_on_id && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
-            catch { return NotFound(new { message = "Design add on with the id " + design_add_on_id + " not found" }); }
-
-            _kaizenTables.DesignAddOns.Update(selectedAddOnForDesign);
-            selectedAddOnForDesign.add_ons_id = selectedAddOn.add_ons_id;
-            selectedAddOnForDesign.add_on_name = input.add_on_name;
-            selectedAddOnForDesign.quantity = input.quantity;
-            selectedAddOnForDesign.price = input.price;
-            selectedAddOnForDesign.last_modified_date = DateTime.Now;
-            await _kaizenTables.SaveChangesAsync();
-
-            return Ok(new { message = "Design add on for " + decodedId + " id " + selectedAddOnForDesign.design_add_on_id + " updated" });
-        }
 
         [HttpDelete("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
@@ -618,31 +507,6 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Tags for " + foundEntry.design_id);
             return Ok(new { message = "Tags removed successfully" });
         }
-        [HttpDelete("{design_id}/add-ons/{design_add_on_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> DeleteDesignAddOn([FromRoute] string design_id, [FromRoute] int design_add_on_id)
-        {
-            string decodedId = design_id;
-            byte[]? byteArrEncodedId = null;
-
-            try
-            {
-                decodedId = Uri.UnescapeDataString(design_id);
-                byteArrEncodedId = Convert.FromBase64String(decodedId);
-            }
-            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
-
-            DesignAddOns? selectedAddOnForDesign = null;
-            try { selectedAddOnForDesign = await _kaizenTables.DesignAddOns.Where(x => x.isActive == true && x.design_add_on_id == design_add_on_id && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
-            catch { return NotFound(new { message = "Design add on with the id " + design_add_on_id + " not found" }); }
-
-            _kaizenTables.DesignAddOns.Update(selectedAddOnForDesign);
-            selectedAddOnForDesign.isActive = false;
-            selectedAddOnForDesign.last_modified_date = DateTime.Now;
-            await _kaizenTables.SaveChangesAsync();
-
-            return Ok(new { message = "Design add on for " + decodedId + " id " + selectedAddOnForDesign.design_add_on_id + " deleted" });
-        }
 
         [HttpDelete("{design_id}/tags/{tag_id}")]
         [Authorize(Roles = UserRoles.Admin)]
@@ -677,7 +541,6 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = "Tag does not exist in the design" }); }
 
         }
-
 
     }
 }

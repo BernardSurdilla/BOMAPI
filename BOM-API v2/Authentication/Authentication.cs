@@ -311,17 +311,6 @@ namespace JWTAuthentication.Controllers
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
-
-        [HttpPost("{roles}")]
-        public async Task<IActionResult> RegisterTest(string roles)
-        {
-            List<Object> resp = new List<Object>();
-            foreach (var item in User.Claims)
-            {
-                resp.Add(item);
-            }
-            return Ok(new {message = roles, claims = resp});
-        }
         
         [Authorize(Roles = UserRoles.Admin)][HttpGet("all-users/")]
         public async Task<List<GetUser>> GetAllUser(int? page, int? record_per_page)

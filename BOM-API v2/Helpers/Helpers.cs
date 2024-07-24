@@ -1418,10 +1418,8 @@ namespace BillOfMaterialsAPI.Helpers
             response.design_picture_url = data.display_picture_url;
             response.cake_description = data.cake_description;
             response.design_tags = new List<GetDesignTag>();
-            response.design_add_ons = new List<GetDesignAddOns>();
 
             List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == data.design_id && x.DesignTags.isActive == true).ToListAsync();
-            List<DesignAddOns> cakeAddOns = await kaizenTables.DesignAddOns.Include(x => x.AddOns).Where(x => x.isActive == true && x.AddOns.isActive == true && x.design_id.SequenceEqual(data.design_id)).ToListAsync();
             DesignImage? image;
             try { image = await context.DesignImage.Where(x => x.isActive == true && x.design_id == data.design_id).FirstAsync(); }
             catch { image = null; }
@@ -1432,10 +1430,6 @@ namespace BillOfMaterialsAPI.Helpers
                 {
                     response.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
                 }
-            }
-            foreach (DesignAddOns currentAddOn in cakeAddOns)
-            {
-                response.design_add_ons.Add(new GetDesignAddOns { add_ons_id = currentAddOn.add_ons_id, add_on_name = currentAddOn.add_on_name, design_add_on_id = currentAddOn.design_add_on_id, price = currentAddOn.price, quantity = currentAddOn.quantity });
             }
             if (image != null) { response.display_picture_data = image.picture_data; }
             else { response.display_picture_data = null; };

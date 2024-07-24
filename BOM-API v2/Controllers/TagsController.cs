@@ -2,7 +2,6 @@
 using BillOfMaterialsAPI.Schemas;
 using BillOfMaterialsAPI.Helpers;
 using BOM_API_v2.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using JWTAuthentication.Authentication;
