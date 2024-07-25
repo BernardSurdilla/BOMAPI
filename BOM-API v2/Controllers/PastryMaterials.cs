@@ -20,7 +20,7 @@ namespace BOM_API_v2.Controllers
         private readonly KaizenTables _kaizenTables;
         private readonly IActionLogger _actionLogger;
 
-        public PastryMaterialController(DatabaseContext context, KaizenTables kaizen, IActionLogger logs, ICakePriceCalculator cakePriceCalculator) { _context = context; _actionLogger = logs; _kaizenTables = kaizen; }
+        public PastryMaterialController(DatabaseContext context, KaizenTables kaizen, IActionLogger logs) { _context = context; _actionLogger = logs; _kaizenTables = kaizen; }
 
         //GET
         [HttpGet]
@@ -290,7 +290,7 @@ namespace BOM_API_v2.Controllers
                     await _context.SaveChangesAsync();
 
                     await DataInsertion.AddPastryMaterialSubVariantIngredient(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_ingredients, _context);
-                    if (entry_sub_variant.sub_variant_add_ons.IsNullOrEmpty() == false) await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_add_ons, _context);
+                    if (entry_sub_variant.sub_variant_add_ons != null) await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_add_ons, _context);
                     
                 }
             }
@@ -425,7 +425,7 @@ namespace BOM_API_v2.Controllers
             await _context.SaveChangesAsync();
 
             await DataInsertion.AddPastryMaterialSubVariantIngredient(lastPastryMaterialSubVariantId, entry.sub_variant_ingredients, _context);
-            if (entry.sub_variant_add_ons.IsNullOrEmpty() == false) { await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry.sub_variant_add_ons, _context); }
+            if (entry.sub_variant_add_ons != null) { await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry.sub_variant_add_ons, _context); }
 
             await _context.SaveChangesAsync();
 

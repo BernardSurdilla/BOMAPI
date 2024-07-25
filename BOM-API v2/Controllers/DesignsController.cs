@@ -197,7 +197,7 @@ namespace BOM_API_v2.Controllers
 
         [HttpGet("{design_id}/pastry-material")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<GetPastryMaterial> GetSpecificPastryMaterialBydesign_id([FromRoute] string design_id)
+        public async Task<GetPastryMaterial> GetSpecificPastryMaterialByDesignId([FromRoute] string design_id)
         {
             Designs? selectedDesign;
             string decodedId = design_id;

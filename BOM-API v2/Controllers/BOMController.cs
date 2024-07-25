@@ -34,9 +34,9 @@ namespace API_TEST.Controllers
         }
 
         [HttpGet("sss/{variant_id}")]
-        public async Task<Dictionary<string, InventorySubtractorInfo>> TestEndp(string variant_id)
+        public async Task<double> TestEndp(string variant_id)
         {
-            return await DataParser.GetTotalIngredientAmountList(variant_id, _context, _kaizenTables);
+            return await PriceCalculator.CalculatePastryMaterialPrice(variant_id, _context, _kaizenTables);
         }
     }
 

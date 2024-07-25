@@ -1,6 +1,5 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using Castle.Components.DictionaryAdapter.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text.Json;
@@ -356,15 +355,18 @@ namespace BillOfMaterialsAPI.Helpers
             if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant != null) { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(selectedPastryMaterialSubVariant.pastry_material_id, context); }
             if (selectedPastryMaterial == null) { throw new NotFoundInDatabaseException(variant_id + " exist in subvariant table, but the base pastry material it points to does not exist"); }
 
-            List<Ingredients> baseIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
-            List<PastryMaterialSubVariantIngredients>? subVariantIngredients = selectedPastryMaterialSubVariant == null ? 
-                null : 
-                await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == selectedPastryMaterialSubVariant.pastry_material_sub_variant_id).ToListAsync();
-
             List<PastryMaterialIngredientImportance> ingredientImportanceList = await context.PastryMaterialIngredientImportance.Where(x => x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
+            Dictionary<string, InventorySubtractorInfo> totalVariantIngredientConsumptionList = await DataParser.GetTotalIngredientAmountList(variant_id, context, kaizenTables);
+            
+            foreach(string currentIngredientId in totalVariantIngredientConsumptionList.Keys)
+            {
+                PastryMaterialIngredientImportance? currentIngredientImportance = ingredientImportanceList.Where(x => x.item_id == currentIngredientId).FirstOrDefault();
 
-            //Code to add PastryMaterialRecipeStatus codes to response here
+                //If record for ingredientImportance is not found; default to normal importance
+                //Else; use the value in the found value
+                
 
+            }
 
             return response;
         }
@@ -830,6 +832,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                             newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
                             newSubIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
+
                             string currentIngredientStringId = Convert.ToString(currentInventoryItemI.id);
 
                             double convertedAmountI = 0.0;
@@ -1061,7 +1064,7 @@ namespace BillOfMaterialsAPI.Helpers
             }
             foreach (PastryMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
             {
-                Schemas.AddOns? referencedAddOns = null;
+                AddOns? referencedAddOns = null;
                 try { referencedAddOns = await kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentAddOn.add_ons_id).FirstAsync(); }
                 catch { continue; }
                 if (referencedAddOns == null) { continue; }
@@ -1464,6 +1467,7 @@ namespace BillOfMaterialsAPI.Helpers
                 string? amountUnitMeasurement = null;
 
                 bool isAmountMeasurementValid = false;
+                
                 foreach (string unitQuantity in validMeasurementUnits.Keys)
                 {
                     List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
@@ -1701,6 +1705,123 @@ namespace BillOfMaterialsAPI.Helpers
             }
 
             return response;
+        }
+
+    }
+    public class PriceCalculator
+    {
+        public static async Task<double> CalculatePastryMaterialPrice(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            double response = 0.0;
+
+            Dictionary<string, InventorySubtractorInfo>? totalIngredientAmountConsumption = null;
+            try { totalIngredientAmountConsumption = await DataParser.GetTotalIngredientAmountList(variant_id, context, kaizenTables); }
+            catch { throw; }
+
+            foreach (string ingredientId in totalIngredientAmountConsumption.Keys)
+            {
+                Item? currentItem = null;
+                try { currentItem = await DataRetrieval.GetInventoryItemAsync(ingredientId, kaizenTables); }
+                catch { throw; }
+
+                InventorySubtractorInfo currentIngredientSubtractionInfo = totalIngredientAmountConsumption[ingredientId];
+                double calculatedAmount = UnitConverter.ConvertByName(currentIngredientSubtractionInfo.Amount, currentIngredientSubtractionInfo.AmountQuantityType, currentIngredientSubtractionInfo.AmountUnit, currentItem.measurements) * currentItem.price;
+
+                response += calculatedAmount;
+            }
+            return response;
+        }
+
+        //Recursive
+        public static async Task<double> CalculateSubMaterialCost(MaterialIngredients data, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            Materials? currentReferencedMaterial = null;
+            try { currentReferencedMaterial = await context.Materials.Where(x => x.isActive == true && x.material_id == data.item_id).FirstAsync(); }
+            catch { return 0.0; }
+            if (currentReferencedMaterial == null) { return 0.0; }
+
+            bool bothValidUnits = ValidUnits.IsUnitValid(data.amount_measurement) && ValidUnits.IsUnitValid(currentReferencedMaterial.amount_measurement);
+            if (bothValidUnits == false) { return 0.0; }
+
+            bool isSameQuantityUnit = ValidUnits.IsSameQuantityUnit(data.amount_measurement, currentReferencedMaterial.amount_measurement);
+            if (isSameQuantityUnit == false) { return 0.0; }
+
+            double costMultiplier = currentReferencedMaterial.amount_measurement.Equals(data.amount_measurement) ?
+                data.amount / currentReferencedMaterial.amount :
+                UnitConverter.ConvertByName(data.amount, ValidUnits.UnitQuantityMeasurement(currentReferencedMaterial.amount_measurement), data.amount_measurement, currentReferencedMaterial.amount_measurement) / currentReferencedMaterial.amount;
+            double totalCost = 0.0;
+
+
+            List<MaterialIngredients> currentReferencedMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterial.material_id).ToListAsync();
+            foreach (MaterialIngredients materialIngredients in currentReferencedMaterialIngredients)
+            {
+                switch (materialIngredients.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        Item? currentMatIngRefItem = null;
+                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                        catch { continue; }
+
+                        bool isInventoryItemMeasurementValid = ValidUnits.IsUnitValid(currentMatIngRefItem.measurements);
+                        bool isInventoryItemQuantityUnitSame = ValidUnits.IsSameQuantityUnit(currentMatIngRefItem.measurements, materialIngredients.amount_measurement);
+                        if (isInventoryItemMeasurementValid == false) { continue; }
+                        if (isInventoryItemQuantityUnitSame == false) { continue; }
+
+                        totalCost += currentMatIngRefItem.measurements.Equals(materialIngredients.amount_measurement) ?
+                            (currentMatIngRefItem.price * materialIngredients.amount) * costMultiplier :
+                            (currentMatIngRefItem.price * UnitConverter.ConvertByName(materialIngredients.amount, ValidUnits.UnitQuantityMeasurement(currentMatIngRefItem.measurements), materialIngredients.amount_measurement, currentMatIngRefItem.measurements)) * costMultiplier;
+                        break;
+                    case IngredientType.Material:
+                        totalCost += await CalculateSubMaterialCost(materialIngredients, context, kaizenTables);
+                        break;
+                }
+            }
+            return totalCost;
+        }
+        public static async Task<double> CalculateSubMaterialCost(Ingredients data, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            Materials? currentReferencedMaterial = null;
+            try { currentReferencedMaterial = await context.Materials.Where(x => x.isActive == true && x.material_id == data.item_id).FirstAsync(); }
+            catch { return 0.0; }
+            if (currentReferencedMaterial == null) { return 0.0; }
+
+            bool bothValidUnits = ValidUnits.IsUnitValid(data.amount_measurement) && ValidUnits.IsUnitValid(currentReferencedMaterial.amount_measurement);
+            if (bothValidUnits == false) { return 0.0; }
+
+            bool isSameQuantityUnit = ValidUnits.IsSameQuantityUnit(data.amount_measurement, currentReferencedMaterial.amount_measurement);
+            if (isSameQuantityUnit == false) { return 0.0; }
+
+            double costMultiplier = currentReferencedMaterial.amount_measurement.Equals(data.amount_measurement) ?
+                data.amount / currentReferencedMaterial.amount :
+                UnitConverter.ConvertByName(data.amount, ValidUnits.UnitQuantityMeasurement(currentReferencedMaterial.amount_measurement), data.amount_measurement, currentReferencedMaterial.amount_measurement) / currentReferencedMaterial.amount;
+            double totalCost = 0.0;
+
+
+            List<MaterialIngredients> currentReferencedMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterial.material_id).ToListAsync();
+            foreach (MaterialIngredients materialIngredients in currentReferencedMaterialIngredients)
+            {
+                switch (materialIngredients.ingredient_type)
+                {
+                    case IngredientType.InventoryItem:
+                        Item? currentMatIngRefItem = null;
+                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                        catch { continue; }
+
+                        bool isInventoryItemMeasurementValid = ValidUnits.IsUnitValid(currentMatIngRefItem.measurements);
+                        bool isInventoryItemQuantityUnitSame = ValidUnits.IsSameQuantityUnit(currentMatIngRefItem.measurements, materialIngredients.amount_measurement);
+                        if (isInventoryItemMeasurementValid == false) { continue; }
+                        if (isInventoryItemQuantityUnitSame == false) { continue; }
+
+                        totalCost += currentMatIngRefItem.measurements.Equals(materialIngredients.amount_measurement) ?
+                            (currentMatIngRefItem.price * materialIngredients.amount) * costMultiplier :
+                            (currentMatIngRefItem.price * UnitConverter.ConvertByName(materialIngredients.amount, ValidUnits.UnitQuantityMeasurement(currentMatIngRefItem.measurements), materialIngredients.amount_measurement, currentMatIngRefItem.measurements)) * costMultiplier;
+                        break;
+                    case IngredientType.Material:
+                        totalCost += await CalculateSubMaterialCost(materialIngredients, context, kaizenTables);
+                        break;
+                }
+            }
+            return totalCost;
         }
     }
 
