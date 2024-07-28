@@ -1,5 +1,6 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
+using Castle.Components.DictionaryAdapter.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text.Json;
@@ -338,6 +339,32 @@ namespace BillOfMaterialsAPI.Helpers
             catch (InvalidOperationException exO) { return false; }
         }
 
+        public static async Task<bool> IsIngredientItemValid(string item_id, string ingredient_type, string amount_measurement,  DatabaseContext context, KaizenTables kaizenTables)
+        {
+            switch (ingredient_type)
+            {
+                case IngredientType.InventoryItem:
+                    //!!!UNTESTED!!!
+                    Item? currentInventoryItem = null;
+                    try { currentInventoryItem = await DataRetrieval.GetInventoryItemAsync(item_id, kaizenTables); }
+                    catch (FormatException exF) { throw; }
+                    catch (NotFoundInDatabaseException exO) { throw; }
+
+                    if (ValidUnits.IsSameQuantityUnit(currentInventoryItem.measurements, amount_measurement) == false) { throw new InvalidAmountMeasurementException("Ingredient with the inventory item id " + currentInventoryItem.id + " does not have the same quantity unit as the referred inventory item"); }
+                    break;
+                case IngredientType.Material:
+                    //Check if item id exists on the 'Materials' table
+                    //or in the inventory
+                    Materials? currentReferredMaterial = null;
+                    try { currentReferredMaterial = await context.Materials.Where(x => x.isActive == true && x.material_id == item_id).FirstAsync(); }
+                    catch { throw new NotFoundInDatabaseException("Id specified in the request does not exist in the database. Id " + item_id); }
+                    if (ValidUnits.IsSameQuantityUnit(currentReferredMaterial.amount_measurement, amount_measurement) == false) { throw new InvalidAmountMeasurementException("Ingredient with the material item id " + currentReferredMaterial.material_id + " does not have the same quantity unit as the referred material"); }
+                    break;
+                default:
+                    throw new InvalidPastryMaterialIngredientTypeException("Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV.");
+            }
+            return true;
+        }
         //Used to check the status of the recipe
         public static async Task<int[]> PastryMaterialRecipeStatus(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
         {
@@ -1436,7 +1463,6 @@ namespace BillOfMaterialsAPI.Helpers
             }
             if (image != null) { response.display_picture_data = image.picture_data; }
             else { response.display_picture_data = null; };
-
             return response;
         }
 
@@ -1483,7 +1509,7 @@ namespace BillOfMaterialsAPI.Helpers
                     }
 
                 }
-                if (isAmountMeasurementValid == false) { throw new AmountMeasurementInvalidException("The measurement of the pastry ingredient with the id " + currentBaseIngredient.ingredient_id + " is not valid."); }
+                if (isAmountMeasurementValid == false) { throw new InvalidAmountMeasurementException("The measurement of the pastry ingredient with the id " + currentBaseIngredient.ingredient_id + " is not valid."); }
 
                 switch (currentBaseIngredient.ingredient_type)
                 {
@@ -1606,7 +1632,7 @@ namespace BillOfMaterialsAPI.Helpers
                             amountUnitMeasurement = currentMeasurement;
                         }
                     }
-                    if (isAmountMeasurementValid == false) { throw new AmountMeasurementInvalidException("The measurement of the pastry material sub variant ingredient with the id " + currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id + " is not valid."); }
+                    if (isAmountMeasurementValid == false) { throw new InvalidAmountMeasurementException("The measurement of the pastry material sub variant ingredient with the id " + currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id + " is not valid."); }
 
                     switch (currentSubVariantIngredient.ingredient_type)
                     {
@@ -1827,5 +1853,6 @@ namespace BillOfMaterialsAPI.Helpers
 
     //Exceptions
     public class NotFoundInDatabaseException : Exception { public NotFoundInDatabaseException(string message) : base(message) { } }
-    public class AmountMeasurementInvalidException : Exception { public AmountMeasurementInvalidException(string message) : base(message) { } }
+    public class InvalidAmountMeasurementException : Exception { public InvalidAmountMeasurementException(string message) : base(message) { } }
+    public class InvalidPastryMaterialIngredientTypeException : Exception { public InvalidPastryMaterialIngredientTypeException(string message) : base(message) { } }
 }

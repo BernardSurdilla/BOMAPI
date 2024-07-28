@@ -559,7 +559,7 @@ namespace API_TEST.Controllers
 
             try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(variant_id, _context, _kaizenTables); }
             catch (FormatException e) { return BadRequest(new { message = e.Message }); }
-            catch (AmountMeasurementInvalidException e) { return StatusCode(500, new { message = e.Message }); }
+            catch (InvalidAmountMeasurementException e) { return StatusCode(500, new { message = e.Message }); }
             catch (NotFoundInDatabaseException e) { return StatusCode(500, new { message = e.Message }); }
 
             List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
