@@ -221,7 +221,7 @@ namespace BOM_API_v2.Controllers
             string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(_context);
 
             await DataInsertion.AddPastryMaterialIngredient(newPastryMaterialId, newEntry.ingredients, _context);
-            if (newEntry.add_ons.IsNullOrEmpty() == false) await DataInsertion.AddPastryMaterialAddOns(newPastryMaterialId, newEntry.add_ons, _context);
+            if (newEntry.add_ons != null) await DataInsertion.AddPastryMaterialAddOns(newPastryMaterialId, newEntry.add_ons, _context);
 
             await _context.SaveChangesAsync();
 
@@ -416,32 +416,8 @@ namespace BOM_API_v2.Controllers
             try { currentIngredient = await DataRetrieval.GetPastryMaterialIngredientAsync(pastry_material_id, ingredient_id, _context); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            switch (entry.ingredient_type)
-            {
-                case IngredientType.InventoryItem:
-                    Item? currentInventoryItemI = null;
-                    try { currentInventoryItemI = await DataRetrieval.GetInventoryItemAsync(entry.item_id, _kaizenTables); }
-
-                    catch (FormatException exF) { return BadRequest(new { message = exF.Message }); }
-                    catch (NotFoundInDatabaseException exO) { return NotFound(new { message = exO.Message }); }
-
-                    if (currentInventoryItemI == null) { return NotFound(new { message = "Item " + entry.item_id + " is not found in the inventory." }); }
-                    if (ValidUnits.IsSameQuantityUnit(currentInventoryItemI.measurements, entry.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the inventory item id " + currentInventoryItemI.id + " does not have the same quantity unit as the referred inventory item" }); }
-
-                    break;
-                case IngredientType.Material:
-                    //Check if item id exists on the 'Materials' table
-                    //or in the inventory
-                    Materials? currentReferredMaterial = null;
-                    try { currentReferredMaterial = await _context.Materials.Where(x => x.isActive == true && x.material_id == entry.item_id).FirstAsync(); }
-                    catch { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + entry.item_id }); }
-                    //Add additional code here for inventory id checking
-                    if (currentReferredMaterial == null) { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + entry.item_id }); }
-                    if (ValidUnits.IsSameQuantityUnit(currentReferredMaterial.amount_measurement, entry.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the material item id " + currentReferredMaterial.material_id + " does not have the same quantity unit as the referred material" }); }
-                    break;
-                default:
-                    return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
-            }
+            try { await DataVerification.IsIngredientItemValid(entry.item_id, entry.ingredient_type, entry.amount_measurement, _context, _kaizenTables); }
+            catch (Exception e) { return BadRequest(new { message = e.Message }); }
 
             DateTime currentTime = DateTime.Now;
 
@@ -519,32 +495,8 @@ namespace BOM_API_v2.Controllers
             try { currentPastryMaterialSubVariantIngredient = await DataRetrieval.GetPastryMaterialSubVariantIngredientAsync(pastry_material_id, pastry_material_sub_variant_id, pastry_material_sub_variant_ingredient_id, _context); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            switch (entry.ingredient_type)
-            {
-                case IngredientType.InventoryItem:
-                    Item? currentInventoryItemI = null;
-                    try { currentInventoryItemI = await DataRetrieval.GetInventoryItemAsync(entry.item_id, _kaizenTables); }
-
-                    catch (FormatException exF) { return BadRequest(new { message = exF.Message }); }
-                    catch (NotFoundInDatabaseException exO) { return NotFound(new { message = exO.Message }); }
-
-                    if (currentInventoryItemI == null) { return NotFound(new { message = "Item " + entry.item_id + " is not found in the inventory." }); }
-                    if (ValidUnits.IsSameQuantityUnit(currentInventoryItemI.measurements, entry.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the inventory item id " + currentInventoryItemI.id + " does not have the same quantity unit as the referred inventory item" }); }
-
-                    break;
-                case IngredientType.Material:
-                    //Check if item id exists on the 'Materials' table
-                    //or in the inventory
-                    Materials? currentReferredMaterial = null;
-                    try { currentReferredMaterial = await _context.Materials.Where(x => x.isActive == true && x.material_id == entry.item_id).FirstAsync(); }
-                    catch { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + entry.item_id }); }
-                    //Add additional code here for inventory id checking
-                    if (currentReferredMaterial == null) { return NotFound(new { message = "Id specified in the request does not exist in the database. Id " + entry.item_id }); }
-                    if (ValidUnits.IsSameQuantityUnit(currentReferredMaterial.amount_measurement, entry.amount_measurement) == false) { return BadRequest(new { message = "Ingredient with the material item id " + currentReferredMaterial.material_id + " does not have the same quantity unit as the referred material" }); }
-                    break;
-                default:
-                    return BadRequest(new { message = "Ingredients to be inserted has an invalid ingredient_type, valid types are MAT and INV." });
-            }
+            try { await DataVerification.IsIngredientItemValid(entry.item_id, entry.ingredient_type, entry.amount_measurement, _context, _kaizenTables); }
+            catch (Exception e) { return BadRequest(new { message = e.Message }); }
 
             _context.PastryMaterialSubVariantIngredients.Update(currentPastryMaterialSubVariantIngredient);
             currentPastryMaterialSubVariantIngredient.item_id = entry.item_id;
@@ -586,7 +538,6 @@ namespace BOM_API_v2.Controllers
 
             return Ok(new { message = "Add on " + pastry_material_sub_variant_add_on_id + " updated " });
         }
-
 
         //DELETE
         [HttpDelete("{pastry_material_id}")]
