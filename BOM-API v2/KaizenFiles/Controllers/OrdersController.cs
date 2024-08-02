@@ -14,7 +14,7 @@ using System.Text.Json;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     [Authorize]
     public class OrdersController : ControllerBase
@@ -28,9 +28,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("manual_ordering")]
+        [HttpPost("current-user/cart/add")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string type)
+        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string pickupDate, [FromQuery] string pickupTime, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string type)
         {
             try
             {
@@ -71,33 +71,44 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Set the status to pending
                 order.status = "pending";
 
-                // Fetch the count of confirmed orders
-                int confirmedOrderCount = await GetConfirmedOrderCount();
-
-                // Determine the pickup date based on order type and confirmed orders count
-                DateTime pickupDate;
-                if (confirmedOrderCount < 5)
+                // Validate and parse the pickup date string to DateTime
+                if (!DateTime.TryParseExact(pickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
                 {
-                    pickupDate = order.type == "rush" ? DateTime.Today.AddDays(3) : DateTime.Today.AddDays(7);
-                }
-                else
-                {
-                    pickupDate = order.type == "rush" ? DateTime.Today.AddDays(4) : DateTime.Today.AddDays(8);
+                    return BadRequest("Invalid pickup date format. Use 'yyyy-MM-dd'.");
                 }
 
-                // Parse the pickup time string to get the hour, minute, and AM/PM values
-                DateTime parsedTime = DateTime.ParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture);
+                // Validate and parse the pickup time string to DateTime
+                if (!DateTime.TryParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
+                {
+                    return BadRequest("Invalid pickup time format. Use 'h:mm tt'.");
+                }
 
-                // Combine the pickup date and parsed time into a single DateTime object
-                DateTime pickupDateTime = new DateTime(pickupDate.Year, pickupDate.Month, pickupDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+                // Combine the pickup date and time into a single DateTime object
+                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
 
                 // Set the combined pickup date and time
                 order.PickupDateTime = pickupDateTime;
 
                 order.Description = description;
 
-                // Insert the order into the database
-                await InsertOrder(order, designId, flavor, size);
+                // Convert designId to hex string
+                string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
+
+
+                // Get the pastry material ID using just the design ID
+                string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
+
+                // Get the pastry material ID using the design ID and size
+                string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, size);
+
+                // Get the pastry material sub-variant ID using the pastry material ID and size
+                string subVariantId = await GetPastryMaterialSubVariantId(subersId, size);
+
+                // Determine the appropriate pastryId to use
+                string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
+                // Insert the order into the database using the determined pastryId
+                await InsertOrder(order, designId, flavor, size, pastryId);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -109,24 +120,44 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task<string> GetCustomerNameById(byte[] customerId)
+
+        private async Task<string> GetPastryMaterialIdByDesignIds(string designIdHex)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT DisplayName FROM users WHERE UserId = @userId";
-
+                string sql = "SELECT pastry_material_id FROM pastrymaterials WHERE design_id = UNHEX(@designId)";
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@userId", customerId);
+                    command.Parameters.AddWithValue("@designId", designIdHex);
 
-                    return (string)await command.ExecuteScalarAsync();
+                    var result = await command.ExecuteScalarAsync();
+                    return result != null && result != DBNull.Value ? result.ToString() : null;
                 }
             }
         }
 
-        [HttpPost("cart")]
+        private async Task<string> GetPastryMaterialIdBySubersIdAndSize(string subersId, string size)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT pastry_material_id FROM pastrymaterials WHERE pastry_material_id = @subersId AND main_variant_name = @size";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@subersId", subersId);
+                    command.Parameters.AddWithValue("@size", size);
+
+                    var result = await command.ExecuteScalarAsync();
+                    return result != null && result != DBNull.Value ? result.ToString() : null;
+                }
+            }
+        }
+
+
+        [HttpPost("current-user/cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateCartOrder([FromQuery] string orderName, [FromQuery] double price, [FromQuery] int quantity, [FromQuery] string designName, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size)
         {
@@ -256,24 +287,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        private async Task<int> GetConfirmedOrderCount()
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT COUNT(*) FROM orders WHERE Status = 'Confirmed'";
-
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    object result = await command.ExecuteScalarAsync();
-                    return Convert.ToInt32(result);
-                }
-            }
-        }
-
-
-
         [HttpGet]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllOrders()
@@ -355,7 +368,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("all_orders_by_customer")]
+        [HttpGet("current-customer/all-orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerIdSummary()
         {
@@ -426,7 +439,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("for_confirmation_orders_by_customer")]
+        [HttpGet("current-customer/for-confirmation-orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerId()
         {
@@ -521,7 +534,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpGet("assign_employees")]
+        [HttpGet("assign-employees")]
         public async Task<IActionResult> GetEmployeesOfType2()
         {
             try
@@ -559,131 +572,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("add_ons_table")]
-        public async Task<IActionResult> AddAddOn([FromBody] AddOnDetails addOnDetails)
-        {
-            try
-            {
-                // Create AddOns object for database insertion
-                var addOns = new AddOns
-                {
-                    name = addOnDetails.name,
-                    pricePerUnit = addOnDetails.pricePerUnit,
-                    quantity = addOnDetails.quantity,
-                    size = addOnDetails.size,
-                    DateAdded = DateTime.UtcNow,  // Current UTC time as DateAdded
-                    LastModifiedDate = null,      // Initial value for LastModifiedDate
-                    IsActive = true               // Set IsActive to true initially
-                };
-
-                // Insert into database
-                int newAddOnsId = await InsertAddOnIntoDatabase(addOns);
-
-                // Optionally, you can return the new AddOnsId or a success message
-                return Ok($"Add-On '{addOns.name}' added with ID '{newAddOnsId}'");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error inserting Add-On into database.");
-                return StatusCode(500, "An error occurred while processing the request.");
-            }
-        }
-
-        private async Task<int> InsertAddOnIntoDatabase(AddOns addOns)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                // SQL INSERT statement with measure and ingredient_type
-                string sql = @"INSERT INTO AddOns (name, price, quantity, size, measurement, ingredient_type, date_added, last_modified_date, IsActive)
-                       VALUES (@Name, @PricePerUnit, @Quantity, @Size, @Measure, @IngredientType, @DateAdded, @LastModifiedDate, @IsActive);
-                       SELECT LAST_INSERT_ID();";
-
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@Name", addOns.name);
-                    command.Parameters.AddWithValue("@PricePerUnit", addOns.pricePerUnit);
-                    command.Parameters.AddWithValue("@Quantity", addOns.quantity);
-                    command.Parameters.AddWithValue("@Size", addOns.size);
-                    command.Parameters.AddWithValue("@Measure", "piece");
-                    command.Parameters.AddWithValue("@IngredientType", "element");
-                    command.Parameters.AddWithValue("@DateAdded", addOns.DateAdded);
-                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.LastModifiedDate ?? (object)DBNull.Value);
-                    command.Parameters.AddWithValue("@IsActive", addOns.IsActive);
-
-                    // Execute scalar to get the inserted ID
-                    int newAddOnsId = Convert.ToInt32(await command.ExecuteScalarAsync());
-                    return newAddOnsId;
-                }
-            }
-        }
-
-
-
-        [HttpGet("add_ons_table")]
-        public async Task<IActionResult> GetAllAddOns()
-        {
-            try
-            {
-                var addOns = await GetAddOnDSOSFromDatabase2();
-
-                if (addOns == null || addOns.Count == 0)
-                {
-                    return NotFound("No Add-Ons found.");
-                }
-
-                return Ok(addOns);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving all Add-Ons.");
-                return StatusCode(500, "An error occurred while processing the request.");
-            }
-        }
-
-        private async Task<List<AddOnDS2>> GetAddOnDSOSFromDatabase2()
-        {
-            List<AddOnDS2> addOnDSOSList = new List<AddOnDS2>();
-
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT name, price, addOnsId, measurement, size, quantity, date_added, last_modified_date, isActive FROM addons";
-
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            var addOnDSOS = new AddOnDS2
-                            {
-                                AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price"),
-                                addOnsId = reader.GetInt32("addOnsId"),
-                                Measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
-                                Quantity = reader.GetInt32("quantity"),
-                                // DateAdded is assumed to be non-nullable and should be directly read
-                                DateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
-                                // Handle LastModifiedDate as nullable
-                                LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("last_modified_date"))
-                                    ? (DateTime?)null
-                                    : reader.GetDateTime(reader.GetOrdinal("last_modified_date")),
-                                IsActive = reader.GetBoolean("isActive")
-                            };
-
-                            addOnDSOSList.Add(addOnDSOS);
-                        }
-                    }
-                }
-            }
-
-            return addOnDSOSList;
-        }
-
-        [HttpGet("{orderId}/add_ons")]
+        [HttpGet("{orderId}/add-ons")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string orderId)
         {
@@ -948,7 +837,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpGet("total_orders")]
+        [HttpGet("total-orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetTotalQuantities()
         {
@@ -982,21 +871,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("final_order_details/{orderIdHex}")]
+        [HttpGet("final-order-details/{orderId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetOrderByOrderId(string orderIdHex)
+        public async Task<IActionResult> GetOrderByOrderId(string orderId)
         {
             try
             {
                 // Convert the hex string to a binary(16) formatted string
-                string binary16OrderId = ConvertGuidToBinary16(orderIdHex).ToLower();
+                string binary16OrderId = ConvertGuidToBinary16(orderId).ToLower();
 
                 // Fetch the specific order and its addons from the database
                 FinalOrder finalOrder = await GetFinalOrderByIdFromDatabase(binary16OrderId);
 
                 if (finalOrder == null)
                 {
-                    return NotFound($"Order with orderId {orderIdHex} not found.");
+                    return NotFound($"Order with orderId {orderId} not found.");
                 }
 
                 // Retrieve DesignId and Size
@@ -1023,7 +912,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error retrieving order by orderId {orderIdHex}");
+                _logger.LogError(ex, $"Error retrieving order by orderId {orderId}");
                 return StatusCode(500, $"An error occurred while processing the request.");
             }
         }
@@ -1259,7 +1148,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpGet("by_type/{type}")]
+        [HttpGet("by-type/{type}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public IActionResult GetOrdersByType(string type)
         {
@@ -1327,7 +1216,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("by_employee_username")]
+        [HttpGet("by-employee-username")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByUsername()
         {
@@ -1484,7 +1373,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpGet("by_customer_username/{customerUsername}")]
+        [HttpGet("by-customer-username/{customerUsername}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername)
         {
@@ -1585,7 +1474,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("by_type/{type}/{username}")]
+        [HttpGet("by-type/{type}/{username}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
@@ -1889,9 +1778,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("update_price")]
+        [HttpPatch("update-price")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public async Task<IActionResult> UpdateOrderAddon([FromQuery] string orderIdHex, [FromQuery] string name, [FromQuery] decimal price)
+        public async Task<IActionResult> UpdateOrderAddon([FromQuery] string orderId, [FromQuery] string name, [FromQuery] decimal price)
         {
             try
             {
@@ -1910,7 +1799,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Convert the hexadecimal orderId to binary(16) format with '0x' prefix for MySQL UNHEX function
-                string orderIdBinary = ConvertGuidToBinary16(orderIdHex).ToLower();
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
 
                 // Add "custom " prefix to the name
                 string customName = "custom " + name;
@@ -1975,9 +1864,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPatch("send_back_to_customer_no_change")]
+        [HttpPatch("send-back-to-customer-no-change")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public async Task<IActionResult> UpdateOrderStatus([FromQuery] string orderIdHex)
+        public async Task<IActionResult> UpdateOrderStatus([FromQuery] string orderId)
         {
             try
             {
@@ -1996,7 +1885,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Convert the hexadecimal orderId to binary(16) format with '0x' prefix for MySQL UNHEX function
-                string orderIdBinary = ConvertGuidToBinary16(orderIdHex).ToLower();
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -2059,7 +1948,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("update_add_on")]
+        [HttpPatch("update-add-on")]
         public async Task<IActionResult> UpdateAddOn(
      [FromQuery] string addOnsId,
      [FromBody] UpdateAddOnRequest request)
@@ -2116,12 +2005,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpPatch("confirmation")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
-        public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderIdHex, [FromQuery] string action)
+        public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderId, [FromQuery] string action)
         {
             try
             {
                 // Convert the GUID string to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderIdHex).ToLower();
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -2194,7 +2083,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                         else
                         {
-                            return BadRequest($"Order with ID '{orderIdHex}' is already confirmed.");
+                            return BadRequest($"Order with ID '{orderId}' is already confirmed.");
                         }
                     }
                     else if (action.Equals("cancel", StringComparison.OrdinalIgnoreCase))
@@ -2207,7 +2096,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         }
                         else
                         {
-                            return BadRequest($"Order with ID '{orderIdHex}' is already canceled.");
+                            return BadRequest($"Order with ID '{orderId}' is already canceled.");
                         }
                     }
                     else
@@ -2215,13 +2104,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         return BadRequest("Invalid action. Please choose 'confirm' or 'cancel'.");
                     }
 
-                    return Ok($"Order with ID '{orderIdHex}' has been successfully {action}ed.");
+                    return Ok($"Order with ID '{orderId}' has been successfully {action}ed.");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request to {action} order with ID '{orderIdHex}'.");
-                return StatusCode(500, $"An error occurred while processing the request to {action} order with ID '{orderIdHex}'.");
+                _logger.LogError(ex, $"An error occurred while processing the request to {action} order with ID '{orderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to {action} order with ID '{orderId}'.");
             }
         }
 
@@ -2244,7 +2133,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("order_status_artist")]
+        [HttpPatch("order-status-artist")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
         public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
@@ -2421,7 +2310,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("update_cart_customer")]
+        [HttpPatch("update-cart-customer")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate(
             [FromQuery] string orderId,
@@ -2485,9 +2374,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
-
-
-
 
         private async Task<int?> GetExistingTotal(string orderName)
         {
@@ -2801,7 +2687,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
          */
 
-        [HttpPatch("manage_add_ons_by_material/{pastryMaterialId}")]
+        [HttpPatch("manage-add-ons-by-material/{pastryMaterialId}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, [FromQuery] string orderId, [FromQuery] int modifiedAddOnId, [FromBody] ManageAddOnAction action)
         {
@@ -3091,7 +2977,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPatch("{orderId}/add_new_add_ons")]
+        [HttpPatch("{orderId}/add-new-add-ons")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
         {
@@ -3225,7 +3111,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPatch("{orderId}/update_order_details")]
+        [HttpPatch("{orderId}/update-order-details")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> UpdateOrderDetails(string orderId, [FromBody] UpdateOrderDetailsRequest request)
         {
@@ -3292,7 +3178,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("assign_employee")]
+        [HttpPatch("assign-employee")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderId, [FromQuery] string employeeUsername)
         {
@@ -3327,9 +3213,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpDelete("remove_cart/{orderIdHex}")]
+        [HttpDelete("remove-cart/{orderId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
-        public async Task<IActionResult> RemoveCart(string orderIdHex)
+        public async Task<IActionResult> RemoveCart(string orderId)
         {
             try
             {
@@ -3341,7 +3227,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Convert the hex orderId to binary format
-                string orderIdBinary = ConvertGuidToBinary16(orderIdHex).ToLower();
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
 
                 // Check if the order belongs to the current user
                 bool isOrderOwnedByUser = await IsOrderOwnedByUser(customerUsername, orderIdBinary);
@@ -3578,14 +3464,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size)
+        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (OrderId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, DesignName) 
-               VALUES (UNHEX(REPLACE(UUID(), '-', '')), NULL, @CustomerName, NULL, NOW(), @status, @designId, @order_name, @price, @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @DesignName)";
+                string sql = @"INSERT INTO orders (
+            OrderId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, DesignId, orderName, price, quantity, 
+            last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, DesignName, PastryId) 
+            VALUES (
+            UNHEX(REPLACE(UUID(), '-', '')), NULL, @CustomerName, NULL, NOW(), @status, @designId, @order_name, @price, 
+            @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3602,11 +3492,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     command.Parameters.AddWithValue("@Flavor", flavor);
                     command.Parameters.AddWithValue("@Size", size);
                     command.Parameters.AddWithValue("@DesignName", order.designName);
+                    command.Parameters.AddWithValue("@PastryId", pastryId);
 
                     await command.ExecuteNonQueryAsync();
                 }
             }
         }
+
 
     }
 }

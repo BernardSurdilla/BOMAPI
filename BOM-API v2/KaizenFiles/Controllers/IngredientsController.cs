@@ -15,7 +15,7 @@ using System.Text.Json;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("[controller]")]
     [ApiController]
     [Authorize]
     public class IngredientsController : ControllerBase
@@ -79,7 +79,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     string sqlCheck = "SELECT COUNT(*) FROM Item WHERE item_name = @item_name";
                     using (var checkCommand = new MySqlCommand(sqlCheck, connection))
                     {
-                        checkCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
+                        checkCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
                         int ingredientCount = Convert.ToInt32(checkCommand.ExecuteScalar());
 
                         if (ingredientCount > 0)
@@ -90,7 +90,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 updateCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
                                 updateCommand.Parameters.AddWithValue("@price", ingredientDto.price);
-                                updateCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
+                                updateCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
                                 updateCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
                                 updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
 
@@ -103,7 +103,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             string sqlInsert = "INSERT INTO Item(item_name, quantity, price, status, type, createdAt, last_updated_by, last_updated_at, measurements) VALUES(@item_name, @quantity, @price, @status, @type, @createdAt, @last_updated_by, @last_updated_at, @measurements)";
                             using (var insertCommand = new MySqlCommand(sqlInsert, connection))
                             {
-                                insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.itemName);
+                                insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
                                 insertCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
                                 insertCommand.Parameters.AddWithValue("@price", ingredientDto.price);
                                 insertCommand.Parameters.AddWithValue("@status", status); // Use the calculated status
@@ -153,7 +153,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 IngriDTP ingredientDto = new IngriDTP
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
-                                    itemName = reader["item_name"].ToString(),
+                                    name = reader["item_name"].ToString(),
                                     quantity = Convert.ToDouble(reader["quantity"]),
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
@@ -197,7 +197,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 var ingredientsDto = activeIngredients.Select(ingredient => new IngriDTP
                 {
                     Id = ingredient.Id,
-                    itemName = ingredient.itemName,
+                    name = ingredient.name,
                     quantity = ingredient.quantity,
                     measurements = ingredient.measurements,
                     price = ingredient.price,
@@ -238,7 +238,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             Ingri ingredient = new Ingri
                             {
                                 Id = Convert.ToInt32(reader["id"]),
-                                itemName = reader["item_name"].ToString(),
+                                name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
@@ -282,7 +282,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 var ingredient = new
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
-                                    itemName = reader["item_name"].ToString(),
+                                    name = reader["item_name"].ToString(),
                                     Quantity = Convert.ToDouble(reader["quantity"]),
                                     Price = Convert.ToDecimal(reader["price"]),
                                     Status = reader["status"].ToString(),
@@ -308,7 +308,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("byname")]
+        [HttpGet("by-name")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientByName([FromQuery] string name)
         {
@@ -322,7 +322,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Map Ingri entities to IngriDTP DTOs
                 var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
                 {
-                    itemName = ingredient.itemName,
+                    name = ingredient.name,
                     quantity = ingredient.quantity,
                     measurements = ingredient.measurements,
                     price = ingredient.price,
@@ -343,7 +343,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("bystatus/{status}")]
+        [HttpGet("by-status/{status}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientsByStatus(string status)
         {
@@ -357,7 +357,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Map Ingri entities to IngriDTP DTOs
                 var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
                 {
-                    itemName = ingredient.itemName,
+                    name = ingredient.name,
                     quantity = ingredient.quantity,
                     measurements = ingredient.measurements,
                     price = ingredient.price,
@@ -378,7 +378,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("bytype/{type}")]
+        [HttpGet("by-type/{type}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetIngredientsByType(string type)
         {
@@ -392,7 +392,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Map Ingri entities to IngriDTP DTOs
                 var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
                 {
-                    itemName = ingredient.itemName,
+                    name = ingredient.name,
                     quantity = ingredient.quantity,
                     measurements = ingredient.measurements,
                     price = ingredient.price,
@@ -443,9 +443,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Map properties from IngriDTO to Ingri
-                if (!string.IsNullOrEmpty(updatedIngredient.itemName))
+                if (!string.IsNullOrEmpty(updatedIngredient.name))
                 {
-                    existingIngredient.itemName = updatedIngredient.itemName;
+                    existingIngredient.name = updatedIngredient.name;
                 }
                 if (updatedIngredient.quantity > 0)
                 {
@@ -504,7 +504,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpDelete("Ingredients/{id}")]
+        [HttpDelete("ingredients/{id}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult DeleteIngredient([FromQuery] int id)
         {
@@ -546,9 +546,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPut("restore{id}")]
+        [HttpPut]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult ReactivateIngredient(int id)
+        public IActionResult ReactivateIngredient([FromQuery] int restore)
         {
             try
             {
@@ -560,7 +560,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     string sqlCheck = "SELECT COUNT(*) FROM Item WHERE Id = @id";
                     using (var checkCommand = new MySqlCommand(sqlCheck, connection))
                     {
-                        checkCommand.Parameters.AddWithValue("@id", id);
+                        checkCommand.Parameters.AddWithValue("@id", restore);
                         int ingredientCount = Convert.ToInt32(checkCommand.ExecuteScalar());
 
                         if (ingredientCount == 0)
@@ -573,23 +573,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     string sqlUpdate = "UPDATE Item SET isActive = @isActive WHERE Id = @id";
                     using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
-                        updateCommand.Parameters.AddWithValue("@id", id);
+                        updateCommand.Parameters.AddWithValue("@id", restore);
                         updateCommand.Parameters.AddWithValue("@isActive", true); // Reactivate the ingredient
                         updateCommand.ExecuteNonQuery();
                     }
                 }
 
-                return Ok($"Ingredient with ID {id} has been successfully reactivated.");
+                return Ok($"Ingredient with ID {restore} has been successfully reactivated.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while reactivating ingredient with ID {id}.");
+                _logger.LogError(ex, $"An error occurred while reactivating ingredient with ID {restore}.");
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+   
 
-
-        [HttpGet("inactive")]
+    [HttpGet("inactive")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public IActionResult GetInactiveIngredients()
         {
@@ -605,7 +605,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Map Ingri entities to IngriDTP DTOs
                 var ingredientsDto = ingredients.Select(ingredient => new IngriDTP
                 {
-                    itemName = ingredient.itemName,
+                    name = ingredient.name,
                     quantity = ingredient.quantity,
                     measurements = ingredient.measurements,
                     price = ingredient.price,
@@ -648,7 +648,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 Ingri ingredient = new Ingri
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
-                                    itemName = reader["item_name"].ToString(),
+                                    name = reader["item_name"].ToString(),
                                     quantity = Convert.ToDouble(reader["quantity"]),
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
@@ -728,7 +728,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             Ingri ingredient = new Ingri
                             {
                                 Id = Convert.ToInt32(reader["id"]),
-                                itemName = reader["item_name"].ToString(),
+                                name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
@@ -769,7 +769,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             Ingri ingredient = new Ingri
                             {
                                 Id = Convert.ToInt32(reader["id"]),
-                                itemName = reader["item_name"].ToString(),
+                                name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
@@ -810,7 +810,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             Ingri ingredient = new Ingri
                             {
                                 Id = Convert.ToInt32(reader["id"]),
-                                itemName = reader["item_name"].ToString(),
+                                name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
@@ -849,7 +849,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             return new Ingri
                             {
                                 Id = reader.GetInt32(reader.GetOrdinal("id")),
-                                itemName = reader["item_name"].ToString(),
+                                name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
@@ -878,7 +878,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@id", ingredient.Id);
-                    command.Parameters.AddWithValue("@item_name", ingredient.itemName);
+                    command.Parameters.AddWithValue("@item_name", ingredient.name);
                     command.Parameters.AddWithValue("@quantity", ingredient.quantity);
                     command.Parameters.AddWithValue("@price", ingredient.price);
                     command.Parameters.AddWithValue("@status", ingredient.status);

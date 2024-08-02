@@ -1,0 +1,27 @@
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+using System.Text.Json.Serialization;
+namespace BOM_API_v2.KaizenFiles.Models
+{
+    public class Adds
+    {
+        public class AddOnDetails
+        {
+            public string name { get; set; }
+            public double pricePerUnit { get; set; }
+            public int quantity { get; set; }
+            public double size { get; set; }
+
+        }
+        public class AddOnDS2
+        {
+            public int addOnsId { get; set; }
+            public string AddOnName { get; set; }
+            public int Quantity { get; set; }
+            public string? Measurement { get; set; }
+            public double PricePerUnit { get; set; }
+            public DateTime DateAdded { get; set; }
+            public DateTime? LastModifiedDate { get; set; }
+            public bool IsActive { get; set; }
+        }
+    }
+}
