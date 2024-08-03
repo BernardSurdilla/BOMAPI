@@ -157,6 +157,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
+        public bool isActive { get; set; }
 
         public PastryMaterials PastryMaterials { get; set; }
     }

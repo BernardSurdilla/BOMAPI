@@ -1,6 +1,7 @@
 ﻿using BillOfMaterialsAPI.Helpers;
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
+using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -15,17 +16,26 @@ namespace BOM_API_v2.Controllers
         private readonly KaizenTables _kaizenTables;
         public UIHelpersController(DatabaseContext databaseContext, KaizenTables kaizenTables) { _context = databaseContext; _kaizenTables = kaizenTables; }
 
-        [Authorize]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpGet("valid-measurement-values")]
         public async Task<Dictionary<string, List<string>>> ValidMeasurementValues()
         {
             return ValidUnits.ValidMeasurementUnits();
         }
-        [Authorize]
+        [Authorize(Roles = UserRoles.Admin)]
         [HttpGet("valid-item-types")]
         public async Task<string[]> ValidItemTypes()
         {
             return ["INV"];
+        }
+        [Authorize(Roles = UserRoles.Admin)]
+        [HttpGet("valid-ingredient-importance-values")]
+        public async Task<Dictionary<string, int>> ValidIngredientImportanceValues()
+        {
+            Dictionary<string, int> response = PastryMaterialIngredientImportanceCode.ValidIngredientImportanceCodes();
+
+            return response;
+            
         }
         [HttpGet("get-design-info/{designId}")]
         public async Task<GetDesignInfo> GetDesignInfo([FromRoute] string designId)

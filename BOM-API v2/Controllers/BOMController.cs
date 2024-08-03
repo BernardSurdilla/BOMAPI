@@ -33,10 +33,10 @@ namespace API_TEST.Controllers
             _kaizenTables = kaizenTables;
         }
 
-        [HttpGet("sss/{variant_id}")]
-        public async Task<double> TestEndp(string variant_id)
+        [HttpGet("sss/{PMID}/{INGID}/{INGTYPE}")]
+        public async Task<bool> TestEndp(string PMID, string INGID, string INGTYPE)
         {
-            return await PriceCalculator.CalculatePastryMaterialPrice(variant_id, _context, _kaizenTables);
+            return await DataVerification.DoesIngredientExistsInPastryMaterial(PMID, INGID, INGTYPE, _context);
         }
     }
 

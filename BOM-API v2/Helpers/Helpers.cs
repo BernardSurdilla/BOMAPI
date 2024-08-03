@@ -3,6 +3,8 @@ using BillOfMaterialsAPI.Schemas;
 using Castle.Components.DictionaryAdapter.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Linq.Expressions;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using UnitsNet;
 
@@ -30,6 +32,19 @@ namespace BillOfMaterialsAPI.Helpers
         public const int Normal = 3;
         public const int Low = 2;
         public const int VeryLow = 1;
+
+        public static Dictionary<string, int> ValidIngredientImportanceCodes()
+        {
+            Dictionary<string, int> response = new Dictionary<string, int>();
+
+            response.Add("Critical", PastryMaterialIngredientImportanceCode.Critical);
+            response.Add("High", PastryMaterialIngredientImportanceCode.High);
+            response.Add("Normal", PastryMaterialIngredientImportanceCode.Normal);
+            response.Add("Low", PastryMaterialIngredientImportanceCode.Low);
+            response.Add("VeryLow", PastryMaterialIngredientImportanceCode.VeryLow);
+
+            return response;
+        }
     }
     public static class PastryMaterialRecipeStatus
     {
@@ -365,6 +380,32 @@ namespace BillOfMaterialsAPI.Helpers
             }
             return true;
         }
+        public static async Task<bool> DoesIngredientExistsInPastryMaterial(string pastry_material_id, string item_id, string ingredient_type, DatabaseContext context)
+        {
+            bool response = false;
+
+            PastryMaterials? currentPastryMaterial;
+            try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, context); }
+            catch { throw; }
+
+            List<Ingredients> mainIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).ToListAsync();
+            response =
+                mainIngredients.Where(x => x.item_id == item_id && x.ingredient_type == ingredient_type).FirstOrDefault() != null;
+            if (response == true) return response;
+
+            List<PastryMaterialSubVariants> subVariants = await context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).ToListAsync();
+            foreach(PastryMaterialSubVariants variant in subVariants)
+            {
+                List<PastryMaterialSubVariantIngredients> subVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == variant.pastry_material_sub_variant_id).ToListAsync();
+
+                response = subVariantIngredients.Where(x => x.item_id == item_id && x.ingredient_type == ingredient_type).FirstOrDefault() != null;
+
+                if (response == true) return response;
+            }
+            
+            return response;
+        }
+
         //Used to check the status of the recipe
         public static async Task<int[]> PastryMaterialRecipeStatus(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
         {
@@ -407,6 +448,14 @@ namespace BillOfMaterialsAPI.Helpers
             string lastPastryMaterialIngredientId = await IdFormat.GetNewestIngredientId(context);
             await TrackPastryMaterialIngredientForInsertion(lastPastryMaterialIngredientId, pastry_material_id, data, context);
             response = lastPastryMaterialIngredientId;
+
+            return response;
+        }
+        public static async Task<Guid> AddPastryMaterialIngredientImportance(string pastry_material_id, PostPastryMaterialIngredientImportance data, DatabaseContext context)
+        {
+            Guid response;
+
+            response = await TrackPastryMaterialIngredientImportanceForInsertion(pastry_material_id, data, context);
 
             return response;
         }
@@ -454,6 +503,18 @@ namespace BillOfMaterialsAPI.Helpers
                 lastPastryMaterialIngredientId = newId;
 
                 response.Add(newId);
+            }
+
+            return response;
+        }
+        public static async Task<List<Guid>> AddPastryMaterialIngredientImportance(string pastry_material_id, List<PostPastryMaterialIngredientImportance> data, DatabaseContext context)
+        {
+            List<Guid> response = new List<Guid>();
+            if (data.IsNullOrEmpty()) { return response; }
+
+            foreach (PostPastryMaterialIngredientImportance ingredientImportance in data)
+            {
+                response.Add(await TrackPastryMaterialIngredientImportanceForInsertion(pastry_material_id, ingredientImportance, context));
             }
 
             return response;
@@ -533,6 +594,30 @@ namespace BillOfMaterialsAPI.Helpers
             await context.Ingredients.AddAsync(newIngredientsEntry);
 
             response = IdFormat.IncrementId(IdPrefix.Ingredient, IdFormat.IdNumbersLength, ingredient_id);
+            return response;
+        }
+        private static async Task<Guid> TrackPastryMaterialIngredientImportanceForInsertion(string pastry_material_id, PostPastryMaterialIngredientImportance data, DatabaseContext context)
+        {
+            Guid response;
+
+            response = Guid.NewGuid();
+
+            PastryMaterialIngredientImportance newIngredientImportanceEntry = new PastryMaterialIngredientImportance();
+            DateTime currentTime = DateTime.Now;
+
+            newIngredientImportanceEntry.pastry_material_ingredient_importance_id = response;
+            newIngredientImportanceEntry.pastry_material_id = pastry_material_id;
+
+            newIngredientImportanceEntry.item_id = data.item_id;
+            newIngredientImportanceEntry.importance = data.importance;
+            newIngredientImportanceEntry.ingredient_type = data.ingredient_type;
+
+            newIngredientImportanceEntry.date_added = currentTime;
+            newIngredientImportanceEntry.last_modified_date = currentTime;
+            newIngredientImportanceEntry.isActive = true;
+
+            await context.PastryMaterialIngredientImportance.AddAsync(newIngredientImportanceEntry);
+
             return response;
         }
         private static async Task<string> TrackPastryMaterialAddOnForInsertion(string pastry_material_add_on_id, string pastry_material_id, PostPastryMaterialAddOns data, DatabaseContext context)
@@ -646,6 +731,32 @@ namespace BillOfMaterialsAPI.Helpers
             }
             catch { }
             throw new NotFoundInDatabaseException("No pastry material ingredient with the id " + ingredient_id + " for the pastry material with the id " + pastry_material_id + " found in the database.");
+        }
+        public static async Task<PastryMaterialIngredientImportance> GetPastryMaterialIngredientImportanceAsync(Guid pastry_material_ingredient_importance_id, DatabaseContext context)
+        {
+            PastryMaterialIngredientImportance? currentIngredientImportance;
+            try
+            {
+                currentIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x
+                => x.isActive == true && x.pastry_material_ingredient_importance_id == pastry_material_ingredient_importance_id).FirstAsync();
+
+                return currentIngredientImportance;
+            }
+            catch { }
+            throw new NotFoundInDatabaseException("No pastry material ingredient importance with the id " + pastry_material_ingredient_importance_id + " found in the database.");
+        }
+        public static async Task<PastryMaterialIngredientImportance> GetPastryMaterialIngredientImportanceAsync(string pastry_material_id, Guid pastry_material_ingredient_importance_id, DatabaseContext context)
+        {
+            PastryMaterialIngredientImportance? currentIngredientImportance;
+            try
+            {
+                currentIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x
+                => x.isActive == true && x.pastry_material_ingredient_importance_id == pastry_material_ingredient_importance_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+
+                return currentIngredientImportance;
+            }
+            catch { }
+            throw new NotFoundInDatabaseException("No pastry material ingredient importance with the id " + pastry_material_ingredient_importance_id + " for the pastry material with the id " + pastry_material_id + " found in the database.");
         }
         public static async Task<PastryMaterialAddOns> GetPastryMaterialAddOnAsync(string pastry_material_add_on_id, DatabaseContext context)
         {
@@ -801,11 +912,13 @@ namespace BillOfMaterialsAPI.Helpers
             response.ingredients_in_stock = true;
 
             List<GetPastryMaterialIngredients> responsePastryMaterialList = new List<GetPastryMaterialIngredients>();
+            List<GetPastryMaterialIngredientImportance> responsePastryMaterialImportanceList = new List<GetPastryMaterialIngredientImportance>();
             List<GetPastryMaterialAddOns> responsePastryMaterialAddOns = new List<GetPastryMaterialAddOns>();
             List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastryMaterialIngredientImportance> currentPastryMaterialIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             List<PastryMaterialAddOns> currentPastryMaterialAddOns = await context.PastryMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
 
             Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
@@ -1088,6 +1201,21 @@ namespace BillOfMaterialsAPI.Helpers
                         }
                 }
                 responsePastryMaterialList.Add(newSubIngredientListEntry);
+            }
+            foreach (PastryMaterialIngredientImportance currentIngredientImportance in currentPastryMaterialIngredientImportance)
+            {
+                GetPastryMaterialIngredientImportance newResponseImportanceListEntry = new GetPastryMaterialIngredientImportance();
+                newResponseImportanceListEntry.pastry_material_id = currentIngredientImportance.pastry_material_id;
+                newResponseImportanceListEntry.pastry_material_ingredient_importance_id = currentIngredientImportance.pastry_material_ingredient_importance_id;
+
+                newResponseImportanceListEntry.item_id = currentIngredientImportance.item_id;
+                newResponseImportanceListEntry.ingredient_type = currentIngredientImportance.ingredient_type;
+                newResponseImportanceListEntry.importance = currentIngredientImportance.importance;
+
+                newResponseImportanceListEntry.date_added = currentIngredientImportance.date_added;
+                newResponseImportanceListEntry.last_modified_date = currentIngredientImportance.last_modified_date;
+
+                responsePastryMaterialImportanceList.Add(newResponseImportanceListEntry);
             }
             foreach (PastryMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
             {
@@ -1433,6 +1561,7 @@ namespace BillOfMaterialsAPI.Helpers
             }
 
             response.ingredients = responsePastryMaterialList;
+            response.ingredient_importance = responsePastryMaterialImportanceList;
             response.add_ons = responsePastryMaterialAddOns;
             response.sub_variants = responsePastryMaterialSubVariants;
             response.cost_estimate = calculatedCost;

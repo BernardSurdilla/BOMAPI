@@ -13,7 +13,7 @@ namespace BOM_API_v2.Controllers
 {
     [ApiController]
     [Route("pastry-materials")]
-    [Authorize]
+    [Authorize(Roles = UserRoles.Admin)]
     public class PastryMaterialController : ControllerBase
     {
         private readonly DatabaseContext _context;
@@ -24,7 +24,6 @@ namespace BOM_API_v2.Controllers
 
         //GET
         [HttpGet]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetPastryMaterial>> GetAllPastryMaterial(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
             List<PastryMaterials> pastryMaterials;
@@ -121,7 +120,6 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("{pastry_material_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<GetPastryMaterial> GetSpecificPastryMaterial(string pastry_material_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -140,7 +138,6 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpGet("{pastry_material_id}/ingredients")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<List<GetPastryMaterialIngredients>> GetAllPastryMaterialIngredient(string pastry_material_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -160,10 +157,9 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "All Pastry Material Ingredients");
             return response;
         }
-
+        
         //POST
         [HttpPost]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterial(PostPastryMaterial newEntry)
         {
             if (await DataVerification.DesignExistsAsync(newEntry.design_id, _context) == false) { return NotFound(new {message = "No design with the id " + newEntry.design_id + " found."}); }
@@ -172,13 +168,29 @@ namespace BOM_API_v2.Controllers
                 try { await DataVerification.IsIngredientItemValid(entry.item_id, entry.ingredient_type, entry.amount_measurement, _context, _kaizenTables); }
                 catch (Exception e) { return BadRequest(new { message = e.Message }); }
             }
-            if (newEntry.add_ons.IsNullOrEmpty() == false)
+            if (newEntry.add_ons != null)
             {
                 foreach (PostPastryMaterialAddOns addOnEntry in newEntry.add_ons)
                 {
                     AddOns? selectedAddOn = null;
                     try { selectedAddOn = await DataRetrieval.GetAddOnItemAsync(addOnEntry.add_ons_id, _kaizenTables); }
                     catch(Exception e) { return NotFound(new { message = e.Message }); }
+                }
+            }
+            if (newEntry.ingredient_importance != null)
+            {
+                foreach (PostPastryMaterialIngredientImportance importanceEntry in newEntry.ingredient_importance)
+                {
+                    bool isImportanceValid = false;
+
+                    bool inMainIngredients = newEntry.ingredients.Where(x => x.item_id == importanceEntry.item_id && x.ingredient_type == importanceEntry.ingredient_type).FirstOrDefault() != null ? true : false;
+
+                    bool inSubVariantIngredients = false;
+                    if (newEntry.sub_variants != null) inSubVariantIngredients = newEntry.sub_variants.Where(subVariant => subVariant.sub_variant_ingredients.Where(ingredient => ingredient.item_id == importanceEntry.item_id && ingredient.ingredient_type == importanceEntry.ingredient_type).IsNullOrEmpty() == false).FirstOrDefault() != null ? true : false;
+
+                    isImportanceValid = inMainIngredients || inSubVariantIngredients;
+
+                    if (isImportanceValid == false) return BadRequest(new { message = "One of the ingredient importance entry uses an item that does not exist in both main and sub variant ingredients, id " + importanceEntry.item_id }); 
                 }
             }
             if (newEntry.sub_variants != null)
@@ -218,11 +230,9 @@ namespace BOM_API_v2.Controllers
             await _context.PastryMaterials.AddAsync(newPastryMaterialEntry);
             await _context.SaveChangesAsync();
 
-            string lastPastryMaterialAddOnId = await IdFormat.GetNewestPastryMaterialAddOnId(_context);
-
             await DataInsertion.AddPastryMaterialIngredient(newPastryMaterialId, newEntry.ingredients, _context);
             if (newEntry.add_ons != null) await DataInsertion.AddPastryMaterialAddOns(newPastryMaterialId, newEntry.add_ons, _context);
-
+            if (newEntry.ingredient_importance != null) await DataInsertion.AddPastryMaterialIngredientImportance(newPastryMaterialId, newEntry.ingredient_importance, _context);
             await _context.SaveChangesAsync();
 
             if (newEntry.sub_variants != null)
@@ -254,7 +264,6 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPost("{pastry_material_id}/ingredients")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialIngredient(string pastry_material_id, PostIngredients entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -271,8 +280,25 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Data inserted to the database." });
 
         }
+        [HttpPost("{pastry_material_id}/ingredient-importance")]
+        public async Task<IActionResult> AddNewPastryMaterialIngredientImportance(string pastry_material_id, PostPastryMaterialIngredientImportance entry)
+        {
+            PastryMaterials? currentPastryMaterial;
+            try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            if (await DataVerification.DoesIngredientExistsInPastryMaterial(pastry_material_id, entry.item_id, entry.ingredient_type, _context) == false) { return BadRequest(new { message = "Item with the id " + entry.item_id + " does not exist in both the main variant and sub variants of the pastry material " + pastry_material_id }); }
+
+            PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id).FirstOrDefaultAsync();
+
+            if (importanceForSelectedIngredient != null) return BadRequest(new { message = "Importance entry for the item with the id " + entry.item_id + " and ingredient type " + entry.ingredient_type + " already exists, please modify that instead" });
+
+            Guid newImportanceEntryId = await DataInsertion.AddPastryMaterialIngredientImportance(pastry_material_id, entry, _context);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Data inserted to the database." });
+        }
         [HttpPost("{pastry_material_id}/add_ons")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialAddOn(string pastry_material_id, PostPastryMaterialAddOns entry)
         {
             PastryMaterials? currentPastryMaterial = null;
@@ -290,7 +316,6 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPost("{pastry_material_id}/sub-variants")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariant(string pastry_material_id, PostPastryMaterialSubVariant entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -337,7 +362,6 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add Sub variant " + lastPastryMaterialSubVariantId + " for " + pastry_material_id);
             return Ok(new { message = "New sub variant for " + pastry_material_id + " added" });
         }
-        [Authorize(Roles = UserRoles.Admin)]
         [HttpPost("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/ingredients")]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantIngredients entry)
         {
@@ -359,7 +383,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "New sub variant ingredient for " + pastry_material_sub_variant_id + " added" });
         }
         [HttpPost("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantAddOns entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -382,7 +405,6 @@ namespace BOM_API_v2.Controllers
 
         //PATCH
         [HttpPatch("{pastry_material_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterial(string pastry_material_id, PatchPastryMaterials entry)
         {
             if (await DataVerification.DesignExistsAsync(entry.design_id, _context) == false) { return NotFound(new { message = "No design with the id " + entry.design_id + " found." }); }
@@ -405,7 +427,6 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpPatch("{pastry_material_id}/ingredients/{ingredient_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialIngredient(string pastry_material_id, string ingredient_id, PatchIngredients entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -433,8 +454,38 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
         }
+        [HttpPatch("{pastry_material_id}/ingredient-importance/{pastry_material_ingredient_importance_id}")]
+        public async Task<IActionResult> UpdatePastryMaterialIngredientImportance(string pastry_material_id, Guid pastry_material_ingredient_importance_id, PatchPastryMaterialIngredientImportance entry)
+        {
+            PastryMaterials? currentPastryMaterial;
+            try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            PastryMaterialIngredientImportance? currentIngredientImportance;
+            try { currentIngredientImportance = await DataRetrieval.GetPastryMaterialIngredientImportanceAsync(pastry_material_id, pastry_material_ingredient_importance_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            if (await DataVerification.DoesIngredientExistsInPastryMaterial(pastry_material_id, entry.item_id, entry.ingredient_type, _context) == false) { return BadRequest(new { message = "Item with the id " + entry.item_id + " does not exist in both the main variant and sub variants of the pastry material " + pastry_material_id }); }
+
+            PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id && x.pastry_material_ingredient_importance_id.Equals(currentIngredientImportance.pastry_material_ingredient_importance_id) == false).FirstOrDefaultAsync();
+
+            if (importanceForSelectedIngredient != null) return BadRequest(new { message = "Importance entry for the item with the id " + entry.item_id + " and ingredient type " + entry.ingredient_type + " already exists, please modify that instead" });
+            
+            DateTime currentTime = DateTime.Now;
+
+            _context.PastryMaterialIngredientImportance.Update(currentIngredientImportance);
+            currentIngredientImportance.item_id = entry.item_id;
+            currentIngredientImportance.importance = entry.importance;
+            currentIngredientImportance.ingredient_type = entry.ingredient_type;
+            currentIngredientImportance.last_modified_date = currentTime;
+
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Ingredient " + pastry_material_id);
+            return Ok(new { message = "Pastry Material Ingredient updated." });
+
+        }
         [HttpPatch("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id, PatchPastryMaterialAddOn entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -459,7 +510,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Add on " + pastry_material_add_on_id + " updated " });
         }
         [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariant(string pastry_material_id, string pastry_material_sub_variant_id, PatchPastryMaterialSubVariants entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -480,7 +530,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Sub variant updated" });
         }
         [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/ingredients/{pastry_material_sub_variant_ingredient_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id, PatchPastryMaterialSubVariantsIngredient entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -510,7 +559,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Sub variant updated" });
         }
         [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id, PatchPastryMaterialSubVariantAddOn entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -541,7 +589,6 @@ namespace BOM_API_v2.Controllers
 
         //DELETE
         [HttpDelete("{pastry_material_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterial(string pastry_material_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -569,7 +616,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material deleted." });
         }
         [HttpDelete("{pastry_material_id}/ingredients/{ingredient_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialIngredient(string pastry_material_id, string ingredient_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -589,8 +635,30 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material Ingredient " + ingredient_id);
             return Ok(new { message = "Ingredient deleted." });
         }
+        [HttpDelete("{pastry_material_id}/ingredient-importance/{pastry_material_ingredient_importance_id}")]
+        public async Task<IActionResult> DeletePastryMaterialIngredientImportance(string pastry_material_id, Guid pastry_material_ingredient_importance_id)
+        {
+            PastryMaterials? currentPastryMaterial;
+            try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            PastryMaterialIngredientImportance? currentIngredientImportance;
+            try { currentIngredientImportance = await DataRetrieval.GetPastryMaterialIngredientImportanceAsync(pastry_material_id, pastry_material_ingredient_importance_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            DateTime currentTime = DateTime.Now;
+
+            _context.PastryMaterialIngredientImportance.Update(currentIngredientImportance);
+            currentIngredientImportance.last_modified_date = currentTime;
+            currentIngredientImportance.isActive = false;
+
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Ingredient " + pastry_material_id);
+            return Ok(new { message = "Pastry Material Ingredient updated." });
+
+        }
         [HttpDelete("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -610,7 +678,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Add on " + pastry_material_add_on_id + " deleted " });
         }
         [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariant(string pastry_material_id, string pastry_material_sub_variant_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -630,7 +697,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Sub variant deleted" });
         }
         [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/ingredients/{pastry_material_sub_variant_ingredient_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialVariantIngredient(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_ingredient_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -654,7 +720,6 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Sub variant deleted" });
         }
         [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
-        [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> DeletePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id)
         {
             PastryMaterials? currentPastryMaterial;

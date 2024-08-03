@@ -121,6 +121,7 @@ namespace BillOfMaterialsAPI.Schemas
         public string main_variant_name { get; set; }
         public bool ingredients_in_stock { get; set; }
         public List<GetPastryMaterialIngredients> ingredients { get; set; }
+        public List<GetPastryMaterialIngredientImportance>? ingredient_importance { get; set; }
         public List<GetPastryMaterialAddOns>? add_ons { get; set; }
         public List<GetPastryMaterialSubVariant>? sub_variants { get; set; }
 
@@ -153,6 +154,18 @@ namespace BillOfMaterialsAPI.Schemas
 
         public List<SubGetMaterialIngredients>? material_ingredients { get; set; }
 
+    }
+    public class GetPastryMaterialIngredientImportance
+    {
+        [Required] public Guid pastry_material_ingredient_importance_id { get; set; }
+        [Required] public string pastry_material_id { get; set; }
+
+        [Required] public string item_id { get; set; }
+        [Required] public string ingredient_type { get; set; }
+        [Required] public int importance { get; set; }
+
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
     }
     public class GetPastryMaterialAddOns
     {
