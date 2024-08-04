@@ -123,7 +123,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class OrderIngredientSubtractionLog
     {
         [Required][Key] public Guid order_ingredient_subtraction_log_id { get; set; }
-        [Required] public Guid order_id { get; set; }
+        [Required][Column(TypeName = "binary(16)")] public byte[] order_id { get; set; }
         [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
 
         public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
@@ -250,9 +250,10 @@ namespace BillOfMaterialsAPI.Schemas
     [Table("orders")]
     public class Orders
     {
-        [Column("OrderId")][Required][Key] public Guid order_id { get; set; }
+        [Column("OrderId")][Required][Key] public byte[] order_id { get; set; }
         [Column("CustomerId")][Required] public Guid customer_id { get; set; }
         [Column("EmployeeId")][Required] public Guid? employee_id { get; set; }
+        [Column("PastryId")] public string pastry_id { get; set; }
 
         [Column("CreatedAt")] public DateTime created_at { get; set; }
         [Column("Status")][MaxLength(50)] public string status { get; set; }
