@@ -11,6 +11,11 @@ using System.Globalization;
 using System.Security.Claims;
 using BOM_API_v2.Helpers;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -147,6 +152,107 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
 
             return addOnDSOSList;
+        }
+
+        [HttpPatch("update-add-on")] //test this soon
+        public async Task<IActionResult> UpdateAddOn([FromQuery] int addOnsId, [FromBody] Models.Adds.UpdateAddOnRequest updateRequest)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                        UPDATE AddOns 
+                        SET 
+                            name = @AddOnName, 
+                            quantity = @Quantity, 
+                            measurement = @Measurement, 
+                            pricePerUnit = @PricePerUnit, 
+                            LastModifiedDate = @LastModifiedDate, 
+                            IsActive = @IsActive 
+                        WHERE addOnsId = @AddOnsId";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@AddOnsId", addOnsId);
+                        command.Parameters.AddWithValue("@AddOnName", updateRequest.AddOnName);
+                        command.Parameters.AddWithValue("@Quantity", updateRequest.Quantity);
+                        command.Parameters.AddWithValue("@Measurement", updateRequest.Measurement ?? (object)DBNull.Value);
+                        command.Parameters.AddWithValue("@PricePerUnit", updateRequest.PricePerUnit);
+                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+                        command.Parameters.AddWithValue("@IsActive", updateRequest.Quantity >= 1);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound($"Add-On with ID '{addOnsId}' not found.");
+                        }
+
+                        return Ok($"Add-On '{addOnsId}' updated successfully.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating Add-On in the database.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+        [HttpPatch("update-add-on/restore-delete")] //test this soon
+        public async Task<IActionResult> UpdateAddOnAction([FromQuery] int addOnsId, [FromQuery] string action)
+        {
+            try
+            {
+                bool isActive;
+
+                switch (action.ToLower())
+                {
+                    case "restore":
+                        isActive = true;
+                        break;
+                    case "delete":
+                        isActive = false;
+                        break;
+                    default:
+                        return BadRequest("Invalid action. Please use 'restore' or 'delete'.");
+                }
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                UPDATE AddOns 
+                SET 
+                    IsActive = @IsActive, 
+                    LastModifiedDate = @LastModifiedDate
+                WHERE addOnsId = @AddOnsId";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@AddOnsId", addOnsId);
+                        command.Parameters.AddWithValue("@IsActive", isActive);
+                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound($"Add-On with ID '{addOnsId}' not found.");
+                        }
+
+                        return Ok($"Add-On '{addOnsId}' updated successfully with action '{action}'.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating Add-On in the database.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
         }
 
     }
