@@ -12,16 +12,13 @@ namespace BOM_API_v2.KaizenFiles.Models
             public double size { get; set; }
 
         }
-        public class AddOnDS2
+        public class UpdateAddOnRequest
         {
-            public int addOnsId { get; set; }
             public string AddOnName { get; set; }
             public int Quantity { get; set; }
             public string? Measurement { get; set; }
             public double PricePerUnit { get; set; }
-            public DateTime DateAdded { get; set; }
-            public DateTime? LastModifiedDate { get; set; }
-            public bool IsActive { get; set; }
         }
+
     }
 }

@@ -108,31 +108,12 @@ namespace CRUDFI.Models
         public int total { get; set; }
         public DateTime date { get; set; }
     }
-    public class DesignAddOnsUpdateDTO
-    {
-        public List<AddOnDTO> AddOnsToAdd { get; set; }
-        public List<string> AddOnsToRemove { get; set; }
-    }
-
-    public class AddOnDTO
-    {
-        public string Name { get; set; }
-        public int Quantity { get; set; }
-    }
 
     public class CustomAddons
     {
         public string? name { get; set; }
         public int? quantity { get; set; }
         public double? price{ get; set; }
-    }
-
-    public class AddOnDTOS
-    {
-        public int AddOnId { get; set; }
-        public string AddOnName { get; set; }
-        public double PricePerUnit { get; set; }
-        public int Quantity { get; set; }
     }
     public class orderAddons
     {
@@ -160,6 +141,7 @@ namespace CRUDFI.Models
         public double Price { get; set; }
         public int Quantity { get; set; }
     }
+
     public class AddOnDS2
     {
         public int addOnsId { get; set; }
@@ -191,17 +173,6 @@ namespace CRUDFI.Models
         public double total { get; set; }
 
     }
-    public class ManageAddOnsRequest
-    {
-        public List<ManageAddOnAction> Actions { get; set; }
-    }
-
-    public class AddOnAction
-    {
-        public int AddOnId { get; set; }
-        public string ActionType { get; set; }
-        public int Quantity { get; set; }
-    }
 
     public class ManageAddOnAction
     {
@@ -213,24 +184,6 @@ namespace CRUDFI.Models
     {
         public int AddOnId { get; set; }
         public int Quantity { get; set; }
-    }
-
-
-    public class OrderAddOn
-    {
-        public int AddOnId { get; set; }
-        public string AddOnName { get; set; }
-        public double Price { get; set; }
-        public int Quantity { get; set; }
-    }
-
-
-    public class DesignAddOn
-    {
-        public int DesignAddOnId { get; set; }
-        public string AddOnName { get; set; }
-        public int Quantity { get; set; }
-        public double Price { get; set; }
     }
     public class AddNewAddOnRequest
     {
