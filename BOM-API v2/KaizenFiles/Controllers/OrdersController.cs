@@ -1948,61 +1948,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("update-add-on")]
-        public async Task<IActionResult> UpdateAddOn(
-     [FromQuery] string addOnsId,
-     [FromBody] UpdateAddOnRequest request)
-        {
-            try
-            {
-                using (var connection = new MySqlConnection(connectionstring))
-                {
-                    await connection.OpenAsync();
-
-                    // Check if the add-on exists
-                    string sqlCheck = "SELECT COUNT(*) FROM addons WHERE addOnsId = @addOnsId";
-                    using (var checkCommand = new MySqlCommand(sqlCheck, connection))
-                    {
-                        checkCommand.Parameters.AddWithValue("@addOnsId", addOnsId);
-                        int addOnCount = Convert.ToInt32(await checkCommand.ExecuteScalarAsync());
-
-                        if (addOnCount == 0)
-                        {
-                            return NotFound("Add-On not found");
-                        }
-                    }
-
-                    // Update the add-on details
-                    string sqlUpdate = @"
-                UPDATE AddOns 
-                SET 
-                    price = @price,
-                    quantity = @quantity,
-                    last_modified_date = @lastModifiedDate
-                WHERE 
-                    addOnsId = @addOnsId";
-
-                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
-                    {
-                        updateCommand.Parameters.AddWithValue("@price", request.Price);
-                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity); // Corrected parameter name to match request
-                        updateCommand.Parameters.AddWithValue("@lastModifiedDate", DateTime.UtcNow);
-                        updateCommand.Parameters.AddWithValue("@addOnsId", addOnsId); // Use the ID from query
-
-                        await updateCommand.ExecuteNonQueryAsync();
-                    }
-                }
-
-                return Ok("Add-On updated successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating the Add-On.");
-                return StatusCode(500, "An error occurred while processing the request.");
-            }
-        }
-
-
         [HttpPatch("confirmation")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderId, [FromQuery] string action)

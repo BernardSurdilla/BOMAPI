@@ -136,11 +136,6 @@ namespace CRUDFI.Models
         public double PricePerUnit { get; set; }
         public int AddOnId { get; set; }
     }
-    public class UpdateAddOnRequest
-    {
-        public double Price { get; set; }
-        public int Quantity { get; set; }
-    }
 
     public class AddOnDS2
     {
