@@ -42,6 +42,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("User is not authorized");
                 }
 
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
                 // Get the design's ID using the provided design name
                 byte[] designId = await GetDesignIdByDesignName(designName);
                 if (designId == null || designId.Length == 0)
@@ -107,7 +113,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
 
                 // Insert the order into the database using the determined pastryId
-                await InsertOrder(order, designId, flavor, size, pastryId);
+                await InsertOrder(order, designId, flavor, size, pastryId, customerId);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -151,6 +157,179 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     var result = await command.ExecuteScalarAsync();
                     return result != null && result != DBNull.Value ? result.ToString() : null;
+                }
+            }
+        }
+
+        [HttpPost("customer/add-to-suborder")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> CreateSubOrder([FromBody] SubOrderDTO subOrderDto, [FromQuery] string orderId, [FromQuery] string designName, [FromQuery] string description, [FromQuery] string flavor, [FromQuery] string size)
+        {
+            try
+            {
+                // Fetch customer username from claims
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Convert the orderId to binary
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                // Get the PickupDateTime and Type from the orders table
+                DateTime? pickupDateTime = await GetOrderPickupDateTime(orderIdBinary);
+                string orderType = await GetOrderType(orderIdBinary);
+
+                if (pickupDateTime == null || orderType == null)
+                {
+                    return BadRequest("Order not found or invalid data.");
+                }
+
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                byte[] designId = await GetDesignIdByDesignName(designName);
+                if (designId == null || designId.Length == 0)
+                {
+                    return BadRequest("Design not found.");
+                }
+
+                string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
+
+                // Get the pastry material ID using just the design ID
+                string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
+
+                // Get the pastry material ID using the design ID and size
+                string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, size);
+
+                // Get the pastry material sub-variant ID using the pastry material ID and size
+                string subVariantId = await GetPastryMaterialSubVariantId(pastryMaterialId, size);
+
+                // Determine the appropriate pastryId to use
+                string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
+
+                // Generate a new suborder object
+                var subOrder = new SubOrder
+                {
+                    SubOrderId = Guid.NewGuid(),
+                    OrderId = orderIdBinary,
+                    CustomerName = customerUsername,
+                    CreatedAt = DateTime.Now,
+                    Status = "pending",
+                    DesignName = designName,
+                    Price = subOrderDto.Price,
+                    Quantity = subOrderDto.Quantity,
+                    Size = size,
+                    Flavor = flavor,
+                    Description = description,
+                    Type = orderType, // Set Type from orders table
+                    IsActive = false, // Set isActive to false for all suborders created
+                    PickupDateTime = pickupDateTime.Value // Set PickupDateTime from orders table
+                };
+
+                // Insert the suborder into the database
+                await InsertSubOrder(subOrder, pastryId, designId, customerId);
+
+                return Ok(); // Return 200 OK if the suborder is successfully created
+            }
+            catch (Exception ex)
+            {
+                // Log and return an error message if an exception occurs
+                _logger.LogError(ex, "An error occurred while creating the suborder");
+                return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
+            }
+        }
+
+
+
+        private async Task<DateTime?> GetOrderPickupDateTime(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT PickupDateTime FROM orders WHERE OrderId = UNHEX(@orderId)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return reader.GetDateTime("PickupDateTime");
+                        }
+                        return null;
+                    }
+                }
+            }
+        }
+
+        private async Task<string> GetOrderType(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT Type FROM orders WHERE OrderId = UNHEX(@orderId)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return reader.GetString("Type");
+                        }
+                        return null;
+                    }
+                }
+            }
+        }
+
+
+        private async Task InsertSubOrder(SubOrder subOrder, string pastryId, byte[] designId, byte[] customerId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string subOrderIdHex = "0x" + Guid.NewGuid().ToString("N");
+
+                string sql = @"INSERT INTO suborders (
+            suborder_id, OrderId, PastryId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, 
+            DesignId, price, quantity, Size, Flavor, Description, last_updated_by, last_updated_at, type, PickupDateTime, isActive) 
+            VALUES (
+            @SubOrderId, UNHEX(@OrderId), @PastryId, @customerId, @CustomerName, NULL, @CreatedAt, 
+            @Status, @DesingId, @Price, @Quantity, @Size, @Flavor, @Description, NULL, NULL, @Type, @PickupDateTime, @IsActive)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@SubOrderId", subOrderIdHex);
+                    command.Parameters.AddWithValue("@OrderId", subOrder.OrderId);
+                    command.Parameters.AddWithValue("@PastryId", pastryId);
+                    command.Parameters.AddWithValue("@DesingId", designId);
+                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@CustomerName", subOrder.CustomerName);
+                    command.Parameters.AddWithValue("@CreatedAt", subOrder.CreatedAt);
+                    command.Parameters.AddWithValue("@Status", subOrder.Status);
+                    command.Parameters.AddWithValue("@Price", subOrder.Price);
+                    command.Parameters.AddWithValue("@Quantity", subOrder.Quantity);
+                    command.Parameters.AddWithValue("@Size", subOrder.Size);
+                    command.Parameters.AddWithValue("@Flavor", subOrder.Flavor);
+                    command.Parameters.AddWithValue("@Description", subOrder.Description);
+                    command.Parameters.AddWithValue("@Type", subOrder.Type);
+                    command.Parameters.AddWithValue("@PickupDateTime", subOrder.PickupDateTime);
+                    command.Parameters.AddWithValue("@IsActive", subOrder.IsActive);
+
+                    await command.ExecuteNonQueryAsync();
                 }
             }
         }
@@ -3393,7 +3572,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId)
+        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId, byte[] customerId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -3403,11 +3582,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             OrderId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, DesignId, price, quantity, 
             last_updated_by, last_updated_at, type, isActive, PickupDateTime, Description, Flavor, Size, DesignName, PastryId) 
             VALUES (
-            UNHEX(REPLACE(UUID(), '-', '')), NULL, @CustomerName, NULL, NOW(), @status, @designId, @order_name, @price, 
+            UNHEX(REPLACE(UUID(), '-', '')), @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
             @quantity, NULL, NULL, @type, @isActive, @pickupDateTime, @Description, @Flavor, @Size, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
+                    command.Parameters.AddWithValue("@customerId", customerId);
                     command.Parameters.AddWithValue("@CustomerName", order.customerName);
                     command.Parameters.AddWithValue("@designId", designId);
                     command.Parameters.AddWithValue("@status", order.status);
