@@ -29,6 +29,12 @@
 
         public DateTime lastUpdatedAt { get; set; }
     }
+    public class ThresholdConfig
+    {
+        public int GoodThreshold { get; set; }
+        public int MidThreshold { get; set; }
+        public int CriticalThreshold { get; set; }
+    }
     public class ItemUpdateRequest
     {
         public string name { get; set; } = "";

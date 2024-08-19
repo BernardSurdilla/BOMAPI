@@ -12,6 +12,9 @@ using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using BOM_API_v2.Helpers;
 using System.Text.Json;
+using System.Text;
+using System.Data;
+using UnitsNet;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -52,17 +55,20 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("User ID not found");
                 }
 
-                // Determine the status based on quantity
+                // Fetch threshold values from the database
+                var thresholds = GetThresholdValues();
+
+                // Determine the status based on quantity and thresholds
                 string status;
-                if (ingredientDto.quantity < 50)
+                if (ingredientDto.quantity <= thresholds.CriticalThreshold)
                 {
                     status = "critical";
                 }
-                else if (ingredientDto.quantity >= 50)
+                else if (ingredientDto.quantity >= thresholds.MidThreshold && ingredientDto.quantity < thresholds.GoodThreshold)
                 {
                     status = "mid";
                 }
-                else if (ingredientDto.quantity >= 100)
+                else if (ingredientDto.quantity >= thresholds.GoodThreshold)
                 {
                     status = "good";
                 }
@@ -130,6 +136,35 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
+        private (int GoodThreshold, int MidThreshold, int CriticalThreshold) GetThresholdValues()
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                connection.Open();
+
+                string sql = "SELECT GoodThreshold, MidThreshold, CriticalThreshold FROM ThresholdConfig WHERE Id = 1";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = command.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            int goodThreshold = reader.GetInt32("GoodThreshold");
+                            int midThreshold = reader.GetInt32("MidThreshold");
+                            int criticalThreshold = reader.GetInt32("CriticalThreshold");
+
+                            return (goodThreshold, midThreshold, criticalThreshold);
+                        }
+                        else
+                        {
+                            throw new Exception("Threshold values not found in the database.");
+                        }
+                    }
+                }
+            }
+        }
+
+
         [HttpGet]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllIngredients()
@@ -142,6 +177,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
+                    // Fetch the threshold values
+                    var thresholds = await GetThresholdValuesAsync(connection);
+
+                    // Fetch all ingredients
                     string sql = "SELECT * FROM Item"; // Adjust SQL query as per your database schema
 
                     using (var command = new MySqlCommand(sql, connection))
@@ -150,13 +189,34 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
+                                double quantity = Convert.ToDouble(reader["quantity"]);
+                                string status;
+
+                                // Determine the status based on quantity and thresholds
+                                if (quantity <= thresholds.CriticalThreshold)
+                                {
+                                    status = "critical";
+                                }
+                                else if (quantity >= thresholds.MidThreshold && quantity < thresholds.GoodThreshold)
+                                {
+                                    status = "mid";
+                                }
+                                else if (quantity >= thresholds.GoodThreshold)
+                                {
+                                    status = "good";
+                                }
+                                else
+                                {
+                                    status = "normal"; // Default status if none of the conditions are met
+                                }
+
                                 IngriDTP ingredientDto = new IngriDTP
                                 {
                                     Id = Convert.ToInt32(reader["id"]),
                                     name = reader["item_name"].ToString(),
-                                    quantity = Convert.ToDouble(reader["quantity"]),
+                                    quantity = quantity,
                                     price = Convert.ToDecimal(reader["price"]),
-                                    status = reader["status"].ToString(),
+                                    status = status, // Use the determined status
                                     type = reader["type"].ToString(),
                                     CreatedAt = Convert.ToDateTime(reader["createdAt"]),
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
@@ -179,6 +239,33 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while fetching ingredients data.");
             }
         }
+
+        // Helper method to fetch threshold values
+        private async Task<ThresholdConfig> GetThresholdValuesAsync(MySqlConnection connection)
+        {
+            string sql = "SELECT * FROM ThresholdConfig WHERE Id = 1"; // Assumes there's only one row with Id = 1
+
+            using (var command = new MySqlCommand(sql, connection))
+            {
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        return new ThresholdConfig
+                        {
+                            GoodThreshold = reader.GetInt32("GoodThreshold"),
+                            MidThreshold = reader.GetInt32("MidThreshold"),
+                            CriticalThreshold = reader.GetInt32("CriticalThreshold")
+                        };
+                    }
+                    else
+                    {
+                        throw new Exception("Threshold configuration not found.");
+                    }
+                }
+            }
+        }
+
 
 
 
@@ -502,6 +589,53 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
+        [HttpPatch("threshold/update")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> UpdateThresholdConfig([FromQuery] int goodThreshold, [FromQuery] int midThreshold)
+        {
+            try
+            {
+                // Ensure that the thresholds are valid
+                if (goodThreshold <= midThreshold || midThreshold <= 0)
+                {
+                    return BadRequest("Invalid threshold values. Ensure goodThreshold is greater than midThreshold and midThreshold is positive.");
+                }
+
+                // Calculate the criticalThreshold
+                int criticalThreshold = midThreshold - 1;
+
+                // Update the threshold configuration in the database
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sqlUpdate = "UPDATE thresholdconfig SET GoodThreshold = @goodThreshold, MidThreshold = @midThreshold, CriticalThreshold = @criticalThreshold WHERE Id = 1";
+
+                    using (var command = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        command.Parameters.AddWithValue("@goodThreshold", goodThreshold);
+                        command.Parameters.AddWithValue("@midThreshold", midThreshold);
+                        command.Parameters.AddWithValue("@criticalThreshold", criticalThreshold);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound("Threshold configuration not found.");
+                        }
+                    }
+                }
+
+                return Ok("Threshold configuration updated successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while updating the threshold configuration.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
 
 
         [HttpDelete("ingredients/{id}")]

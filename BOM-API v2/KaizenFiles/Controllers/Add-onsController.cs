@@ -42,11 +42,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     name = addOnDetails.name,
                     pricePerUnit = addOnDetails.pricePerUnit,
-                    quantity = addOnDetails.quantity,
                     size = addOnDetails.size,
                     DateAdded = DateTime.UtcNow,  // Current UTC time as DateAdded
                     LastModifiedDate = null,      // Initial value for LastModifiedDate
-                    IsActive = true               // Set IsActive to true initially
                 };
 
                 // Insert into database
@@ -69,21 +67,19 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 // SQL INSERT statement with measure and ingredient_type
-                string sql = @"INSERT INTO AddOns (name, price, quantity, size, measurement, ingredient_type, date_added, last_modified_date, IsActive)
-                VALUES (@Name, @PricePerUnit, @Quantity, @Size, @Measure, @IngredientType, @DateAdded, @LastModifiedDate, @IsActive);
+                string sql = @"INSERT INTO AddOns (name, price, size, measurement, ingredient_type, date_added, last_modified_date)
+                VALUES (@Name, @PricePerUnit, @Size, @Measure, @IngredientType, @DateAdded, @LastModifiedDate);
                 SELECT LAST_INSERT_ID();";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@Name", addOns.name);
                     command.Parameters.AddWithValue("@PricePerUnit", addOns.pricePerUnit);
-                    command.Parameters.AddWithValue("@Quantity", addOns.quantity);
                     command.Parameters.AddWithValue("@Size", addOns.size);
                     command.Parameters.AddWithValue("@Measure", "piece");
                     command.Parameters.AddWithValue("@IngredientType", "element");
                     command.Parameters.AddWithValue("@DateAdded", addOns.DateAdded);
                     command.Parameters.AddWithValue("@LastModifiedDate", addOns.LastModifiedDate ?? (object)DBNull.Value);
-                    command.Parameters.AddWithValue("@IsActive", addOns.IsActive);
 
                     // Execute scalar to get the inserted ID
                     int newAddOnsId = Convert.ToInt32(await command.ExecuteScalarAsync());
@@ -121,7 +117,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT name, price, addOnsId, measurement, size, quantity, date_added, last_modified_date, isActive FROM addons";
+                string sql = "SELECT name, price, addOnsId, measurement, size, date_added, last_modified_date FROM addons";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -135,14 +131,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 PricePerUnit = reader.GetDouble("price"),
                                 addOnsId = reader.GetInt32("addOnsId"),
                                 Measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
-                                Quantity = reader.GetInt32("quantity"),
                                 // DateAdded is assumed to be non-nullable and should be directly read
                                 DateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
                                 // Handle LastModifiedDate as nullable
                                 LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("last_modified_date"))
                                     ? (DateTime?)null
                                     : reader.GetDateTime(reader.GetOrdinal("last_modified_date")),
-                                IsActive = reader.GetBoolean("isActive")
                             };
 
                             addOnDSOSList.Add(addOnDSOS);
@@ -167,22 +161,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         UPDATE AddOns 
                         SET 
                             name = @AddOnName, 
-                            quantity = @Quantity, 
                             measurement = @Measurement, 
                             pricePerUnit = @PricePerUnit, 
                             LastModifiedDate = @LastModifiedDate, 
-                            IsActive = @IsActive 
                         WHERE addOnsId = @AddOnsId";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@AddOnsId", addOnsId);
                         command.Parameters.AddWithValue("@AddOnName", updateRequest.AddOnName);
-                        command.Parameters.AddWithValue("@Quantity", updateRequest.Quantity);
                         command.Parameters.AddWithValue("@Measurement", updateRequest.Measurement ?? (object)DBNull.Value);
                         command.Parameters.AddWithValue("@PricePerUnit", updateRequest.PricePerUnit);
                         command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
-                        command.Parameters.AddWithValue("@IsActive", updateRequest.Quantity >= 1);
 
                         int rowsAffected = await command.ExecuteNonQueryAsync();
 
@@ -201,59 +191,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
-        [HttpPatch("update-add-on/restore-delete")] //test this soon
-        public async Task<IActionResult> UpdateAddOnAction([FromQuery] int addOnsId, [FromQuery] string action)
-        {
-            try
-            {
-                bool isActive;
 
-                switch (action.ToLower())
-                {
-                    case "restore":
-                        isActive = true;
-                        break;
-                    case "delete":
-                        isActive = false;
-                        break;
-                    default:
-                        return BadRequest("Invalid action. Please use 'restore' or 'delete'.");
-                }
-
-                using (var connection = new MySqlConnection(connectionstring))
-                {
-                    await connection.OpenAsync();
-
-                    string sql = @"
-                UPDATE AddOns 
-                SET 
-                    IsActive = @IsActive, 
-                    LastModifiedDate = @LastModifiedDate
-                WHERE addOnsId = @AddOnsId";
-
-                    using (var command = new MySqlCommand(sql, connection))
-                    {
-                        command.Parameters.AddWithValue("@AddOnsId", addOnsId);
-                        command.Parameters.AddWithValue("@IsActive", isActive);
-                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
-
-                        int rowsAffected = await command.ExecuteNonQueryAsync();
-
-                        if (rowsAffected == 0)
-                        {
-                            return NotFound($"Add-On with ID '{addOnsId}' not found.");
-                        }
-
-                        return Ok($"Add-On '{addOnsId}' updated successfully with action '{action}'.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating Add-On in the database.");
-                return StatusCode(500, "An error occurred while processing the request.");
-            }
-        }
 
     }
 }

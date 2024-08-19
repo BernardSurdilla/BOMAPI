@@ -53,6 +53,33 @@ namespace CRUDFI.Models
         public string Size { get; set; }
         public string Flavor { get; set; }
     }
+    public class SubOrder
+    {
+        public Guid SubOrderId { get; set; } // Unique identifier for the suborder
+        public string OrderId { get; set; } // Order ID from the main order table (in binary format)
+        public string PastryId { get; set; } // ID of the pastry
+        public string CustomerName { get; set; } // Name of the customer placing the suborder
+        public string? EmployeeName { get; set; } // Name of the employee processing the suborder
+        public DateTime CreatedAt { get; set; } // Date and time when the suborder was created
+        public string Status { get; set; } // Status of the suborder (e.g., pending, completed)
+        public string DesignName { get; set; } // Name of the design for the suborder
+        public double Price { get; set; } // Price of the suborder item
+        public int Quantity { get; set; } // Quantity of the items in the suborder
+        public string Size { get; set; } // Size of the suborder item
+        public string Flavor { get; set; } // Flavor of the suborder item
+        public string Description { get; set; } // Description of the suborder
+        public string Type { get; set; } // Type of the suborder
+        public bool IsActive { get; set; } // Whether the suborder is active
+        public DateTime PickupDateTime { get; set; } // Date and time for pickup
+    }
+
+
+    public class SubOrderDTO
+    {
+        public double Price { get; set; } // Price of the suborder item
+        public int Quantity { get; set; } // Quantity of the items in the suborder
+    }
+
 
     public class OrderSummary
     {
@@ -73,7 +100,6 @@ namespace CRUDFI.Models
 
     public class OrderDTO
     {
-        public string OrderName { get; set; } = "";
         public double Price { get; set; }
         public int Quantity { get; set; }
     }
