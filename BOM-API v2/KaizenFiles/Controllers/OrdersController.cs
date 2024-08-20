@@ -14,7 +14,7 @@ using System.Text.Json;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("[controller]")]
+    [Route("orders")]
     [ApiController]
     [Authorize]
     public class OrdersController : ControllerBase

@@ -229,7 +229,6 @@ namespace BillOfMaterialsAPI.Schemas
         [Column("CreatedAt")] public DateTime created_at { get; set; }
         [Column("Status")][MaxLength(50)] public string status { get; set; }
         [Column("DesignId")] public byte[] design_id { get; set; }
-        [Column("orderName")][MaxLength(50)] public string order_name {  get; set; }
         public double price { get; set; }
         [MaxLength(50)] public string? last_updated_by { get; set; }
         public DateTime? last_updated_at { get; set; }
@@ -284,6 +283,170 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime date_added { get; set; }
         public DateTime? last_modified_date { get; set; }
         public bool isActive { get; set; }
+    }
+    [PrimaryKey("suborder_id")]
+    [Table("suborders")]
+    public class SubOrder
+    {
+        [Key]
+        [Column("suborder_id")]
+        [MaxLength(25)]
+        public string SubOrderId { get; set; }
+
+        [Column("OrderId")]
+        public byte[] OrderId { get; set; }
+
+        [Column("PastryId")]
+        [MaxLength(50)]
+        public string PastryId { get; set; }
+
+        [Column("CustomerId")]
+        public byte[]? CustomerId { get; set; }
+
+        [Column("EmployeeId")]
+        public byte[]? EmployeeId { get; set; }
+
+        [Column("CustomerName")]
+        [MaxLength(50)]
+        public string CustomerName { get; set; }
+
+        [Column("EmployeeName")]
+        [MaxLength(50)]
+        public string EmployeeName { get; set; }
+
+        [Column("CreatedAt")]
+        public DateTime CreatedAt { get; set; }
+
+        [Column("Status")]
+        [MaxLength(50)]
+        public string Status { get; set; }
+
+        [Column("DesignId")]
+        public byte[] DesignId { get; set; }
+
+        [Column("DesignName")]
+        [MaxLength(50)]
+        public string DesignName { get; set; }
+
+        [Column("price")]
+        public double Price { get; set; }
+
+        [Column("quantity")]
+        public int Quantity { get; set; }
+
+        [Column("Size")]
+        [MaxLength(50)]
+        public string Size { get; set; }
+
+        [Column("Flavor")]
+        [MaxLength(50)]
+        public string Flavor { get; set; }
+
+        [Column("Description")]
+        public string? Description { get; set; }
+
+        [Column("last_updated_by")]
+        [MaxLength(50)]
+        public string? LastUpdatedBy { get; set; }
+
+        [Column("last_updated_at")]
+        public DateTime? LastUpdatedAt { get; set; }
+
+        [Column("type")]
+        [MaxLength(50)]
+        public string? Type { get; set; }
+
+        [Column("PickupDateTime")]
+        public DateTime? PickupDateTime { get; set; }
+
+        [Column("isActive")]
+        public bool IsActive { get; set; }
+    }
+    [PrimaryKey("orderAddOnId")]
+    [Table("orderaddons")]
+    public class OrderAddon
+    {
+        [Key]
+        [Column("orderAddOnId")]
+        public int OrderAddOnId { get; set; }
+
+        [Column("OrderId")]
+        public Guid OrderId { get; set; } // Assuming OrderId is a binary(16) GUID
+
+        [Column("addOnsId")]
+        public int? AddOnsId { get; set; } // Nullable int
+
+        [Column("name")]
+        [MaxLength(50)]
+        public string? Name { get; set; }
+
+        [Column("price")]
+        public double? Price { get; set; } // Nullable double
+
+        [Column("quantity")]
+        public int Quantity { get; set; }
+
+        [Column("Total")]
+        public double Total { get; set; }
+
+        // Navigation properties
+        public Orders Order { get; set; }
+        public AddOns? AddOn { get; set; }
+    }
+    [PrimaryKey("Id")] // Assuming your ORM supports this attribute
+    [Table("sales")]
+    public class Sale
+    {
+        [Key]
+        [Column("Id")]
+        public int Id { get; set; }
+
+        [Column("Name")]
+        [Required]
+        [MaxLength(50)]
+        public string Name { get; set; }
+
+        [Column("Contact")]
+        [Required]
+        [MaxLength(10)]
+        public string Contact { get; set; }
+
+        [Column("Email")]
+        [Required]
+        [MaxLength(50)]
+        public string Email { get; set; }
+
+        [Column("Cost")]
+        [Required]
+        public double Cost { get; set; }
+
+        [Column("Total")]
+        [Required]
+        public int Total { get; set; }
+
+        [Column("Date")]
+        [Required]
+        public DateTime Date { get; set; }
+    }
+    [PrimaryKey("Id")] // Assuming your ORM supports this attribute
+    [Table("thresholdconfig")]
+    public class ThresholdConfig
+    {
+        [Key]
+        [Column("Id")]
+        public int Id { get; set; }
+
+        [Column("GoodThreshold")]
+        [Required]
+        public int GoodThreshold { get; set; }
+
+        [Column("MidThreshold")]
+        [Required]
+        public int MidThreshold { get; set; }
+
+        [Column("CriticalThreshold")]
+        [Required]
+        public int CriticalThreshold { get; set; }
     }
 
     //Legacy account tables
