@@ -98,6 +98,7 @@ namespace BillOfMaterialsAPI.Schemas
         [MaxLength(50)] public string display_picture_url { get; set; }
         public string cake_description { get; set; }
         public List<Guid>? design_tag_ids { get; set; }
+        public List<string>? design_shape_names { get; set; }
         public List<PostDesignAddOns>? design_add_ons { get; set; }
         public byte[]? display_picture_data { get; set; }
     }
@@ -115,5 +116,10 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(50)] public string add_on_name { get; set; }
         [Required] public int quantity { get; set; }
         [Required] public double price { get; set; }
+    }
+    public class PostDesignShape
+    {
+        [Required] public Guid design_id { get; set; }
+        [Required] public string shape_name { get; set;  }
     }
 }

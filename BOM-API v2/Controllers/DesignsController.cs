@@ -300,6 +300,22 @@ namespace BOM_API_v2.Controllers
                     }
                 }
             }
+
+            List<DesignShapes> newDesignShapes = new List<DesignShapes>();
+            if (input.design_shape_names != null)
+            {
+                foreach (string shapeName in input.design_shape_names)
+                {
+                    newDesignShapes.Add(new DesignShapes
+                    {
+                        design_shape_id = Guid.NewGuid(),
+                        shape_name = shapeName,
+                        design_id = newEntryId,
+                        isActive = true
+                    });
+                }
+            }
+
             DesignImage? newDesignImage = null;
             if (input.display_picture_data != null)
             {
@@ -309,15 +325,61 @@ namespace BOM_API_v2.Controllers
                 newDesignImage.picture_data = input.display_picture_data;
                 newDesignImage.isActive = true;
             }
-
+            
             _databaseContext.Designs.Add(newEntry);
             _databaseContext.SaveChanges();
 
-            if (newTagRelationships.IsNullOrEmpty() == false) { await _databaseContext.DesignTagsForCakes.AddRangeAsync(newTagRelationships); await _databaseContext.SaveChangesAsync(); }
-            if (newDesignImage != null) { await _databaseContext.DesignImage.AddAsync(newDesignImage); await _databaseContext.SaveChangesAsync(); }
+            if (newTagRelationships.IsNullOrEmpty() == false) 
+            { 
+                await _databaseContext.DesignTagsForCakes.AddRangeAsync(newTagRelationships); 
+                await _databaseContext.SaveChangesAsync(); 
+            }
+            if (newDesignShapes.IsNullOrEmpty() == false)
+            {
+                await _databaseContext.DesignShapes.AddRangeAsync(newDesignShapes);
+                await _databaseContext.SaveChangesAsync();
+            }
+            if (newDesignImage != null) 
+            { 
+                await _databaseContext.DesignImage.AddAsync(newDesignImage); 
+                await _databaseContext.SaveChangesAsync(); 
+            }
 
             await _actionLogger.LogAction(User, "POST", "Add new design " + newEntryId.ToString());
             return Ok(new { message = "Design " + Convert.ToBase64String(newEntryId) + " added", id = Convert.ToBase64String(newEntryId) });
+        }
+        [HttpPost("{design_id}/shapes/")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> AddNewShape(string shape_name, [FromRoute] string design_id)
+        {
+            Designs? selectedDesign;
+            string decodedId = design_id;
+            byte[]? byteArrEncodedId = null;
+
+            try
+            {
+                decodedId = Uri.UnescapeDataString(design_id);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
+
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
+
+            DesignShapes? sameShapeName = await _databaseContext.DesignShapes.Where(x => x.isActive == true && x.shape_name == shape_name).FirstOrDefaultAsync();
+            if (sameShapeName != null) { return BadRequest(new { message = "Shape with the same name already exists" }); }
+
+            DesignShapes newShapeAssociation = new DesignShapes
+            {
+                design_shape_id = Guid.NewGuid(),
+                design_id = selectedDesign.design_id,
+                shape_name = shape_name,
+                isActive = true
+            };
+            await _databaseContext.DesignShapes.AddAsync(newShapeAssociation);
+            await _databaseContext.SaveChangesAsync();
+
+            return Ok(new { message = "New shape (" + shape_name + ") associated with design " + design_id });
         }
         
         [HttpPut("{design_id}/tags")]
@@ -445,6 +507,35 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
             return Ok(new { message = "Design " + design_id.ToString() + " updated" });
         }
+        [HttpPatch("{design_id}/shapes/{design_shape_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> UpdateDesignShapeName(string design_id, Guid design_shape_id, [FromBody]string design_shape_name)
+        {
+            Designs? selectedDesign;
+            string decodedId = design_id;
+            byte[]? byteArrEncodedId = null;
+
+            try
+            {
+                decodedId = Uri.UnescapeDataString(design_id);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
+
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
+
+            DesignShapes? selectedShape = await _databaseContext.DesignShapes.Where(x => x.isActive == true && x.design_id.SequenceEqual(selectedDesign.design_id) && x.design_shape_id == design_shape_id).FirstOrDefaultAsync();
+            if (selectedShape == null) { return NotFound(new {message = "Shape with the id " + design_shape_id + " does not exist or deleted"}); }
+
+            _databaseContext.DesignShapes.Update(selectedShape);
+            selectedShape.shape_name = design_shape_name;
+            await _databaseContext.SaveChangesAsync();
+
+            return Ok(new { message = "Shape " + design_shape_id + " updated" });
+
+        }
+
 
         [HttpDelete("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
@@ -506,6 +597,35 @@ namespace BOM_API_v2.Controllers
 
             await _actionLogger.LogAction(User, "DELETE", "Tags for " + foundEntry.design_id);
             return Ok(new { message = "Tags removed successfully" });
+        }
+        [HttpDelete("{design_id}/shapes/{design_shape_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> RemoveDesignShape(string design_id, Guid design_shape_id)
+        {
+
+            Designs? selectedDesign;
+            string decodedId = design_id;
+            byte[]? byteArrEncodedId = null;
+
+            try
+            {
+                decodedId = Uri.UnescapeDataString(design_id);
+                byteArrEncodedId = Convert.FromBase64String(decodedId);
+            }
+            catch { return BadRequest(new { message = "Cannot convert design id on route to string" }); }
+
+            try { selectedDesign = await _databaseContext.Designs.Where(x => x.isActive == true && x.design_id == byteArrEncodedId).FirstAsync(); }
+            catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
+
+            DesignShapes? selectedShape = await _databaseContext.DesignShapes.Where(x => x.isActive == true && x.design_id.SequenceEqual(selectedDesign.design_id) && x.design_shape_id == design_shape_id).FirstOrDefaultAsync();
+            if (selectedShape == null) { return NotFound(new { message = "Shape with the id " + design_shape_id + " does not exist or deleted" }); }
+
+            _databaseContext.DesignShapes.Update(selectedShape);
+            selectedShape.isActive = false;
+            await _databaseContext.SaveChangesAsync();
+
+            return Ok(new { message = "Shape " + design_shape_id + " deleted" });
+
         }
 
         [HttpDelete("{design_id}/tags/{tag_id}")]

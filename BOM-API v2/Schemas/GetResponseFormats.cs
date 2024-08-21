@@ -273,6 +273,7 @@ namespace BillOfMaterialsAPI.Schemas
         public byte[]? display_picture_data { get; set; }
 
         public List<GetDesignTag>? design_tags { get; set; }
+        public List<GetDesignShape>? design_shapes { get; set; }
     }
     public class GetDesignWithoutPastryMaterial
     {
@@ -294,6 +295,11 @@ namespace BillOfMaterialsAPI.Schemas
     {
         public Guid design_tag_id { get; set; }
         public string design_tag_name { get; set; }
+    }
+    public class GetDesignShape
+    {
+        public Guid design_shape_id { get; set; }
+        public string shape_name { get; set; }
     }
     public class GetTag
     {

@@ -1577,8 +1577,11 @@ namespace BillOfMaterialsAPI.Helpers
             response.design_picture_url = data.display_picture_url;
             response.cake_description = data.cake_description;
             response.design_tags = new List<GetDesignTag>();
+            response.design_shapes = new List<GetDesignShape>();
 
             List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == data.design_id && x.DesignTags.isActive == true).ToListAsync();
+            List<DesignShapes> cakeShapes = await context.DesignShapes.Where(x => x.isActive == true && x.design_id == data.design_id).ToListAsync();
+
             DesignImage? image;
             try { image = await context.DesignImage.Where(x => x.isActive == true && x.design_id == data.design_id).FirstAsync(); }
             catch { image = null; }
@@ -1590,6 +1593,15 @@ namespace BillOfMaterialsAPI.Helpers
                     response.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
                 }
             }
+            foreach (DesignShapes currentShape in cakeShapes)
+            {
+                response.design_shapes.Add(new GetDesignShape
+                {
+                    design_shape_id = currentShape.design_shape_id,
+                    shape_name = currentShape.shape_name
+                });
+            }
+
             if (image != null) { response.display_picture_data = image.picture_data; }
             else { response.display_picture_data = null; };
             return response;

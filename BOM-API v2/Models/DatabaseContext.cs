@@ -39,6 +39,7 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<DesignTags> DesignTags { get; set; }
         public DbSet<DesignTagsForCakes> DesignTagsForCakes { get; set; }
         public DbSet<DesignImage> DesignImage { get; set; }
+        public DbSet<DesignShapes> DesignShapes { get; set; }
     }   
 
     public class KaizenTables : DbContext
@@ -48,7 +49,6 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<Orders> Orders { get; set; }
         public DbSet<Item> Item { get; set; }
         public DbSet<AddOns> AddOns { get; set; }
-        public DbSet<DesignAddOns> DesignAddOns { get; set; }
         public DbSet<SubOrder> SubOrder { get; set; }
         public DbSet<OrderAddon> OrderAddon { get; set; }
         public DbSet<Sale> Sale { get; set; }

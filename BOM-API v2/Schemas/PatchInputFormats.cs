@@ -62,4 +62,9 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public int quantity { get; set; }
         [Required] public double price { get; set; }
     }
+    public class PatchDesignShape
+    {
+        [Required] public Guid design_shape_id { get; set; }
+        [Required] public string shape_name { get; set; }
+    }
 }

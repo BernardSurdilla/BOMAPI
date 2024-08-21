@@ -242,6 +242,15 @@ namespace BillOfMaterialsAPI.Schemas
 
         public Designs Designs { get; set; }
     }
+    public class DesignShapes
+    {
+        [Key] public Guid design_shape_id { get; set; }
+        [ForeignKey("Designs")] public byte[] design_id { get; set; }
+        public string shape_name { get; set; }
+        public bool isActive { get; set; }
+
+        public Designs Designs { get; set; }
+    }
 
     //
     // Orders table: Kaizen
