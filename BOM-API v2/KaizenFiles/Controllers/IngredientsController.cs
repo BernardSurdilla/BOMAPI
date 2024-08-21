@@ -18,7 +18,7 @@ using UnitsNet;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("[controller]")]
+    [Route("ingredients")]
     [ApiController]
     [Authorize]
     public class IngredientsController : ControllerBase

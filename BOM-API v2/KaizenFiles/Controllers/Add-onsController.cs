@@ -19,7 +19,7 @@ using System.Threading.Tasks;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("[controller]")]
+    [Route("add-ons")]
     [ApiController]
     public class Add_onsController : ControllerBase
     {
@@ -32,7 +32,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("add-ons-table")]
+        [HttpPost]
         public async Task<IActionResult> AddAddOn([FromBody] Models.Adds.AddOnDetails addOnDetails)
         {
             try
@@ -88,7 +88,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("add-ons-table")]
+        [HttpGet]
         public async Task<IActionResult> GetAllAddOns()
         {
             try
