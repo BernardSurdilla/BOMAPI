@@ -47,6 +47,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public byte[] design_id { get; set; }
         [Required] public string main_variant_name { get; set; }
         [Required] public List<PostIngredients> ingredients { get; set; }
+        public List<PostPastryMaterialIngredientImportance>? ingredient_importance { get; set; }
         public List<PostPastryMaterialAddOns>? add_ons { get; set; }
         public List<PostPastryMaterialSubVariant>? sub_variants { get; set; }
     }
@@ -58,6 +59,17 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
+    }
+    public class PostPastryMaterialIngredientImportance
+    {
+        [Required] public string item_id { get; set; }
+        [Required][RegularExpression("^(" + IngredientType.Material + "|" + IngredientType.InventoryItem + ")$", ErrorMessage = "Value must be either IngredientType.Material or IngredientType.InventoryItem")] public string ingredient_type { get; set; }
+        [Required][Range(1, 5, ErrorMessage = "Value of importance must be within 1 - 5 only")] public int importance { get; set; }
+    }
+    public class PostPastryMaterialAddOns
+    {
+        [Required] public int add_ons_id { get; set; }
+        [Required] public double amount { get; set; }
     }
     public class PostPastryMaterialSubVariant
     {
@@ -73,12 +85,6 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
-    }
-
-    public class PostPastryMaterialAddOns
-    {
-        [Required] public int add_ons_id { get; set; }
-        [Required] public double amount { get; set; }
     }
     public class PostPastryMaterialSubVariantAddOns
     {

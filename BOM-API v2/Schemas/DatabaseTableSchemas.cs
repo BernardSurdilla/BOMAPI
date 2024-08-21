@@ -54,7 +54,7 @@ namespace BillOfMaterialsAPI.Schemas
 
     }
     [PrimaryKey("pastry_material_add_on_id")]
-    public class PastyMaterialAddOns
+    public class PastryMaterialAddOns
     {
         [Required][Key][MaxLength(29)] public string pastry_material_add_on_id { get; set; }
         [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
@@ -66,6 +66,8 @@ namespace BillOfMaterialsAPI.Schemas
 
         public PastryMaterials PastryMaterials { get; set; }
     }
+
+
     [PrimaryKey("pastry_material_sub_variant_id")]
     public class PastryMaterialSubVariants
     {
@@ -117,6 +119,15 @@ namespace BillOfMaterialsAPI.Schemas
         public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
     }
 
+    [PrimaryKey("order_ingredient_subtraction_log_id")]
+    public class OrderIngredientSubtractionLog
+    {
+        [Required][Key] public Guid order_ingredient_subtraction_log_id { get; set; }
+        [Required][Column(TypeName = "binary(16)")] public byte[] order_id { get; set; }
+        [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
+
+        public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
+    }
     [PrimaryKey("ingredient_subtraction_history_id")]
     public class IngredientSubtractionHistory
     {
@@ -132,6 +143,23 @@ namespace BillOfMaterialsAPI.Schemas
         public string amount_quantity_type;
         public string amount_unit;
         public double amount;
+    }
+
+    [PrimaryKey("pastry_material_ingredient_importance_id")]
+    public class PastryMaterialIngredientImportance
+    {
+        [Required][Key] public Guid pastry_material_ingredient_importance_id { get; set; }
+        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
+
+        [Required] public string item_id { get; set; }
+        [Required] public string ingredient_type { get; set; }
+        [Required] public int importance { get; set; }
+
+        [Required] public DateTime date_added { get; set; }
+        public DateTime last_modified_date { get; set; }
+        public bool isActive { get; set; }
+
+        public PastryMaterials PastryMaterials { get; set; }
     }
 
     //Pastry ingredients that is made from a combination of 2 or more items
@@ -222,9 +250,10 @@ namespace BillOfMaterialsAPI.Schemas
     [Table("orders")]
     public class Orders
     {
-        [Column("OrderId")][Required][Key] public Guid order_id { get; set; }
+        [Column("OrderId")][Required][Key] public byte[] order_id { get; set; }
         [Column("CustomerId")][Required] public Guid customer_id { get; set; }
         [Column("EmployeeId")][Required] public Guid? employee_id { get; set; }
+        [Column("PastryId")] public string pastry_id { get; set; }
 
         [Column("CreatedAt")] public DateTime created_at { get; set; }
         [Column("Status")][MaxLength(50)] public string status { get; set; }
@@ -251,23 +280,6 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime last_updated_at { get; set; }
 
         public string measurements { get; set; }
-    }
-    [PrimaryKey("design_add_on_id")]
-    [Table("DesignAddOns")]
-    public class DesignAddOns
-    {
-        [Column("DesignAddOnId")][Key] public int design_add_on_id { get; set; }
-        [Column("DesignId")][ForeignKey("Designs")] public byte[] design_id { get; set; }
-        [Column("AddOnsId")][ForeignKey("AddOns")] public int add_ons_id { get; set; }
-        [Column("AddOnName")] public string add_on_name { get; set; }
-        [Column("Quantity")] public int quantity { get; set; }
-        [Column("Price")] public double price { get; set; }
-        [Column("DateAdded")] public DateTime date_added { get; set; }
-        [Column("LastModifiedDate")] public DateTime last_modified_date { get; set; }
-        public bool isActive { get; set; }
-
-        public Designs Designs { get; set; }
-        public AddOns AddOns { get; set; }
     }
     [PrimaryKey("add_ons_id")]
     [Table("addOns")]

@@ -22,13 +22,15 @@ namespace BillOfMaterialsAPI.Models
 
         public DbSet<PastryMaterials> PastryMaterials { get; set; }
         public DbSet<Ingredients> Ingredients { get; set; }
-        public DbSet<PastyMaterialAddOns> PastyMaterialAddOns { get; set; }
+        public DbSet<PastryMaterialAddOns> PastryMaterialAddOns { get; set; }
 
         public DbSet<PastryMaterialSubVariants> PastryMaterialSubVariants { get; set; }
         public DbSet<PastryMaterialSubVariantIngredients> PastryMaterialSubVariantIngredients { get; set; }
         public DbSet<PastryMaterialSubVariantAddOns> PastryMaterialSubVariantAddOns { get; set; }
 
         public DbSet<IngredientSubtractionHistory> IngredientSubtractionHistory { get; set; }
+        public DbSet<OrderIngredientSubtractionLog> OrderIngredientSubtractionLog { get; set; }
+        public DbSet<PastryMaterialIngredientImportance> PastryMaterialIngredientImportance { get; set; }
 
         public DbSet<Materials> Materials { get; set; }
         public DbSet<MaterialIngredients> MaterialIngredients { get; set; }
@@ -51,7 +53,6 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<OrderAddon> OrderAddon { get; set; }
         public DbSet<Sale> Sale { get; set; }
         public DbSet<ThresholdConfig> ThresholdConfig { get; set; }
-
     }
 
     public class InventoryAccounts : DbContext

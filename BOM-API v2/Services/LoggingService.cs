@@ -42,12 +42,12 @@ namespace BillOfMaterialsAPI.Services
             try { TransactionLogs logs = await _logs.TransactionLogs.OrderByDescending(x => x.log_id).FirstAsync(); lastLogId = logs.log_id; }
             catch
             {
-                string newLogId = IdFormat.logsIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newLogId += "0"; }
+                string newLogId = IdPrefix.Logs;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newLogId += "0"; }
                 lastLogId = newLogId;
             }
             TransactionLogs newLog = new TransactionLogs(
-                    IdFormat.IncrementId(IdFormat.logsIdFormat, IdFormat.idNumLength, lastLogId),
+                    IdFormat.IncrementId(IdPrefix.Logs, IdFormat.IdNumbersLength, lastLogId),
                     currentUserData.Id,
                     currentUserData.UserName == null ? "N/A" : currentUserData.UserName,
                     currentUserData.Email == null ? "N/A" : currentUserData.Email,
@@ -72,12 +72,12 @@ namespace BillOfMaterialsAPI.Services
             try { TransactionLogs logs = await _logs.TransactionLogs.OrderByDescending(x => x.log_id).FirstAsync(); lastLogId = logs.log_id; }
             catch
             {
-                string newLogId = IdFormat.logsIdFormat;
-                for (int i = 1; i <= IdFormat.idNumLength; i++) { newLogId += "0"; }
+                string newLogId = IdPrefix.Logs;
+                for (int i = 1; i <= IdFormat.IdNumbersLength; i++) { newLogId += "0"; }
                 lastLogId = newLogId;
             }
             TransactionLogs newLog = new TransactionLogs(
-                    IdFormat.IncrementId(IdFormat.logsIdFormat, IdFormat.idNumLength, lastLogId),
+                    IdFormat.IncrementId(IdPrefix.Logs, IdFormat.IdNumbersLength, lastLogId),
                     userId,
                     userName == null ? "N/A" : userName,
                     email == null ? "N/A" : email,

@@ -19,7 +19,7 @@ namespace API_TEST.Controllers
     //
 
     [ApiController]
-    [Route("Debug/")]
+    [Route("debug")]
     public class TestEndpointsController : ControllerBase
     {
         private readonly DatabaseContext _context;
@@ -31,6 +31,12 @@ namespace API_TEST.Controllers
             _context = context;
             _actionLogger = logger;
             _kaizenTables = kaizenTables;
+        }
+
+        [HttpGet("sss/{PMID}/{INGID}/{INGTYPE}")]
+        public async Task<bool> TestEndp(string PMID, string INGID, string INGTYPE)
+        {
+            return await DataVerification.DoesIngredientExistsInPastryMaterial(PMID, INGID, INGTYPE, _context);
         }
     }
 
@@ -518,6 +524,220 @@ namespace API_TEST.Controllers
 
             await _actionLogger.LogAction(User, "GET", "Tag occurence");
             return response;
+        }
+    }
+    [ApiController]
+    public class BOMDataManipulationController : ControllerBase
+    {
+        private readonly DatabaseContext _context;
+        private readonly KaizenTables _kaizenTables;
+        private readonly IActionLogger _actionLogger;
+
+        public BOMDataManipulationController(DatabaseContext context, KaizenTables kaizen, IActionLogger logs) { _context = context; _actionLogger = logs; _kaizenTables = kaizen; }
+
+        //
+        // INVENTORY ACTIONS
+        //
+        [HttpPost("pastry-materials/{pastry_material_id}/subtract-recipe-ingredients-on-inventory/{variant_id}")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_id)
+        {
+            PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.FindAsync(pastry_material_id);
+            PastryMaterialSubVariants? sub_variant = null;
+
+            if (currentPastryMaterial == null) { return NotFound(new { message = "No pastry material with the specified id found" }); }
+            if (currentPastryMaterial.pastry_material_id.Equals(variant_id) == false)
+            {
+                try { sub_variant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id.Equals(variant_id)).FirstAsync(); }
+                catch { return NotFound(new { message = "No variant with the id " + variant_id + " exists" }); }
+            }
+
+            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
+            Dictionary<string, InventorySubtractorInfo>? inventoryItemsAboutToBeSubtracted = null;
+
+            try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(variant_id, _context, _kaizenTables); }
+            catch (FormatException e) { return BadRequest(new { message = e.Message }); }
+            catch (InvalidAmountMeasurementException e) { return StatusCode(500, new { message = e.Message }); }
+            catch (NotFoundInDatabaseException e) { return StatusCode(500, new { message = e.Message }); }
+
+            List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
+            foreach (string currentInventoryItemId in inventoryItemsAboutToBeSubtracted.Keys)
+            {
+                InventorySubtractorInfo currentInventorySubtractorInfo = inventoryItemsAboutToBeSubtracted[currentInventoryItemId];
+
+                //No need to check, record already checked earlier
+                Item referencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(currentInventoryItemId, _kaizenTables);
+
+                string? inventoryItemMeasurement = null;
+                string? inventoryItemQuantityUnit = null;
+                bool isInventoryItemMeasurementValid = false;
+
+                //Add code here to check if the unit of the item in the inventory and the recorded total is the same
+                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                {
+                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(referencedInventoryItem.measurements));
+
+                    if (currentMeasurement == null) { continue; }
+                    else
+                    {
+                        isInventoryItemMeasurementValid = true;
+                        inventoryItemQuantityUnit = unitQuantity;
+                        inventoryItemMeasurement = currentMeasurement;
+                    }
+                }
+                if (isInventoryItemMeasurementValid == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" }); }
+                if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType }); }
+
+                double amountToBeSubtracted = 0.0;
+                if (inventoryItemQuantityUnit.Equals("Count"))
+                {
+                    amountToBeSubtracted = currentInventorySubtractorInfo.Amount;
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount;
+                }
+                else
+                {
+                    amountToBeSubtracted = UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - amountToBeSubtracted;
+                }
+
+
+                ItemSubtractionInfo newIngredientSubtractionInfoEntry = new ItemSubtractionInfo
+                {
+                    item_id = Convert.ToString(referencedInventoryItem.id),
+                    item_name = referencedInventoryItem.item_name,
+                    amount_quantity_type = inventoryItemQuantityUnit,
+                    amount_unit = referencedInventoryItem.measurements,
+                    amount = amountToBeSubtracted
+                };
+
+                dataForSubtractionHistory.Add(newIngredientSubtractionInfoEntry);
+                _kaizenTables.Item.Update(referencedInventoryItem);
+            }
+
+            IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
+            {
+                ingredient_subtraction_history_id = new Guid(),
+                item_subtraction_info = dataForSubtractionHistory,
+                date_subtracted = DateTime.Now,
+            };
+            await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
+
+            await _kaizenTables.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "POST", "Subtract ingredients of " + pastry_material_id);
+            return Ok(new { message = "Ingredients sucessfully deducted." });
+        }
+        
+        [HttpPost("orders/{order_id}/subtract-recipe-ingredients-on-inventory/")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string order_id)
+        {
+            string decodedId = order_id;
+            byte[]? byteArrEncodedId = null;
+            try
+            {
+                Guid orderId = new Guid(order_id);
+                byteArrEncodedId = orderId.ToByteArray();
+            }
+            catch { return BadRequest(new { message = "Invalid order id format on route" }); }
+
+            Orders? selectedOrder = await _kaizenTables.Orders.Where(x => x.is_active == true && x.order_id.SequenceEqual(byteArrEncodedId)).FirstOrDefaultAsync();
+            if (selectedOrder == null) { return NotFound(new { message = "No order with the specified id found" }); }
+            OrderIngredientSubtractionLog? recordOfSubtraction = await _context.OrderIngredientSubtractionLog.Where(x => x.order_id.SequenceEqual(x.order_id)).FirstOrDefaultAsync();
+            if (recordOfSubtraction != null) { return BadRequest(new { message = "Order " + order_id + " is already subtracted in the inventory" }); }
+
+            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
+            Dictionary<string, InventorySubtractorInfo>? inventoryItemsAboutToBeSubtracted = null;
+
+            try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(selectedOrder.pastry_id, _context, _kaizenTables); }
+            catch (FormatException e) { return BadRequest(new { message = e.Message }); }
+            catch (InvalidAmountMeasurementException e) { return StatusCode(500, new { message = e.Message }); }
+            catch (NotFoundInDatabaseException e) { return StatusCode(500, new { message = e.Message }); }
+
+
+            List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
+            foreach (string currentInventoryItemId in inventoryItemsAboutToBeSubtracted.Keys)
+            {
+                InventorySubtractorInfo currentInventorySubtractorInfo = inventoryItemsAboutToBeSubtracted[currentInventoryItemId];
+
+                //No need to check, record already checked earlier
+                Item referencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(currentInventoryItemId, _kaizenTables);
+
+                string? inventoryItemMeasurement = null;
+                string? inventoryItemQuantityUnit = null;
+                bool isInventoryItemMeasurementValid = false;
+
+                //Add code here to check if the unit of the item in the inventory and the recorded total is the same
+                foreach (string unitQuantity in validMeasurementUnits.Keys)
+                {
+                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
+
+                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(referencedInventoryItem.measurements));
+
+                    if (currentMeasurement == null) { continue; }
+                    else
+                    {
+                        isInventoryItemMeasurementValid = true;
+                        inventoryItemQuantityUnit = unitQuantity;
+                        inventoryItemMeasurement = currentMeasurement;
+                    }
+                }
+                if (isInventoryItemMeasurementValid == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" }); }
+                if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType }); }
+
+                double amountToBeSubtracted = 0.0;
+                if (inventoryItemQuantityUnit.Equals("Count"))
+                {
+                    amountToBeSubtracted = currentInventorySubtractorInfo.Amount;
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount;
+                }
+                else
+                {
+                    amountToBeSubtracted = UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - amountToBeSubtracted;
+                }
+
+
+                ItemSubtractionInfo newIngredientSubtractionInfoEntry = new ItemSubtractionInfo
+                {
+                    item_id = Convert.ToString(referencedInventoryItem.id),
+                    item_name = referencedInventoryItem.item_name,
+                    amount_quantity_type = inventoryItemQuantityUnit,
+                    amount_unit = referencedInventoryItem.measurements,
+                    amount = amountToBeSubtracted
+                };
+
+                dataForSubtractionHistory.Add(newIngredientSubtractionInfoEntry);
+                _kaizenTables.Item.Update(referencedInventoryItem);
+            }
+            Guid ingredientSubtractionHistoryRecordId = Guid.NewGuid();
+
+            IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
+            {
+                ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId,
+                item_subtraction_info = dataForSubtractionHistory,
+                date_subtracted = DateTime.Now,
+            };
+            await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
+            await _context.SaveChangesAsync();
+
+            OrderIngredientSubtractionLog newOrderSubtractionHistory = new OrderIngredientSubtractionLog
+            {
+                order_ingredient_subtraction_log_id = Guid.NewGuid(),
+                order_id = byteArrEncodedId,
+                ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId
+            };
+            await _context.OrderIngredientSubtractionLog.AddAsync(newOrderSubtractionHistory);
+            await _context.SaveChangesAsync();
+
+            await _kaizenTables.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "POST", "Subtract ingredients of order:" + order_id);
+
+            return Ok(new { message = "Ingredients sucessfully deducted." });
         }
         
     }
