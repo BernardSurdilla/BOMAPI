@@ -57,6 +57,11 @@ namespace CRUDFI.Models
         public string Flavor { get; set; }
     }
 
+    public class OrdList
+    {
+        public List<Ord> summary { get; set; } = new List<Ord>();
+    }
+
     public class Ord
     {
         public string OrderId { get; set; }
@@ -108,20 +113,37 @@ namespace CRUDFI.Models
     }
     public class FinalOrder
     {
-        public string OrderName { get; set; } = "";
-        public string designName { get; set; } = string.Empty;
-        public double Price { get; set; }
-        public int Quantity { get; set; }
-        public string Description { get; set; }
-        public string size { get; set; }
-        public string flavor { get; set; }
-        public string type { get; set; } = "";
-        public DateTime? PickupDateTime { get; set; }
+        public string OrderId { get; set; }
         public string PastryMaterialId { get; set; }
         public string variantId { get; set; }
+        public Guid? customerId { get; set; }
+        public string CustomerName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string status { get; set; } = "";
+        public string payment { get; set; } = "";
+        public string lastUpdatedBy { get; set; } = "";
+        public DateTime? lastUpdatedAt { get; set; }
+        public DateTime? PickupDateTime { get; set; }
+        public string Type { get; set; } // Type of the suborder
+        public bool IsActive { get; set; } // Whether the suborder is active
+        public List<OrderSummary> summary { get; set; } = new List<OrderSummary>();
         public List<AddOnDetails2> AddOns { get; set; } = new List<AddOnDetails2>();
         public List<CustomAddons> customAddons { get; set; } = new List<CustomAddons>();
         public double allTotal { get; set; }
+    }
+    public class AddOnDetails2
+    {
+        public string name { get; set; }
+        public double pricePerUnit { get; set; }
+        public int quantity { get; set; }
+        public double total { get; set; }
+
+    }
+    public class CustomAddons
+    {
+        public string? name { get; set; }
+        public int? quantity { get; set; }
+        public double? price { get; set; }
     }
     public class TotalOrders
     {
@@ -138,12 +160,7 @@ namespace CRUDFI.Models
         public DateTime date { get; set; }
     }
 
-    public class CustomAddons
-    {
-        public string? name { get; set; }
-        public int? quantity { get; set; }
-        public double? price { get; set; }
-    }
+    
     public class orderAddons
     {
         public string pastryId { get; set; }
@@ -189,14 +206,7 @@ namespace CRUDFI.Models
         public DateTime? LastModifiedDate { get; set; }
         public bool IsActive { get; set; }
     }
-    public class AddOnDetails2
-    {
-        public string name { get; set; }
-        public double pricePerUnit { get; set; }
-        public int quantity { get; set; }
-        public double total { get; set; }
-
-    }
+    
 
     public class ManageAddOnAction
     {

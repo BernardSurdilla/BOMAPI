@@ -565,7 +565,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("current-user/orders")] //debug soon
+        [HttpGet("current-user/orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerIdSummary()
         {
@@ -577,14 +577,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("No valid customer username found.");
                 }
 
-                List<Ord> orders = new List<Ord>();
+                // Create an instance of OrdList to store the orders
+                OrdList ordList = new OrdList();
 
-                await RetrieveOrdersByCustomerIdAsync(customerUsername, orders);
+                await RetrieveOrdersByCustomerIdAsync(customerUsername, ordList);
 
-                if (orders.Count == 0)
+                if (ordList.summary.Count == 0)
                     return NotFound("No orders available for this customer");
 
-                return Ok(orders);
+                return Ok(ordList);
             }
             catch (Exception ex)
             {
@@ -593,19 +594,19 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task RetrieveOrdersByCustomerIdAsync(string customerUsername, List<Ord> orders)
+        private async Task RetrieveOrdersByCustomerIdAsync(string customerUsername, OrdList ordList)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
                 string sql = @"
-        SELECT 
-            OrderId, PastryId, CustomerId, CustomerName, CreatedAt, Status, 
-            payment, last_updated_by, last_updated_at, PickupDateTime, type, isActive
-        FROM orders 
-        WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-        AND type = 'pending'";
+    SELECT 
+        OrderId, PastryId, CustomerId, CustomerName, CreatedAt, Status, 
+        payment, last_updated_by, last_updated_at, PickupDateTime, type, isActive
+    FROM orders 
+    WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
+    AND type = 'pending'";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -640,12 +641,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             var orderSummaries = await RetrieveOrderSummariesByOrderId(connection, orderIdBinary);
                             order.summary = orderSummaries;
 
-                            orders.Add(order);
+                            // Add the order to the OrdList summary
+                            ordList.summary.Add(order);
                         }
                     }
                 }
             }
         }
+
 
         private async Task<List<OrderSummary>> RetrieveOrderSummariesByOrderId(MySqlConnection connection, string orderIdBinary)
         {
@@ -732,7 +735,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("current-user/for-confirmation-orders")] //debug soon
+        [HttpGet("current-user/for-confirmation-orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersBySummary()
         {
@@ -744,14 +747,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("No valid customer username found.");
                 }
 
-                List<Ord> orders = new List<Ord>();
+                OrdList ordList = new OrdList();
 
-                await RetrieveOrdersByCustomerIdAsync1(customerUsername, orders);
+                await RetrieveOrdersByCustomerIdAsync1(customerUsername, ordList.summary);
 
-                if (orders.Count == 0)
+                if (ordList.summary.Count == 0)
                     return NotFound("No orders available for this customer");
 
-                return Ok(orders);
+                return Ok(ordList);
             }
             catch (Exception ex)
             {
@@ -767,12 +770,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string sql = @"
-        SELECT 
-            OrderId, PastryId, CustomerId, CustomerName, CreatedAt, Status, 
-            payment, last_updated_by, last_updated_at, PickupDateTime, type, isActive
-        FROM orders 
-        WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-        AND type = 'confirmation'";
+SELECT 
+    OrderId, PastryId, CustomerId, CustomerName, CreatedAt, Status, 
+    payment, last_updated_by, last_updated_at, PickupDateTime, type, isActive
+FROM orders 
+WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
+AND type = 'confirmation'";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -813,7 +816,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
-
 
 
         /*[HttpGet("current-user/for-confirmation-orders")]
@@ -946,21 +948,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("current-user/{orderId}/add-ons")] //might remove this 
+        [HttpGet("current-user/{suborderId}/add-ons")] //might remove this 
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
-        public async Task<IActionResult> GetAddOnsByOrderId(string orderId)
+        public async Task<IActionResult> GetAddOnsByOrderId(string suborderId)
         {
             try
             {
                 // Convert orderId to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+                string orderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
 
                 // Fetch DesignId and Size for the given orderId
                 var (designIdHex, size) = await GetDesignIdAndSizeByOrderId(orderIdBinary);
 
                 if (string.IsNullOrEmpty(designIdHex))
                 {
-                    return NotFound($"No DesignId found for order with ID '{orderId}'.");
+                    return NotFound($"No DesignId found for order with ID '{suborderId}'.");
                 }
 
                 // Fetch pastry_material_id using DesignId
@@ -1034,8 +1036,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error retrieving add-ons for order with ID '{orderId}'");
-                return StatusCode(500, $"An error occurred while retrieving add-ons for order with ID '{orderId}'.");
+                _logger.LogError(ex, $"Error retrieving add-ons for order with ID '{suborderId}'");
+                return StatusCode(500, $"An error occurred while retrieving add-ons for order with ID '{suborderId}'.");
             }
         }
 
@@ -1047,7 +1049,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT DesignId, Size FROM orders WHERE OrderId = UNHEX(@orderId)";
+                string sql = "SELECT DesignId, Size FROM suborders WHERE OrderId = UNHEX(@orderId)";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@orderId", orderIdBinary);
@@ -1223,7 +1225,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT SUM(quantity) AS TotalQuantity FROM orders WHERE isActive = TRUE";
+                    string sql = "SELECT SUM(quantity) AS TotalQuantity FROM suborders WHERE isActive = TRUE";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -1244,8 +1246,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-
-        [HttpGet("customer/final-order-details/{orderId}")]
+        [HttpGet("customer/final-order-details/{orderId}")] //debug this soon
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderId)
         {
@@ -1254,7 +1255,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Convert the hex string to a binary(16) formatted string
                 string binary16OrderId = ConvertGuidToBinary16(orderId).ToLower();
 
-                // Fetch the specific order and its addons from the database
+                // Fetch the specific order and its suborders/addons from the database
                 FinalOrder finalOrder = await GetFinalOrderByIdFromDatabase(binary16OrderId);
 
                 if (finalOrder == null)
@@ -1262,7 +1263,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return NotFound($"Order with orderId {orderId} not found.");
                 }
 
-                // Retrieve DesignId and Size
+                // Retrieve DesignId and Size from suborders
                 var designIdAndSize = await GetDesignIdAndSizeByOrderId(binary16OrderId);
                 if (designIdAndSize.designIdHex != null && designIdAndSize.size != null)
                 {
@@ -1276,11 +1277,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                 }
 
+                // Calculate the total price of all suborders
+                double totalSuborderPrice = finalOrder.summary.Sum(suborder => suborder.Price * suborder.Quantity);
+
                 // Calculate the total from orderaddons
                 double totalFromOrderAddons = await GetTotalFromOrderAddons(binary16OrderId);
 
-                // Calculate allTotal as sum of Price and totalFromOrderAddons
-                finalOrder.allTotal = finalOrder.Price + totalFromOrderAddons;
+                // Set the finalOrder allTotal as the sum of all suborders' prices and add-ons
+                finalOrder.allTotal = totalSuborderPrice + totalFromOrderAddons;
 
                 return Ok(finalOrder);
             }
@@ -1290,6 +1294,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, $"An error occurred while processing the request.");
             }
         }
+
 
 
         private async Task<string> GetVariantIdByPastryMaterialIdAndSize(string pastryMaterialId, string size)
@@ -1372,49 +1377,86 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                // Query to get order details
+                // Query to get order and suborder details
                 string orderSql = @"
-        SELECT DesignName, price, quantity, Size, Flavor, type, Description, PickupDateTime
-        FROM orders
-        WHERE OrderId = UNHEX(@orderId)";
+        SELECT o.OrderId, o.PickupDateTime, o.CustomerName, o.status, o.payment, 
+               o.last_updated_by, o.last_updated_at, o.type, o.isActive,
+               s.suborder_id, s.PastryId, s.CustomerId, s.EmployeeId, s.EmployeeName,
+               s.DesignId, s.DesignName, s.price, s.quantity, s.Size, s.Flavor,
+               s.color, s.shape, s.tier, s.Description, s.CreatedAt, s.Status AS SubOrderStatus
+        FROM orders o
+        JOIN suborders s ON o.OrderId = s.OrderId
+        WHERE o.OrderId = UNHEX(@orderId)";
 
-                // Query to get add-on IDs, quantity, and total from orderaddons
+                // Query to get add-ons details from orderaddons
                 string addOnsSql = @"
         SELECT addOnsId, quantity, Total
         FROM orderaddons
         WHERE OrderId = UNHEX(@orderId)";
 
                 FinalOrder finalOrder = null;
+                List<OrderSummary> orderSummaries = new List<OrderSummary>();
 
-                // Get order details
+                // Get order and suborder details
                 using (var orderCommand = new MySqlCommand(orderSql, connection))
                 {
                     orderCommand.Parameters.AddWithValue("@orderId", orderId);
 
                     using (var reader = await orderCommand.ExecuteReaderAsync())
                     {
-                        if (await reader.ReadAsync())
+                        while (await reader.ReadAsync())
                         {
-                            finalOrder = new FinalOrder
+                            if (finalOrder == null)
                             {
-                                designName = reader.GetString("DesignName"),
+                                // Initialize FinalOrder object
+                                finalOrder = new FinalOrder
+                                {
+                                    OrderId = orderId,
+                                    PickupDateTime = reader.GetDateTime("PickupDateTime"),
+                                    CustomerName = reader.GetString("CustomerName"),
+                                    status = reader.GetString("status"),
+                                    payment = reader.GetString("payment"),
+                                    lastUpdatedBy = reader.GetString("last_updated_by"),
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime("last_updated_at"),
+                                    Type = reader.GetString("type"),
+                                    IsActive = reader.GetBoolean("isActive"),
+                                    summary = new List<OrderSummary>(),
+                                    AddOns = new List<AddOnDetails2>(),
+                                    customAddons = new List<CustomAddons>()
+                                };
+                            }
+
+                            // Add each suborder to the summary list
+                            orderSummaries.Add(new OrderSummary
+                            {
+                                suborderId = reader.GetGuid("suborder_id"),
+                                PastryMaterialId = reader.GetString("PastryId"),
+                                CustomerId = reader.GetGuid("CustomerId"),
+                                employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId")) ? (Guid?)null : reader.GetGuid("EmployeeId"),
+                                employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName")) ? string.Empty : reader.GetString("EmployeeName"),
+                                designId = reader.IsDBNull(reader.GetOrdinal("DesignId")) ? null : (byte[]?)reader["DesignId"],
+                                DesignName = reader.GetString("DesignName"),
                                 Price = reader.GetDouble("price"),
                                 Quantity = reader.GetInt32("quantity"),
-                                Description = reader.GetString("Description"),
-                                size = reader.GetString("Size"),
-                                flavor = reader.GetString("Flavor"),
-                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString("type"),
-                                PickupDateTime = reader.GetDateTime("PickupDateTime"),
-                                AddOns = new List<AddOnDetails2>(),
-                                customAddons = new List<CustomAddons>()
-                            };
+                                Size = reader.GetString("Size"),
+                                Flavor = reader.GetString("Flavor"),
+                                color = reader.GetString("color"),
+                                shape = reader.GetString("shape"),
+                                tier = reader.GetString("tier"),
+                                Description = reader.IsDBNull(reader.GetOrdinal("Description")) ? string.Empty : reader.GetString("Description"),
+                                CreatedAt = reader.GetDateTime("CreatedAt"),
+                                Status = reader.GetString("SubOrderStatus")
+                            });
                         }
                     }
                 }
 
+                // Assign order summaries to the finalOrder
                 if (finalOrder != null)
                 {
-                    // Get add-on IDs, quantity, and total
+                    finalOrder.summary = orderSummaries;
+
+                    // Get add-ons details
                     List<AddOnDetails2> addOnsDetails = new List<AddOnDetails2>();
 
                     using (var addOnsCommand = new MySqlCommand(addOnsSql, connection))
@@ -1450,6 +1492,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return finalOrder;
             }
         }
+
+
 
         // Method to fetch add-on details from the addons table by addOnsId
         private async Task<AddOnDetails2> GetAddOnDetailsById(int? addOnsId)
@@ -1521,7 +1565,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpGet("current-user/order-type/{type}")]
+        [HttpGet("current-user/order-type/{type}")] //update this 
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public IActionResult GetOrdersByType(string type)
         {
@@ -1588,7 +1632,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("admin/by-employee-username")]
+        [HttpGet("admin/by-employee-username")] //update this
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByUsername()
         {
@@ -1744,7 +1788,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpGet("admin/by-customer-username/{customerUsername}")]
+        [HttpGet("admin/by-customer-username/{customerUsername}")] //update this
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername)
         {
@@ -1844,7 +1888,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpGet("admin/by-type/{type}/{username}")]
+        [HttpGet("admin/by-type/{type}/{username}")] //update this
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type, string username)
         {
@@ -1928,7 +1972,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return validOrderTypes.Contains(type.ToLower());
         }
 
-        [HttpGet("admin/inactive")]
+        /*[HttpGet("admin/inactive")] //update this
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)] // Adjust authorization as needed
         public async Task<IActionResult> GetInactiveOrders()
         {
@@ -1993,10 +2037,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
 
             return orders;
-        }
+        }*/
 
         [HttpGet("admin/active")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)] // Adjust authorization as needed
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)] // update this
         public async Task<IActionResult> GetActiveOrdersFromDatabase()
         {
             try
@@ -2062,7 +2106,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return orders;
         }
 
-        [HttpGet("customer/cart")]
+        [HttpGet("customer/cart")] //update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetCartOrdersForUser()
         {
@@ -2144,7 +2188,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("admin/update-price")] //change this 
+        [HttpPatch("admin/update-price")] //change this
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderAddon([FromQuery] string orderId, [FromQuery] string name, [FromQuery] decimal price)
         {
@@ -2230,7 +2274,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPatch("admin/send-back-to-customer-no-change")]
+        [HttpPatch("admin/send-back-to-customer-no-change")] //no decision yet
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderStatus([FromQuery] string orderId)
         {
@@ -2368,22 +2412,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 }
                             }
 
-                            // Update AddOns quantities for each entry in orderaddons
-                            /*foreach (var (AddOnsId, Quantity) in orderAddOnsList)
-                            {
-                                // Only update if AddOnsId is not null
-                                if (AddOnsId.HasValue)
-                                {
-                                    string sqlUpdateAddOns = "UPDATE addons SET quantity = quantity - @Quantity WHERE addOnsId = @AddOnsId";
-                                    using (var updateAddOnsCommand = new MySqlCommand(sqlUpdateAddOns, connection))
-                                    {
-                                        updateAddOnsCommand.Parameters.AddWithValue("@Quantity", Quantity);
-                                        updateAddOnsCommand.Parameters.AddWithValue("@AddOnsId", AddOnsId.Value);
-                                        await updateAddOnsCommand.ExecuteNonQueryAsync();
-                                    }
-                                }
-                            }*/
-
                             // Set isActive to true
                             await UpdateOrderStatus(orderIdBinary, true);
                             await UpdateStatus(orderIdBinary, "confirmed");
@@ -2444,7 +2472,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("artist/update-order-status")]
+        [HttpPatch("artist/update-order-status")] //update this
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
         public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
         {
@@ -2621,7 +2649,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("customer/update-cart")]
+        [HttpPatch("customer/update-cart")] //update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate(
             [FromQuery] string orderId,
@@ -2998,7 +3026,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
          */
 
-        [HttpPatch("customer/manage-add-ons-by-material/{pastryMaterialId}")]
+        [HttpPatch("customer/manage-add-ons-by-material/{pastryMaterialId}")] //done
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, [FromQuery] string orderId, [FromQuery] int modifiedAddOnId, [FromBody] ManageAddOnAction action)
         {
@@ -3297,7 +3325,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPatch("customer/{orderId}/add-new-add-ons")]
+        [HttpPatch("customer/{orderId}/add-new-add-ons")] //debug soon
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
         {
@@ -3431,7 +3459,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPatch("customer/{orderId}/update-order-details")]
+        [HttpPatch("customer/{orderId}/update-order-details")]//update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> UpdateOrderDetails(string orderId, [FromBody] UpdateOrderDetailsRequest request)
         {
@@ -3498,7 +3526,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("admin/assign-employee")]
+        [HttpPatch("admin/assign-employee")]//update this 
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderId, [FromQuery] string employeeUsername)
         {
@@ -3533,7 +3561,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpDelete("customer/remove-cart/{orderId}")]
+        [HttpDelete("customer/remove-cart/{orderId}")] //update this 
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> RemoveCart(string orderId)
         {
