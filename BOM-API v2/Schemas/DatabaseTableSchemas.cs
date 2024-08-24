@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Runtime.InteropServices;
 using System;
+using MimeKit.Encodings;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -144,7 +145,6 @@ namespace BillOfMaterialsAPI.Schemas
         public string amount_unit;
         public double amount;
     }
-
     [PrimaryKey("pastry_material_ingredient_importance_id")]
     public class PastryMaterialIngredientImportance
     {
@@ -251,6 +251,16 @@ namespace BillOfMaterialsAPI.Schemas
         public bool isActive { get; set; }
 
         public Designs Designs { get; set; }
+    }
+
+    //Live chat table
+    public class DirectMessages
+    {
+        public Guid direct_message_id { get; set; }
+        public string? sender_account_id { get; set; }
+        public string? receiver_account_id { get; set; }
+        public string message { get; set; }
+        public DateTime date_sent { get; set; }
     }
 
     //
