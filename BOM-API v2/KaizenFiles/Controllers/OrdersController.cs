@@ -12,7 +12,7 @@ using System.Security.Claims;
 using BOM_API_v2.Helpers;
 using System.Text.Json;
 using static BOM_API_v2.KaizenFiles.Models.Adds;
-using BillOfMaterialsAPI.Schemas;
+
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -80,7 +80,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Set isActive to false for all orders created
 
                 // Set the status to pending
-                order.status = "pending";
+                order.status = "to pay";
 
                 // Convert designId to hex string
                 string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
@@ -183,6 +183,135 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
+
+        [HttpPost("customer/checkout-cart")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> PatchOrderTypeAndPickupDate(
+    [FromQuery] string suborderid,
+    [FromQuery] string type,
+    [FromQuery] string pickupDate,
+    [FromQuery] string pickupTime,
+    [FromQuery] string payment)
+        {
+            try
+            {
+                // Retrieve customer username from claims
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Retrieve customerId from username
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                // Validate type
+                if (!type.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
+                    !type.Equals("rush", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
+                }
+
+                // Parse and validate the pickup date and time
+                if (!DateTime.TryParseExact(pickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate) ||
+                    !DateTime.TryParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
+                {
+                    return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
+                }
+
+                // Combine the parsed date and time into a single DateTime object
+                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+                // Generate a new GUID for the OrderId
+
+                Guid orderId = Guid.NewGuid();
+                string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
+
+                string suborderIdBinary = ConvertGuidToBinary16((suborderid)).ToLower();
+
+                // Check if the suborder exists in the suborders table
+                if (!await DoesSuborderExist(suborderIdBinary))
+                {
+                    return NotFound($"Suborder with ID '{suborderIdBinary}' not found.");
+                }
+
+                // Insert the new order with the same suborderid and other details
+                await InsertOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, type, payment);
+
+                // Update the suborder with the suborderid using UNHEX
+                await UpdateSuborderWithOrderId(suborderIdBinary, orderIdBinary);
+
+
+                return Ok($"Order for suborder ID '{orderIdBinary}' has been successfully created.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while processing the request.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<bool> DoesSuborderExist(string suborderId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT COUNT(1) FROM suborders WHERE suborder_id = UNHEX(@suborderid)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@suborderid", suborderId);
+                    return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+                }
+            }
+        }
+
+        private async Task UpdateSuborderWithOrderId(string suborderId, string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Prepare the SQL query to update the suborder
+                string sql = "UPDATE suborders SET OrderId = UNHEX(@orderid) WHERE suborder_id = UNHEX(@suborderid)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Define and add the necessary parameters
+                    command.Parameters.AddWithValue("@orderid", orderIdBinary);  // Use the provided orderIdBinary
+                    command.Parameters.AddWithValue("@suborderid", suborderId);  // Pass the suborderId as hexadecimal
+
+                    // Execute the query
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+
+        private async Task InsertOrderWithOrderId(string orderIdBinary, string customerName, byte[] customerId, DateTime pickupDateTime, string type, string payment)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"INSERT INTO orders (OrderId, CustomerId, CustomerName, PickupDateTime, Type, Payment, Status, CreatedAt) 
+                       VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, @payment, 'for update', NOW())";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderid", orderIdBinary);
+                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@pickupDateTime", pickupDateTime);
+                    command.Parameters.AddWithValue("@CustomerName", customerName);
+                    command.Parameters.AddWithValue("@type", type);
+                    command.Parameters.AddWithValue("@payment", payment);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
 
         /*[HttpPost("customer/add-to-suborder")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
@@ -507,16 +636,22 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
                                                 ? (Guid?)null
-                                                : (Guid)reader.GetValue(reader.GetOrdinal("OrderId"));
+                                                : new Guid((byte[])reader["OrderId"]);
 
-                                Guid suborderId = reader.GetGuid(reader.GetOrdinal("suborder_id"));
+                                Guid suborderId = new Guid((byte[])reader["suborder_id"]);
                                 Guid customerId = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
                                                   ? Guid.Empty
-                                                  : reader.GetGuid(reader.GetOrdinal("CustomerId"));
+                                                  : new Guid((byte[])reader["CustomerId"]);
 
                                 Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
                                                   ? Guid.Empty
-                                                  : reader.GetGuid(reader.GetOrdinal("EmployeeId"));
+                                                  : new Guid((byte[])reader["EmployeeId"]);
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"));
+                                string? LastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
 
                                 orders.Add(new Order
                                 {
@@ -533,9 +668,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     designName = reader.GetString(reader.GetOrdinal("DesignName")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                    lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
-                                                    ? null
-                                                    : reader.GetString(reader.GetOrdinal("last_updated_by")),
+                                    lastUpdatedBy = LastUpdatedBy,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
@@ -544,9 +677,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                     size = reader.GetString(reader.GetOrdinal("Size")),
                                     customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                    employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
-                                                   ? null
-                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"))
+                                    employeeName = employeeName
                                 });
                             }
                         }
@@ -564,258 +695,222 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-
-        [HttpGet("current-user/orders")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetOrdersByCustomerIdSummary()
+        [HttpGet("current/user/to-pay")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
             try
             {
-                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
-                if (string.IsNullOrEmpty(customerUsername))
+                List<Cart> orders = new List<Cart>();
+
+                using (var connection = new MySqlConnection(connectionstring))
                 {
-                    return Unauthorized("No valid customer username found.");
+                    await connection.OpenAsync();
+
+                    string sql = @"
+            SELECT 
+                suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
+                HEX(DesignId) as DesignId, DesignName, price, quantity, 
+                last_updated_by, last_updated_at, isActive, Description, 
+                Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
+            FROM suborders 
+            WHERE CustomerId = @customerId AND Status IN('to pay')";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@customerId", customerId);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["OrderId"]);
+
+                                Guid suborderId = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["CustomerId"]);
+
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["EmployeeId"]);
+
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"));
+
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new Cart
+                                {
+                                    Id = orderId, // Handle null values for orderId
+                                    suborderId = suborderId,
+                                    CustomerId = customerIdFromDb,
+                                    employeeId = employeeId,
+                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                    Status = reader.GetString(reader.GetOrdinal("Status")),
+                                    color = reader.GetString(reader.GetOrdinal("color")),
+                                    shape = reader.GetString(reader.GetOrdinal("shape")),
+                                    tier = reader.GetString(reader.GetOrdinal("tier")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy,
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                    Description = reader.GetString(reader.GetOrdinal("Description")),
+                                    Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                    Size = reader.GetString(reader.GetOrdinal("Size")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    employeeName = employeeName
+                                });
+                            }
+                        }
+                    }
                 }
 
-                // Create an instance of OrdList to store the orders
-                OrdList ordList = new OrdList();
+                if (orders.Count == 0)
+                    return NotFound("No orders found for the specified customer.");
 
-                await RetrieveOrdersByCustomerIdAsync(customerUsername, ordList);
-
-                if (ordList.summary.Count == 0)
-                    return NotFound("No orders available for this customer");
-
-                return Ok(ordList);
+                return Ok(orders);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving orders by customer ID");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
 
-        private async Task RetrieveOrdersByCustomerIdAsync(string customerUsername, OrdList ordList)
+        [HttpGet("current/user/to-receive")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToReceiveOrdersByCustomerId()
         {
-            using (var connection = new MySqlConnection(connectionstring))
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
             {
-                await connection.OpenAsync();
+                return Unauthorized("User is not authorized");
+            }
 
-                string sql = @"
-    SELECT 
-        OrderId, PastryId, CustomerId, CustomerName, CreatedAt, Status, 
-        payment, last_updated_by, last_updated_at, PickupDateTime, type, isActive
-    FROM orders 
-    WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-    AND type = 'pending'";
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
 
-                using (var command = new MySqlCommand(sql, connection))
+            try
+            {
+                List<Cart> orders = new List<Cart>();
+
+                using (var connection = new MySqlConnection(connectionstring))
                 {
-                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
+                    await connection.OpenAsync();
 
-                    using (var reader = await command.ExecuteReaderAsync())
+                    string sql = @"
+            SELECT 
+                suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
+                HEX(DesignId) as DesignId, DesignName, price, quantity, 
+                last_updated_by, last_updated_at, isActive, Description, 
+                Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
+            FROM suborders 
+            WHERE CustomerId = @customerId AND Status IN('to receive')";
+
+                    using (var command = new MySqlCommand(sql, connection))
                     {
-                        while (await reader.ReadAsync())
+                        command.Parameters.AddWithValue("@customerId", customerId);
+
+                        using (var reader = await command.ExecuteReaderAsync())
                         {
-                            string orderIdBinary = reader.GetString(reader.GetOrdinal("OrderId"));
-
-                            // Retrieve detailed order information
-                            var orderDetails = await GetOrderDetailsById(connection, orderIdBinary);
-
-                            var order = new Ord
+                            while (await reader.ReadAsync())
                             {
-                                OrderId = orderDetails.OrderId.ToString("N"),
-                                PastryId = reader.GetString(reader.GetOrdinal("PastryId")),
-                                customerId = reader.IsDBNull(reader.GetOrdinal("CustomerId")) ? (Guid?)null : reader.GetGuid(reader.GetOrdinal("CustomerId")),
-                                CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                status = reader.GetString(reader.GetOrdinal("Status")),
-                                payment = reader.GetString(reader.GetOrdinal("payment")),
-                                lastUpdatedBy = reader.GetString(reader.GetOrdinal("last_updated_by")),
-                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                PickupDateTime = reader.IsDBNull(reader.GetOrdinal("PickupDateTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-                                Type = reader.GetString(reader.GetOrdinal("type")),
-                                IsActive = reader.GetBoolean(reader.GetOrdinal("isActive"))
-                            };
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["OrderId"]);
 
-                            // Retrieve the list of order summaries
-                            var orderSummaries = await RetrieveOrderSummariesByOrderId(connection, orderIdBinary);
-                            order.summary = orderSummaries;
+                                Guid suborderId = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["CustomerId"]);
 
-                            // Add the order to the OrdList summary
-                            ordList.summary.Add(order);
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["EmployeeId"]);
+
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"));
+
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new Cart
+                                {
+                                    Id = orderId, // Handle null values for orderId
+                                    suborderId = suborderId,
+                                    CustomerId = customerIdFromDb,
+                                    employeeId = employeeId,
+                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                    Status = reader.GetString(reader.GetOrdinal("Status")),
+                                    color = reader.GetString(reader.GetOrdinal("color")),
+                                    shape = reader.GetString(reader.GetOrdinal("shape")),
+                                    tier = reader.GetString(reader.GetOrdinal("tier")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy,
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                    Description = reader.GetString(reader.GetOrdinal("Description")),
+                                    Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                    Size = reader.GetString(reader.GetOrdinal("Size")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    employeeName = employeeName
+                                });
+                            }
                         }
                     }
                 }
-            }
-        }
 
+                if (orders.Count == 0)
+                    return NotFound("No orders found for the specified customer.");
 
-        private async Task<List<OrderSummary>> RetrieveOrderSummariesByOrderId(MySqlConnection connection, string orderIdBinary)
-        {
-            var orderSummaries = new List<OrderSummary>();
-
-            string sql = @"
-    SELECT 
-        suborder_id, OrderId, DesignName, price, quantity, 
-        Description, Flavor, Size, shape, color, tier
-    FROM suborders 
-    WHERE OrderId = UNHEX(@orderId)";
-
-            using (var command = new MySqlCommand(sql, connection))
-            {
-                command.Parameters.AddWithValue("@orderId", orderIdBinary);
-
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    while (await reader.ReadAsync())
-                    {
-                        byte[] orderIdBytes = new byte[16];
-                        reader.GetBytes(reader.GetOrdinal("OrderId"), 0, orderIdBytes, 0, 16);
-
-                        // Create a Guid from byte array
-                        Guid orderId = new Guid(orderIdBytes);
-
-                        orderSummaries.Add(new OrderSummary
-                        {
-                            suborderId = reader.GetGuid(reader.GetOrdinal("suborder_id")),
-                            Id = orderId,
-                            DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
-                            Price = reader.GetDouble(reader.GetOrdinal("price")),
-                            Description = reader.GetString(reader.GetOrdinal("Description")),
-                            Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                            Size = reader.GetString(reader.GetOrdinal("Size")),
-                            color = reader.GetString(reader.GetOrdinal("color")),
-                            shape = reader.GetString(reader.GetOrdinal("shape")),
-                            tier = reader.GetString(reader.GetOrdinal("tier"))
-                        });
-                    }
-                }
-            }
-
-            return orderSummaries;
-        }
-
-        private async Task<(Guid OrderId, string CustomerId, string CustomerName, DateTime CreatedAt, string Status, double Payment, string LastUpdatedBy, DateTime? LastUpdatedAt, string Type, DateTime? PickupDateTime, bool IsActive)> GetOrderDetailsById(MySqlConnection connection, string orderIdBinary)
-        {
-            string sql = @"
-    SELECT 
-        OrderId, CustomerId, CustomerName, CreatedAt, Status, payment, 
-        last_updated_by, last_updated_at, type, PickupDateTime, isActive
-    FROM orders
-    WHERE OrderId = UNHEX(@orderId)";
-
-            using (var command = new MySqlCommand(sql, connection))
-            {
-                command.Parameters.AddWithValue("@orderId", orderIdBinary);
-
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    if (await reader.ReadAsync())
-                    {
-                        return (
-                            OrderId: reader.GetGuid(reader.GetOrdinal("OrderId")),
-                            CustomerId: reader.GetString(reader.GetOrdinal("CustomerId")),
-                            CustomerName: reader.GetString(reader.GetOrdinal("CustomerName")),
-                            CreatedAt: reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                            Status: reader.GetString(reader.GetOrdinal("Status")),
-                            Payment: reader.GetDouble(reader.GetOrdinal("payment")),
-                            LastUpdatedBy: reader.GetString(reader.GetOrdinal("last_updated_by")),
-                            LastUpdatedAt: reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                            Type: reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
-                            PickupDateTime: reader.IsDBNull(reader.GetOrdinal("PickupDateTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-                            IsActive: reader.GetBoolean(reader.GetOrdinal("isActive"))
-                        );
-                    }
-                    else
-                    {
-                        throw new Exception($"Order details not found for OrderId '{orderIdBinary}'.");
-                    }
-                }
-            }
-        }
-
-
-        [HttpGet("current-user/for-confirmation-orders")]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetOrdersBySummary()
-        {
-            try
-            {
-                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
-                if (string.IsNullOrEmpty(customerUsername))
-                {
-                    return Unauthorized("No valid customer username found.");
-                }
-
-                OrdList ordList = new OrdList();
-
-                await RetrieveOrdersByCustomerIdAsync1(customerUsername, ordList.summary);
-
-                if (ordList.summary.Count == 0)
-                    return NotFound("No orders available for this customer");
-
-                return Ok(ordList);
+                return Ok(orders);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving orders by customer ID");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
 
-        private async Task RetrieveOrdersByCustomerIdAsync1(string customerUsername, List<Ord> orders)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
 
-                string sql = @"
-SELECT 
-    OrderId, PastryId, CustomerId, CustomerName, CreatedAt, Status, 
-    payment, last_updated_by, last_updated_at, PickupDateTime, type, isActive
-FROM orders 
-WHERE CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)
-AND type = 'confirmation'";
 
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
-
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            string orderIdBinary = reader.GetString(reader.GetOrdinal("OrderId"));
-
-                            // Retrieve detailed order information
-                            var orderDetails = await GetOrderDetailsById(connection, orderIdBinary);
-
-                            var order = new Ord
-                            {
-                                OrderId = orderDetails.OrderId.ToString("N"),
-                                PastryId = reader.GetString(reader.GetOrdinal("PastryId")),
-                                customerId = reader.IsDBNull(reader.GetOrdinal("CustomerId")) ? (Guid?)null : reader.GetGuid(reader.GetOrdinal("CustomerId")),
-                                CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                status = reader.GetString(reader.GetOrdinal("Status")),
-                                payment = reader.GetString(reader.GetOrdinal("payment")),
-                                lastUpdatedBy = reader.GetString(reader.GetOrdinal("last_updated_by")),
-                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                PickupDateTime = reader.IsDBNull(reader.GetOrdinal("PickupDateTime")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-                                Type = reader.GetString(reader.GetOrdinal("type")),
-                                IsActive = reader.GetBoolean(reader.GetOrdinal("isActive"))
-                            };
-
-                            // Retrieve the list of order summaries
-                            var orderSummaries = await RetrieveOrderSummariesByOrderId(connection, orderIdBinary);
-                            order.summary = orderSummaries;
-
-                            orders.Add(order);
-                        }
-                    }
-                }
-            }
-        }
 
 
         /*[HttpGet("current-user/for-confirmation-orders")]
@@ -2039,72 +2134,6 @@ AND type = 'confirmation'";
             return orders;
         }*/
 
-        [HttpGet("admin/active")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)] // update this
-        public async Task<IActionResult> GetActiveOrdersFromDatabase()
-        {
-            try
-            {
-                List<Order> orders = await GetOnlyActiveOrdersFromDatabase();
-
-                if (orders == null || orders.Count == 0)
-                    return NotFound("No active orders found");
-
-                return Ok(orders);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "An error occurred while fetching inactive orders");
-                return StatusCode(500, "An error occurred while processing the request");
-            }
-        }
-
-        private async Task<List<Order>> GetOnlyActiveOrdersFromDatabase()
-        {
-            List<Order> orders = new List<Order>();
-
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT * FROM orders WHERE isActive = @isActive";
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@isActive", true);
-
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        while (await reader.ReadAsync())
-                        {
-                            orders.Add(new Order
-                            {
-                                orderId = reader.GetGuid(reader.GetOrdinal("OrderId")),
-                                customerId = reader.GetGuid(reader.GetOrdinal("CustomerId")),
-                                employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId")) ? Guid.Empty : reader.GetGuid(reader.GetOrdinal("EmployeeId")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                status = reader.GetString(reader.GetOrdinal("Status")),
-                                designId = reader["DesignId"] as byte[],
-                                price = reader.GetDouble(reader.GetOrdinal("price")),
-                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
-                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at")) ? (DateTime?)null : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                type = reader.IsDBNull(reader.GetOrdinal("type")) ? null : reader.GetString(reader.GetOrdinal("type")),
-                                isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                Description = reader.GetString(reader.GetOrdinal("Description")),
-                                flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                size = reader.GetString(reader.GetOrdinal("Size")),
-                                PickupDateTime = reader.GetDateTime(reader.GetOrdinal("PickupDateTime")),
-                                customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                employeeName = reader.GetString(reader.GetOrdinal("EmployeeName"))
-
-                            });
-                        }
-                    }
-                }
-            }
-
-            return orders;
-        }
 
         [HttpGet("customer/cart")] //update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
@@ -2648,72 +2677,6 @@ AND type = 'confirmation'";
             }
         }
 
-
-        [HttpPatch("customer/update-cart")] //update this 
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> PatchOrderTypeAndPickupDate(
-            [FromQuery] string orderId,
-            [FromQuery] string type,
-            [FromQuery] string pickupDate,
-            [FromQuery] string pickupTime)
-        {
-            try
-            {
-                // Convert the orderId from GUID string to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
-
-                // Validate type
-                if (!type.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
-                    !type.Equals("rush", StringComparison.OrdinalIgnoreCase))
-                {
-                    return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
-                }
-
-                // Parse the pickup date string to DateTime
-                if (!DateTime.TryParseExact(pickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
-                {
-                    return BadRequest("Invalid pickup date format. Use 'yyyy-MM-dd'.");
-                }
-
-                // Parse the pickup time string to TimeSpan
-                if (!DateTime.TryParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
-                {
-                    return BadRequest("Invalid pickup time format. Use 'h:mm tt'.");
-                }
-
-                // Combine the pickup date and time into a single DateTime object
-                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
-
-                // Update the type and pickup date in the database
-                await UpdateOrderTypeAndPickupDate(orderIdBinary, type, pickupDateTime);
-
-                return Ok($"Order with ID '{orderId}' has been successfully updated with type '{type}' and pickup date '{pickupDateTime.ToString("yyyy-MM-dd HH:mm")}'.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"An error occurred while processing the request to update order with ID '{orderId}'.");
-                return StatusCode(500, $"An error occurred while processing the request to update order with ID '{orderId}'.");
-            }
-        }
-
-        private async Task UpdateOrderTypeAndPickupDate(string orderIdBinary, string type, DateTime pickupDateTime)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "UPDATE orders SET type = @type, PickupDateTime = @pickupDate, status = 'for update' WHERE OrderId = UNHEX(@orderId)";
-
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@type", type);
-                    command.Parameters.AddWithValue("@pickupDate", pickupDateTime);
-                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
-        }
-
         private async Task<int?> GetExistingTotal(string DesignName)
         {
             using (var connection = new MySqlConnection(connectionstring))
@@ -2758,13 +2721,28 @@ AND type = 'confirmation'";
                 {
                     await connection.OpenAsync();
 
-                    string sql = "UPDATE orders SET Status = @status WHERE OrderId = UNHEX(@orderId)";
-
-                    using (var command = new MySqlCommand(sql, connection))
+                    // Update the status of the order
+                    string orderSql = "UPDATE orders SET Status = @status WHERE OrderId = UNHEX(@orderId)";
+                    using (var orderCommand = new MySqlCommand(orderSql, connection))
                     {
-                        command.Parameters.AddWithValue("@status", status);
-                        command.Parameters.AddWithValue("@orderId", orderIdBinary);
-                        await command.ExecuteNonQueryAsync();
+                        orderCommand.Parameters.AddWithValue("@status", status);
+                        orderCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                        await orderCommand.ExecuteNonQueryAsync();
+                    }
+
+                    // Determine the suborders status based on the order status
+                    string subOrderStatus = status == "confirmed" ? "to receive" : status == "cancelled" ? "cancelled" : null;
+
+                    if (subOrderStatus != null)
+                    {
+                        // Update the status of the suborders
+                        string subOrderSql = "UPDATE suborders SET Status = @subOrderStatus WHERE OrderId = UNHEX(@orderId)";
+                        using (var subOrderCommand = new MySqlCommand(subOrderSql, connection))
+                        {
+                            subOrderCommand.Parameters.AddWithValue("@subOrderStatus", subOrderStatus);
+                            subOrderCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                            await subOrderCommand.ExecuteNonQueryAsync();
+                        }
                     }
                 }
             }
@@ -2774,6 +2752,8 @@ AND type = 'confirmation'";
                 throw;
             }
         }
+
+
 
         /* [HttpPatch("{orderId}/manage_add_ons")]
          [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
