@@ -8,8 +8,10 @@ namespace LiveChat
         void RemoveConnection(ConnectionInfo entry);
         void RemoveConnection(string connectionId);
         List<ConnectionInfo> GetAllConnections();
-        List<ConnectionInfo> GetAllAdminConnections();
+        List<ConnectionInfo> GetAllCustomerConnections();
         List<ConnectionInfo> GetAllManagerConnections();
+        List<ConnectionInfo> GetAllArtistConnections();
+        List<ConnectionInfo> GetAllAdminConnections();
     }
     public class ConnectionInfo
     {
@@ -64,13 +66,21 @@ namespace LiveChat
         {
             return ConnectionInfos; 
         }
-        public List<ConnectionInfo> GetAllAdminConnections()
+        public List<ConnectionInfo> GetAllCustomerConnections()
         {
-            return ConnectionInfos.Where(x => x.Claims != null && x.Claims.Contains(UserRoles.Admin)).ToList();
+            return ConnectionInfos.Where(x => x.Claims != null && x.Claims.Contains(UserRoles.Customer)).ToList();
+        }
+        public List<ConnectionInfo> GetAllArtistConnections()
+        {
+            return ConnectionInfos.Where(x => x.Claims != null && x.Claims.Contains(UserRoles.Artist)).ToList();
         }
         public List<ConnectionInfo> GetAllManagerConnections()
         {
             return ConnectionInfos.Where(x => x.Claims != null && x.Claims.Contains(UserRoles.Manager)).ToList();
+        }
+        public List<ConnectionInfo> GetAllAdminConnections()
+        {
+            return ConnectionInfos.Where(x => x.Claims != null && x.Claims.Contains(UserRoles.Admin)).ToList();
         }
 
     }

@@ -242,6 +242,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         public Designs Designs { get; set; }
     }
+    [PrimaryKey("design_shape_id")]
     public class DesignShapes
     {
         [Key] public Guid design_shape_id { get; set; }
