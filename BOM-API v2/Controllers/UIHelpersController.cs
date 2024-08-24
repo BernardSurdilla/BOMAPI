@@ -5,6 +5,8 @@ using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using LiveChat;
+using Microsoft.IdentityModel.Tokens;
 
 namespace BOM_API_v2.Controllers
 {
@@ -14,7 +16,8 @@ namespace BOM_API_v2.Controllers
     {
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
-        public UIHelpersController(DatabaseContext databaseContext, KaizenTables kaizenTables) { _context = databaseContext; _kaizenTables = kaizenTables; }
+        private readonly ILiveChatConnectionManager _liveChatConnectionManager;
+        public UIHelpersController(DatabaseContext databaseContext, KaizenTables kaizenTables, ILiveChatConnectionManager connectionManager) { _context = databaseContext; _kaizenTables = kaizenTables; _liveChatConnectionManager = connectionManager; }
 
         [Authorize(Roles = UserRoles.Admin)]
         [HttpGet("valid-measurement-values")]
@@ -119,5 +122,58 @@ namespace BOM_API_v2.Controllers
             return response;
         }
 
+        [HttpGet("live-chat/online-admins")]
+        public async Task<List<ChatConnection>> GetLiveChatAdminsOnline()
+        {
+            List<ChatConnection> response = new List<ChatConnection>();
+
+            List<LiveChat.ConnectionInfo> connectionInfos = new List<LiveChat.ConnectionInfo>();
+
+            connectionInfos.AddRange(_liveChatConnectionManager.GetAllAdminConnections());
+            connectionInfos.AddRange(_liveChatConnectionManager.GetAllManagerConnections());
+
+            connectionInfos.GroupBy(x => x.ConnectionId).Select(g => g.First()).ToList();
+
+            foreach (LiveChat.ConnectionInfo connectionInfo in connectionInfos)
+            {
+                response.Add(new ChatConnection
+                {
+                    connection_id = connectionInfo.ConnectionId,
+                    name = connectionInfo.Name,
+                    role = connectionInfo.Claims == null ? "Anonymous" : connectionInfo.Claims.FirstOrDefault()
+                });
+            }
+
+            return response;
+        }
+        [HttpGet("live-chat/online-users")]
+        public async Task<List<ChatConnection>> GetLiveChatUsersOnline()
+        {
+            List<ChatConnection> response = new List<ChatConnection>();
+
+            List<LiveChat.ConnectionInfo> connectionInfos = new List<LiveChat.ConnectionInfo>();
+
+            connectionInfos.AddRange(_liveChatConnectionManager.GetAllConnections());
+
+            foreach (LiveChat.ConnectionInfo? connectionInfo in connectionInfos)
+            {
+                if (connectionInfo == null) continue;
+                response.Add(new ChatConnection
+                {
+                    connection_id = connectionInfo.ConnectionId,
+                    name = connectionInfo.Name,
+                    role = connectionInfo.Claims == null || connectionInfo.Claims.IsNullOrEmpty() ? "Anonymous" : connectionInfo.Claims.FirstOrDefault()
+                });
+            }
+
+            return response;
+        }
+    }
+
+    public class ChatConnection
+    {
+        public string connection_id { get; set; }
+        public string? name { get; set; }
+        public string? role { get; set; }
     }
 }

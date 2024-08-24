@@ -14,6 +14,7 @@ using BOM_API_v2.Bridge;
 using API_TEST.Controllers;
 using BOM_API_v2.Helpers;
 using BOM_API_v2.Controllers;
+using LiveChat;
 
 
 const string API_VERSION = "v1";
@@ -29,12 +30,12 @@ builder.Services.AddCors(options =>
     options.AddPolicy(name: "DebugPolicy", policy =>
     {
         policy.SetIsOriginAllowedToAllowWildcardSubdomains()
-        .AllowAnyOrigin()
+        .SetIsOriginAllowed((host) => true)
+        .AllowCredentials()
         .AllowAnyHeader()
         .AllowAnyMethod();
     });
 });
-
 builder.Services.AddControllers(options => options.Conventions.Add(new GlobalControllerRoutePrefixConvention(new GlobalControllerRoutePrefix(GLOBAL_ROUTE_PREFIX))));
 
 
@@ -50,6 +51,7 @@ builder.Services.AddSwaggerGen(opt =>
     });
     opt.OperationFilter<SecurityRequirementsOperationFilter>();
 });
+
 
 //
 // SERVER CONNECTIONS
@@ -90,7 +92,34 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration.GetSection("JWT").GetValue<string>("ValidIssuer"),
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("JWT").GetValue<string>("Secret")))
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
+
+            if (!string.IsNullOrEmpty(token))
+            {
+                context.Token = token;
+                return Task.CompletedTask;
+            }
+            else
+            {
+                string? accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    (path.StartsWithSegments("/live-chat")))
+                {
+                    context.Token = accessToken.Split(" ").Last();
+                }
+                return Task.CompletedTask;
+            }
+        }
+    };
 });
+
+//Live Chat
+builder.Services.AddSignalR();
 
 //Custom Services
 //NOTE: Services can also be dependency injected
@@ -99,6 +128,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddScoped<IActionLogger, AccountManager>(); //Logging service
 builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Service
 builder.Services.AddTransient<IInventoryBOMBridge, BOMInventoryBridge>(); //Inventory BOM Bridge Service
+builder.Services.AddSingleton<ILiveChatConnectionManager, LiveChatConnectionManager>(); //Live chat connections
 
 
 var app = builder.Build();
@@ -115,5 +145,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ChatHub>("/live-chat");
 
 app.Run();

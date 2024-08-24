@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Real-Time Chat with SignalR</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.js"></script>
+  </head>
+  <body>
+    <div>
+      <input type="text" id="message" placeholder="Enter your message" />
+      <input type="text" id="bearer-token" />
+      <select id="connection-options"></select>
+      <button id="connection-options-refresh">Refresh connections</button>
+      <br />
+      <button id="sendButtonCustomer">Send: Customer</button>
+      <button id="sendButtonAdmin">Send: Admin</button>
+      <button id="startConnection">Start Connection</button>
+    </div>
+    <div id="chatBox"></div>
+    <script>
+      var connection = new signalR.HubConnectionBuilder()
+        .withUrl("http://localhost:5155/live-chat/", {
+          accessTokenFactory: () => {
+            var fixedToken = $("#bearer-token").val();
+            return fixedToken;
+          },
+        })
+        .build();
+
+      $("#startConnection").click(function () {
+        connection
+          .start()
+          .then(function () {
+            console.log("Connected!");
+          })
+          .catch(function (err) {
+            console.error(err.toString());
+          });
+      });
+      connection.on("RecieveMessage", function (parsed_message) {
+        var encodedUser = $("<div />")
+          .text(parsed_message.sender_name)
+          .html();
+        var encodedMsg = $("<div />")
+          .text(
+            parsed_message.sender_message +
+              " " +
+              parsed_message.sender_message_time_sent
+          )
+          .html();
+        $("#chatBox").append(
+          "<p><strong>" + encodedUser + "</strong>: " + encodedMsg + "</p>"
+        );
+      });
+
+      $("#sendButtonCustomer").click(async function () {
+        var message = $("#message").val();
+        var e = document.getElementById("connection-options");
+        var connection_value = e.value;
+        connection.invoke("customer-send-message", message, connection_value);
+        $("#message").val("").focus();
+      });
+
+      $("#sendButtonAdmin").click(async function () {
+        var message = $("#message").val();
+        var e = document.getElementById("connection-options");
+        var connection_value = e.value;
+        connection.invoke("admin-send-message", message, connection_value);
+        $("#message").val("").focus();
+      });
+
+      $("#connection-options-refresh").click(async function () {
+        var onlineUserList;
+        fetch(
+          "http://localhost:5155/culo-api/v1/ui-helpers/live-chat/online-users"
+        )
+          .then((response) => response.json())
+          .then((jsonArray) => {
+            document.getElementById("connection-options").innerHTML = "";
+            jsonArray.forEach((element) => {
+              var newOption = new Option(
+                element.name + " " + element.role,
+                element.connection_id
+              );
+              document
+                .getElementById("connection-options")
+                .appendChild(newOption);
+            });
+          });
+      });
+    </script>
+  </body>
+</html>
