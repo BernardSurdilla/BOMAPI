@@ -11,9 +11,13 @@ namespace LiveChat
     public class ChatHub : Hub
     {
         private readonly ILiveChatConnectionManager _connectionManager;
+        private readonly DirectMessagesDB _directMessagesDB;
         private const string CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME = "RecieveMessage";
 
-        public ChatHub(ILiveChatConnectionManager connectionManager) { _connectionManager = connectionManager; }
+        public ChatHub(ILiveChatConnectionManager connectionManager, DirectMessagesDB directMessagesDB)
+        {
+            _connectionManager = connectionManager; _directMessagesDB = directMessagesDB;
+        }
 
         [HubMethodName("customer-send-message")]
         public async Task CustomerSendMessage(string message, string connectionId)
@@ -125,6 +129,7 @@ namespace LiveChat
             
             return base.OnConnectedAsync();
         }
+
         public override Task OnDisconnectedAsync(Exception exception)
         {
             _connectionManager.RemoveConnection(Context.ConnectionId);
@@ -152,9 +157,24 @@ namespace LiveChat
         }
         public async Task<int> SendMessageToSenderAndRecepientClients(ISingleClientProxy sender, ISingleClientProxy recepient, MessageFormat message)
         {
-
             await recepient.SendAsync(CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME, message);
             await sender.SendAsync(CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME, message);
+
+            return 1;
+        }
+        public async Task<int> LogMessageToDB(MessageFormat message, APIUsers sender, APIUsers recepient)
+        {
+            DirectMessages newDbEntry = new DirectMessages
+            {
+                direct_message_id = Guid.NewGuid(),
+                sender_account_id = sender.Id,
+                receiver_account_id = recepient.Id,
+                date_sent = message.sender_message_time_sent,
+                message = message.sender_message,
+            };
+
+            await _directMessagesDB.AddAsync(newDbEntry);
+            await _directMessagesDB.SaveChangesAsync();
 
             return 1;
         }
