@@ -684,8 +684,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                 }
 
+                // If no orders are found, return an empty list
                 if (orders.Count == 0)
-                    return NotFound("No orders available");
+                    return Ok(new List<Order>());
 
                 return Ok(orders);
             }
@@ -791,8 +792,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                 }
 
+                // If no orders are found, return an empty list
                 if (orders.Count == 0)
-                    return NotFound("No orders found for the specified customer.");
+                    return Ok(new List<Order>());
 
                 return Ok(orders);
             }
@@ -802,9 +804,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("current/user/to-receive")]
+        [HttpGet("current/user/to-receive/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetToReceiveOrdersByCustomerId()
+        public async Task<IActionResult> GetToPayInitialOrdersByCustomerId()
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -822,20 +824,19 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             try
             {
-                List<Cart> orders = new List<Cart>();
+                List<toPayInitial> orders = new List<toPayInitial>();
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     await connection.OpenAsync();
 
                     string sql = @"
-            SELECT 
-                suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
-                HEX(DesignId) as DesignId, DesignName, price, quantity, 
-                last_updated_by, last_updated_at, isActive, Description, 
-                Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
-            FROM suborders 
-            WHERE CustomerId = @customerId AND Status IN('to receive')";
+    SELECT 
+        suborder_id, OrderId, CustomerId, CreatedAt, Status, 
+        HEX(DesignId) as DesignId, DesignName, price, quantity, 
+        last_updated_by, last_updated_at, isActive, CustomerName, PastryId 
+    FROM suborders 
+    WHERE CustomerId = @customerId AND Status IN('to receive')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -854,6 +855,108 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                                         ? Guid.Empty
                                                         : new Guid((byte[])reader["CustomerId"]);
 
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new toPayInitial
+                                {
+                                    Id = orderId, // Handle null values for orderId
+                                    suborderId = suborderId,
+                                    CustomerId = customerIdFromDb,
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy ?? "",
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("CustomerName"))
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        [HttpGet("current/user/to-receive/full-details")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToReceiveOrdersByCustomerId([FromQuery] string suborderid)
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            // Convert suborderId to binary format
+            string suborderIdBinary = ConvertGuidToBinary16((suborderid)).ToLower();
+            
+            // Check if the suborder exists in the suborders table
+            if (!await DoesSuborderExist(suborderIdBinary))
+            {
+                return NotFound($"Suborder with ID '{suborderIdBinary}' not found.");
+            }
+            Debug.Write(suborderIdBinary);
+
+            try
+            {
+                List<Full> orders = new List<Full>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+    SELECT 
+        suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
+        HEX(DesignId) as DesignId, DesignName, price, quantity, 
+        last_updated_by, last_updated_at, isActive, Description, 
+        Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
+    FROM suborders 
+    WHERE CustomerId = @customerId AND Status IN ('to receive') AND suborder_id = UNHEX(@suborderIdBinary)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@customerId", customerId);
+                        command.Parameters.AddWithValue("@suborderIdBinary", suborderIdBinary);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["OrderId"]);
+
+                                Guid suborderIdFromDb = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["CustomerId"]);
+
                                 Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
                                                   ? Guid.Empty
                                                   : new Guid((byte[])reader["EmployeeId"]);
@@ -866,15 +969,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
 
-                                orders.Add(new Cart
+                                orders.Add(new Full
                                 {
-                                    Id = orderId, // Handle null values for orderId
-                                    suborderId = suborderId,
+                                    suborderId = suborderIdFromDb,
+                                    orderId = orderId,
                                     CustomerId = customerIdFromDb,
                                     employeeId = employeeId,
-                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                    employeeName = employeeName ?? string.Empty,
                                     CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                                     Status = reader.GetString(reader.GetOrdinal("Status")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     tier = reader.GetString(reader.GetOrdinal("tier")),
@@ -882,7 +986,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                    lastUpdatedBy = lastUpdatedBy,
+                                    lastUpdatedBy = lastUpdatedBy ?? string.Empty,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
@@ -891,16 +995,35 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
                                     Size = reader.GetString(reader.GetOrdinal("Size")),
                                     CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
-                                    employeeName = employeeName
                                 });
+                            }
+                        }
+                    }
+
+                    if (orders.Count > 0)
+                    {
+                        // Scan the orders table using the retrieved orderId from the suborders table
+                        foreach (var order in orders)
+                        {
+                            if (order.orderId.HasValue)
+                            {
+                                // Convert orderId to binary format
+                                string orderIdBinary = ConvertGuidToBinary16(order.orderId.Value.ToString()).ToLower();
+                                Debug.Write(orderIdBinary);
+
+                                var orderDetails = await GetOrderDetailsByOrderId(connection, orderIdBinary);
+                                if (orderDetails != null)
+                                {
+                                    // Populate additional fields from the orders table
+                                    order.payment = orderDetails.payment;
+                                    order.PickupDateTime = orderDetails.PickupDateTime;
+                                }
                             }
                         }
                     }
                 }
 
-                if (orders.Count == 0)
-                    return NotFound("No orders found for the specified customer.");
-
+                // Return the orders list
                 return Ok(orders);
             }
             catch (Exception ex)
@@ -909,8 +1032,37 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        private async Task<OrderDetails?> GetOrderDetailsByOrderId(MySqlConnection connection, string orderIdBinary)
+        {
+            string sql = @"
+        SELECT OrderId, Status, payment, type, PickupDateTime 
+        FROM orders 
+        WHERE OrderId = UNHEX(@orderIdBinary)";
 
+            using (var command = new MySqlCommand(sql, connection))
+            {
+                command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
 
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        return new OrderDetails
+                        {
+                            orderId = new Guid((byte[])reader["OrderId"]),
+                            Status = reader.GetString(reader.GetOrdinal("Status")),
+                            payment = reader.GetString(reader.GetOrdinal("payment")),
+                            type = reader.GetString(reader.GetOrdinal("type")),
+                            PickupDateTime = reader.IsDBNull(reader.GetOrdinal("PickupDateTime"))
+                                            ? (DateTime?)null
+                                            : reader.GetDateTime(reader.GetOrdinal("PickupDateTime"))
+                        };
+                    }
+                }
+            }
+
+            return null;
+        }
 
 
         /*[HttpGet("current-user/for-confirmation-orders")]
@@ -3006,107 +3158,99 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
          */
 
-        [HttpPatch("customer/manage-add-ons-by-material/{pastryMaterialId}")] //done
+        [HttpPatch("customer/manage-add-ons-by-material/{pastryMaterialId}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, [FromQuery] string orderId, [FromQuery] int modifiedAddOnId, [FromBody] ManageAddOnAction action)
+        public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, [FromQuery] string suborderId, [FromQuery] int modifiedAddOnId, [FromBody] ManageAddOnAction action)
         {
-            try
+            // Log the start of the process
+            _logger.LogInformation($"Starting ManageAddOnsByPastryMaterialId for pastryMaterialId: {pastryMaterialId}, OrderId: {suborderId}, and AddOnId: {modifiedAddOnId}");
+
+            // Convert OrderId to binary format
+            string orderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+
+            using (var connection = new MySqlConnection(connectionstring))
             {
-                _logger.LogInformation($"Starting ManageAddOnsByPastryMaterialId for pastryMaterialId: {pastryMaterialId}, OrderId: {orderId}, and AddOnId: {modifiedAddOnId}");
+                await connection.OpenAsync();
 
-                // Convert OrderId to binary format
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
-
-                using (var connection = new MySqlConnection(connectionstring))
+                using (var transaction = await connection.BeginTransactionAsync())
                 {
-                    await connection.OpenAsync();
-
-                    using (var transaction = await connection.BeginTransactionAsync())
+                    try
                     {
-                        try
+                        // Retrieve size from orders table
+                        string size = await GetOrderSize(connection, transaction, orderIdBinary);
+
+                        // Retrieve add-ons based on pastryMaterialId and size
+                        List<PastryMaterialAddOn> allAddOns = new List<PastryMaterialAddOn>();
+
+                        // Check if size matches any sub-variant
+                        List<PastryMaterialAddOn> pastryMaterialSubVariantAddOns = await GetPastryMaterialSubVariantAddOns(connection, transaction, pastryMaterialId, size);
+                        if (pastryMaterialSubVariantAddOns.Any())
                         {
-                            // Retrieve size from orders table
-                            string size = await GetOrderSize(connection, transaction, orderIdBinary);
+                            allAddOns.AddRange(pastryMaterialSubVariantAddOns);
+                        }
 
-                            // Retrieve add-ons based on pastryMaterialId and size
-                            List<PastryMaterialAddOn> allAddOns = new List<PastryMaterialAddOn>();
+                        // Always retrieve add-ons from pastymaterialaddons regardless of size
+                        List<PastryMaterialAddOn> pastryMaterialAddOns = await GetPastryMaterialAddOns(connection, transaction, pastryMaterialId);
+                        allAddOns.AddRange(pastryMaterialAddOns);
 
-                            // Check if size matches any sub-variant
-                            List<PastryMaterialAddOn> pastryMaterialSubVariantAddOns = await GetPastryMaterialSubVariantAddOns(connection, transaction, pastryMaterialId, size);
-                            if (pastryMaterialSubVariantAddOns.Any())
+                        // Fetch add-on details only once for efficiency
+                        Dictionary<int, (string Name, double Price)> addOnDetailsDict = new Dictionary<int, (string Name, double Price)>();
+                        foreach (var addOn in allAddOns)
+                        {
+                            var addOnDetails = await GetAddOnDetails(connection, transaction, addOn.AddOnId);
+                            addOnDetailsDict[addOn.AddOnId] = addOnDetails;
+                        }
+
+                        // Process the action
+                        foreach (var addOn in allAddOns)
+                        {
+                            if (addOn.AddOnId == modifiedAddOnId)
                             {
-                                allAddOns.AddRange(pastryMaterialSubVariantAddOns);
-                            }
-
-                            // Always retrieve add-ons from pastymaterialaddons regardless of size
-                            List<PastryMaterialAddOn> pastryMaterialAddOns = await GetPastryMaterialAddOns(connection, transaction, pastryMaterialId);
-                            allAddOns.AddRange(pastryMaterialAddOns);
-
-                            // Fetch add-on details only once for efficiency
-                            Dictionary<int, (string Name, double Price)> addOnDetailsDict = new Dictionary<int, (string Name, double Price)>();
-                            foreach (var addOn in allAddOns)
-                            {
-                                var addOnDetails = await GetAddOnDetails(connection, transaction, addOn.AddOnId);
-                                addOnDetailsDict[addOn.AddOnId] = addOnDetails;
-                            }
-
-                            // Process the action
-                            foreach (var addOn in allAddOns)
-                            {
-                                if (addOn.AddOnId == modifiedAddOnId)
+                                if (action.ActionType.ToLower() == "setquantity")
                                 {
-                                    if (action.ActionType.ToLower() == "setquantity")
+                                    // Fetch add-on details
+                                    if (addOnDetailsDict.TryGetValue(addOn.AddOnId, out var addOnDetails))
                                     {
-                                        // Fetch add-on details
-                                        if (addOnDetailsDict.TryGetValue(addOn.AddOnId, out var addOnDetails))
-                                        {
-                                            // Calculate total price
-                                            double total = action.Quantity * addOnDetails.Price;
+                                        // Calculate total price
+                                        double total = action.Quantity * addOnDetails.Price;
 
-                                            // Insert or update quantity for the specified add-on in orderaddons
-                                            await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, addOn.Quantity, total, addOnDetailsDict);
-
-                                        }
+                                        // Insert or update quantity for the specified add-on in orderaddons
+                                        await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, action.Quantity, total, addOnDetailsDict);
                                     }
-                                    else if (action.ActionType.ToLower() == "remove")
-                                    {
-                                        // Set quantity to 0 and remove add-on from orderaddons
-                                        await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, 0, 0, addOnDetailsDict);
-                                    }
-                                    else
-                                    {
-                                        return BadRequest($"Unsupported action type '{action.ActionType}'.");
-                                    }
+                                }
+                                else if (action.ActionType.ToLower() == "remove")
+                                {
+                                    // Set quantity to 0 and remove add-on from orderaddons
+                                    await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, 0, 0, addOnDetailsDict);
                                 }
                                 else
                                 {
-                                    // Insert add-on without modifying its quantity or total
-                                    var addOnDetails = addOnDetailsDict[addOn.AddOnId];
-                                    double total = addOn.Quantity * addOnDetails.Price;
-                                    await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, addOn.Quantity, total, addOnDetailsDict);
-
+                                    return BadRequest($"Unsupported action type '{action.ActionType}'.");
                                 }
                             }
+                            else
+                            {
+                                // Insert add-on without modifying its quantity or total
+                                var addOnDetails = addOnDetailsDict[addOn.AddOnId];
+                                double total = addOn.Quantity * addOnDetails.Price;
+                                await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, addOn.Quantity, total, addOnDetailsDict);
+                            }
+                        }
 
-                            await transaction.CommitAsync();
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Transaction failed, rolling back");
-                            await transaction.RollbackAsync();
-                            throw;
-                        }
+                        await transaction.CommitAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Transaction failed, rolling back");
+                        await transaction.RollbackAsync();
+                        throw;
                     }
                 }
+            }
 
-                return Ok("Add-ons quantities successfully managed.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error managing add-ons for pastry material with ID '{pastryMaterialId}'");
-                return StatusCode(500, $"An error occurred while managing add-ons for pastry material with ID '{pastryMaterialId}'.");
-            }
+            return Ok("Add-ons quantities successfully managed.");
         }
+
 
         private async Task<string> GetOrderSize(MySqlConnection connection, MySqlTransaction transaction, string orderId)
         {
@@ -3232,8 +3376,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 // Check if the add-on already exists in orderaddons
                 string selectSql = @"SELECT COUNT(*) 
-                             FROM orderaddons 
-                             WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
+            FROM orderaddons 
+            WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
 
                 using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
                 {
@@ -3246,7 +3390,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         // Insert new add-on into orderaddons
                         string insertSql = @"INSERT INTO orderaddons (OrderId, AddOnsId, quantity, total, name, price)
-                     VALUES (UNHEX(@orderId), @addOnId, @quantity, @total, @name, @price)";
+                    VALUES (UNHEX(@orderId), @addOnId, @quantity, @total, @name, @price)";
                         using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
                         {
                             insertCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
@@ -3258,14 +3402,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             _logger.LogInformation($"Inserting add-on ID '{addOnId}' with quantity '{quantity}', total '{total}', name '{addOnDetails.Name}', and price '{addOnDetails.Price}' into orderaddons");
                             await insertCommand.ExecuteNonQueryAsync();
                         }
-
                     }
                     else
                     {
                         // Update quantity and total for existing add-on in orderaddons
                         string updateSql = @"UPDATE orderaddons 
-                                 SET quantity = @quantity, total = @total
-                                 WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
+                    SET quantity = @quantity, total = @total
+                    WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
 
                         using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
                         {
@@ -3287,6 +3430,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await RemoveAddOnFromOrderAddOns(connection, transaction, orderIdBinary, addOnId);
             }
         }
+
+
 
         private async Task RemoveAddOnFromOrderAddOns(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, int addOnId)
         {
