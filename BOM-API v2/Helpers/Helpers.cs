@@ -883,19 +883,18 @@ namespace BillOfMaterialsAPI.Helpers
                 return currentInventoryItem;
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
-            catch (InvalidOperationException exO) {
-                Debug.WriteLine(exO.Message);
-                throw new NotFoundInDatabaseException("The id " + id + " does not exist in the inventory"); }
+            catch (InvalidOperationException exO) { throw new NotFoundInDatabaseException("The id " + id + " does not exist in the inventory"); }
         }
         public static async Task<AddOns> GetAddOnItemAsync(int add_ons_id, KaizenTables kaizenTables)
         {
             AddOns? selectedAddOn = null;
             try 
             { 
-                selectedAddOn = await kaizenTables.AddOns.Where(x => x.add_ons_id == add_ons_id && x.isActive == true).FirstAsync();
+                selectedAddOn = await kaizenTables.AddOns.Where(x => x.add_ons_id == add_ons_id).FirstAsync();
+                
                 return selectedAddOn;
             }
-            catch { throw new NotFoundInDatabaseException("Add on with the id " + Convert.ToString(add_ons_id) + " does not exist."); }
+            catch(Exception e) { throw new NotFoundInDatabaseException("Add on with the id " + Convert.ToString(add_ons_id) + " does not exist."); }
             
         }
     }
@@ -1223,7 +1222,7 @@ namespace BillOfMaterialsAPI.Helpers
             foreach (PastryMaterialAddOns currentAddOn in currentPastryMaterialAddOns)
             {
                 AddOns? referencedAddOns = null;
-                try { referencedAddOns = await kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentAddOn.add_ons_id).FirstAsync(); }
+                try { referencedAddOns = await kaizenTables.AddOns.Where(x => x.add_ons_id == currentAddOn.add_ons_id).FirstAsync(); }
                 catch { continue; }
                 if (referencedAddOns == null) { continue; }
 
@@ -1538,7 +1537,7 @@ namespace BillOfMaterialsAPI.Helpers
                 foreach (PastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariantAddOns)
                 {
                     Schemas.AddOns? referencedAddOns = null;
-                    try { referencedAddOns = await kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
+                    try { referencedAddOns = await kaizenTables.AddOns.Where(x => x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
                     catch { continue; }
                     if (referencedAddOns == null) { continue; }
 

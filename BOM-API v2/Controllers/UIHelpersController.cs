@@ -72,7 +72,7 @@ namespace BOM_API_v2.Controllers
             foreach (GetPastryMaterialAddOns currentPastryMaterialAddOn in parsedData.add_ons)
             {
                 AddOns? referencedAddOns = null;
-                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentPastryMaterialAddOn.add_ons_id).FirstAsync(); }
+                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.add_ons_id == currentPastryMaterialAddOn.add_ons_id).FirstAsync(); }
                 catch { continue; }
                 if (referencedAddOns == null) { continue; }
 
@@ -81,7 +81,6 @@ namespace BOM_API_v2.Controllers
                 newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
                 newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
                 newMainVariantAddOnsEntry.amount = currentPastryMaterialAddOn.amount;
-                newMainVariantAddOnsEntry.stock = referencedAddOns.quantity;
                 newMainVariantAddOnsEntry.price = referencedAddOns.price;
 
                 mainVariant.add_ons.Add(newMainVariantAddOnsEntry);
@@ -101,7 +100,7 @@ namespace BOM_API_v2.Controllers
                 foreach (GetPastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariant.sub_variant_add_ons)
                 {
                     AddOns? referencedAddOns = null;
-                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.isActive == true && x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
+                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
                     catch { continue; }
                     if (referencedAddOns == null) { continue; }
 
@@ -110,7 +109,6 @@ namespace BOM_API_v2.Controllers
                     newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
                     newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
                     newMainVariantAddOnsEntry.amount = currentSubVariantAddOn.amount;
-                    newMainVariantAddOnsEntry.stock = referencedAddOns.quantity;
                     newMainVariantAddOnsEntry.price = referencedAddOns.price;
                     
                     newResponseSubVariantEntry.add_ons.Add(newMainVariantAddOnsEntry);

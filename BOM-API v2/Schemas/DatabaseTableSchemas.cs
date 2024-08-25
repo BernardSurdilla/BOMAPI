@@ -253,15 +253,6 @@ namespace BillOfMaterialsAPI.Schemas
         public Designs Designs { get; set; }
     }
 
-    //Live chat table
-    public class DirectMessages
-    {
-        public Guid direct_message_id { get; set; }
-        public string? sender_account_id { get; set; }
-        public string? receiver_account_id { get; set; }
-        public string message { get; set; }
-        public DateTime date_sent { get; set; }
-    }
 
     //
     // Orders table: Kaizen
@@ -311,10 +302,8 @@ namespace BillOfMaterialsAPI.Schemas
         [MaxLength(50)] public string measurement { get; set; }
         public double size { get; set; }
         [MaxLength(50)] public string ingredient_type { get; set; }
-        public int quantity { get; set; }
         public DateTime date_added { get; set; }
         public DateTime? last_modified_date { get; set; }
-        public bool isActive { get; set; }
     }
     [PrimaryKey("SubOrderId")]
     [Table("suborders")]
