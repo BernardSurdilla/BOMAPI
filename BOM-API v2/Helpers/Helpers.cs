@@ -3,6 +3,7 @@ using BillOfMaterialsAPI.Schemas;
 using Castle.Components.DictionaryAdapter.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -882,7 +883,9 @@ namespace BillOfMaterialsAPI.Helpers
                 return currentInventoryItem;
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
-            catch (InvalidOperationException exO) { throw new NotFoundInDatabaseException("The id " + id + " does not exist in the inventory"); }
+            catch (InvalidOperationException exO) {
+                Debug.WriteLine(exO.Message);
+                throw new NotFoundInDatabaseException("The id " + id + " does not exist in the inventory"); }
         }
         public static async Task<AddOns> GetAddOnItemAsync(int add_ons_id, KaizenTables kaizenTables)
         {

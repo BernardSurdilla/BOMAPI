@@ -316,7 +316,7 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime? last_modified_date { get; set; }
         public bool isActive { get; set; }
     }
-    [PrimaryKey("suborder_id")]
+    [PrimaryKey("SubOrderId")]
     [Table("suborders")]
     public class SubOrder
     {
@@ -394,7 +394,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Column("isActive")]
         public bool IsActive { get; set; }
     }
-    [PrimaryKey("orderAddOnId")]
+    [PrimaryKey("OrderAddOnId")]
     [Table("orderaddons")]
     public class OrderAddon
     {
