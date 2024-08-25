@@ -30,7 +30,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("customer/add-to-cart")]
+        [HttpPost("current/user/add-to-cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string Description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string color, [FromQuery] string shape, [FromQuery] string tier)
         {
@@ -184,7 +184,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("customer/checkout-cart")]
+        [HttpPost("current/user/checkout-cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate(
     [FromQuery] string suborderid,
@@ -308,6 +308,97 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     command.Parameters.AddWithValue("@type", type);
                     command.Parameters.AddWithValue("@payment", payment);
                     await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        [HttpPost("current/user/confirm-cancel-order")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderId, [FromQuery] string action)
+        {
+            // Validate action parameter
+            if (action != "confirm" && action != "cancel")
+            {
+                return BadRequest("Invalid action parameter. It must be 'confirm' or 'cancel'.");
+            }
+
+            if (string.IsNullOrEmpty(orderId))
+            {
+                return BadRequest("OrderId cannot be null or empty.");
+            }
+
+            // Convert orderId to binary format for querying
+            string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+            // Check if the order exists
+            var orderExists = await CheckOrderExistx(orderIdBinary);
+
+            if (!orderExists)
+            {
+                return NotFound("No orders found for the specified orderId.");
+            }
+
+            // Perform the update based on the action
+            bool updateResult = await UpdateOrderStatus(orderIdBinary, action);
+
+            if (updateResult)
+            {
+                return Ok("Order status updated successfully.");
+            }
+            else
+            {
+                return StatusCode(500, "An error occurred while updating the order status.");
+            }
+        }
+
+        private async Task<bool> CheckOrderExistx(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+        SELECT COUNT(1) 
+        FROM orders 
+        WHERE OrderId = UNHEX(@orderIdBinary)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
+                    var count = Convert.ToInt32(await command.ExecuteScalarAsync());
+                    return count > 0;
+                }
+            }
+        }
+
+        private async Task<bool> UpdateOrderStatus(string orderIdBinary, string action)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+        UPDATE orders
+        SET isActive = @isActive, Status = @status
+        WHERE OrderId = UNHEX(@orderIdBinary)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
+
+                    if (action == "confirm")
+                    {
+                        command.Parameters.AddWithValue("@isActive", true);
+                        command.Parameters.AddWithValue("@status", "confirmed");
+                    }
+                    else if (action == "cancel")
+                    {
+                        command.Parameters.AddWithValue("@isActive", false);
+                        command.Parameters.AddWithValue("@status", "cancelled");
+                    }
+
+                    var rowsAffected = await command.ExecuteNonQueryAsync();
+                    return rowsAffected > 0;
                 }
             }
         }
@@ -1064,6 +1155,212 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return null;
         }
 
+        [HttpGet("final-order-details")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetFinalOrderDetailsByOrderId([FromQuery] string orderId)
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+            try
+            {
+                // Retrieve basic order details
+                var orderDetails = await GetOrderDetailx(orderIdBinary);
+
+                if (orderDetails != null)
+                {
+                    // Retrieve suborders
+                    orderDetails.OrderItems = await GetSuborderDetails(orderIdBinary);
+
+                    // Initialize total sum
+                    double totalSum = 0;
+
+                    foreach (var suborder in orderDetails.OrderItems)
+                    {
+                        // Retrieve add-ons for each suborder
+                        suborder.OrderAddons = await GetOrderAddonsDetails(suborder.SuborderId);
+
+                        // Calculate the total for this suborder
+                        double addOnsTotal = suborder.OrderAddons.Sum(addon => addon.AddOnTotal);
+                        suborder.SubOrderTotal = (suborder.Price * suborder.Quantity) + addOnsTotal;
+
+                        // Add to the overall total
+                        totalSum += suborder.SubOrderTotal;
+                    }
+
+                    // Set the total in CheckOutDetails
+                    orderDetails.OrderTotal = totalSum;
+                }
+
+                return Ok(orderDetails);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+
+        private async Task<CheckOutDetails> GetOrderDetailx(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string orderSql = @"
+    SELECT OrderId, Status, payment, type, PickupDateTime 
+    FROM orders 
+    WHERE OrderId = UNHEX(@orderIdBinary)";
+
+                using (var command = new MySqlCommand(orderSql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return new CheckOutDetails
+                            {
+                                OrderId = new Guid((byte[])reader["OrderId"]),
+                                Status = reader.GetString(reader.GetOrdinal("Status")),
+                                PaymentMethod = reader.GetString(reader.GetOrdinal("payment")),
+                                OrderType = reader.GetString(reader.GetOrdinal("type")),
+                                PickupDateTime = reader.IsDBNull(reader.GetOrdinal("PickupDateTime"))
+                                    ? (DateTime?)null
+                                    : reader.GetDateTime(reader.GetOrdinal("PickupDateTime"))
+                            };
+                        }
+                    }
+                }
+            }
+            return null;
+        }
+
+        private async Task<List<OrderItem>> GetSuborderDetails(string orderIdBinary)
+        {
+            var suborders = new List<OrderItem>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string suborderSql = @"
+    SELECT 
+        suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
+        HEX(DesignId) as DesignId, DesignName, price, quantity, 
+        last_updated_by, last_updated_at, isActive, Description, 
+        Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
+    FROM suborders 
+    WHERE OrderId = UNHEX(@orderIdBinary)";
+
+                using (var command = new MySqlCommand(suborderSql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var suborder = new OrderItem
+                            {
+                                SuborderId = new Guid((byte[])reader["suborder_id"]),
+                                OrderId = new Guid((byte[])reader["OrderId"]),
+                                CustomerId = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                    ? Guid.Empty
+                                    : new Guid((byte[])reader["CustomerId"]),
+                                EmployeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                    ? Guid.Empty
+                                    : new Guid((byte[])reader["EmployeeId"]),
+                                EmployeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                    ? string.Empty
+                                    : reader.GetString(reader.GetOrdinal("EmployeeName")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
+                                Status = reader.GetString(reader.GetOrdinal("Status")),
+                                PastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                Color = reader.GetString(reader.GetOrdinal("color")),
+                                Shape = reader.GetString(reader.GetOrdinal("shape")),
+                                Tier = reader.GetString(reader.GetOrdinal("tier")),
+                                DesignId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
+                                DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                LastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                    ? string.Empty
+                                    : reader.GetString(reader.GetOrdinal("last_updated_by")),
+                                LastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                    ? (DateTime?)null
+                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                IsActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
+                                Description = reader.GetString(reader.GetOrdinal("Description")),
+                                Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
+                                Size = reader.GetString(reader.GetOrdinal("Size")),
+                                CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                SubOrderTotal = reader.GetDouble(reader.GetOrdinal("price")) * reader.GetInt32(reader.GetOrdinal("quantity")) // Calculate Total
+                            };
+
+                            suborders.Add(suborder);
+                        }
+                    }
+                }
+            }
+
+            return suborders;
+        }
+
+        private async Task<List<OrderAddon>> GetOrderAddonsDetails(Guid suborderId)
+        {
+            var addons = new List<OrderAddon>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string addOnsSql = @"
+    SELECT addOnsId, quantity, Total, name, price
+    FROM orderaddons
+    WHERE OrderId = UNHEX(@suborderIdBinary)";
+
+                using (var command = new MySqlCommand(addOnsSql, connection))
+                {
+                    string subId = BitConverter.ToString(suborderId.ToByteArray()).Replace("-", "").ToLower();
+                    command.Parameters.AddWithValue("@suborderIdBinary", subId);
+                    Debug.Write("suborderId: " + subId);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            addons.Add(new OrderAddon
+                            {
+                                AddonId = reader.GetInt32(reader.GetOrdinal("addOnsId")),
+                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")), // Corrected to Int32
+                                AddOnTotal = reader.GetDouble(reader.GetOrdinal("Total")),
+                                Name = reader.GetString(reader.GetOrdinal("name")),
+                                Price = reader.GetDouble(reader.GetOrdinal("price"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return addons;
+        }
+
+
+
+
 
         /*[HttpGet("current-user/for-confirmation-orders")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
@@ -1493,7 +1790,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("customer/final-order-details/{orderId}")] //debug this soon
+        /*[HttpGet("customer/final-order-details/{orderId}")] //debug this soon
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderByOrderId(string orderId)
         {
@@ -1808,7 +2105,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             return customAddonsList;
         }
-
+        */
 
 
 
@@ -2539,7 +2836,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("customer/confirmation")] //debug this 
+        /*[HttpPatch("customer/confirmation")] //debug this 
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderId, [FromQuery] string action)
         {
@@ -2633,7 +2930,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, $"An error occurred while processing the request to {action} order with ID '{orderId}'.");
             }
         }
-
+        */
 
         private byte[] FromHexString(string hexString)
         {
