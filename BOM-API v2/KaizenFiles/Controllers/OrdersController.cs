@@ -32,7 +32,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpPost("current/user/add-to-cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto, [FromQuery] string designName, [FromQuery] string Description, [FromQuery] string flavor, [FromQuery] string size, [FromQuery] string color, [FromQuery] string shape, [FromQuery] string tier)
+        public async Task<IActionResult> CreateOrder(
+    [FromBody] OrderDTO orderDto,
+    [FromQuery] string designName,
+    [FromQuery] string Description,
+    [FromQuery] string flavor,
+    [FromQuery] string size,
+    [FromQuery] string color,
+    [FromQuery] string shape,
+    [FromQuery] string tier,
+    [FromQuery] double price) // price is now from query
         {
             try
             {
@@ -64,7 +73,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     orderId = Guid.NewGuid(),
                     suborderId = Guid.NewGuid(),
-                    price = orderDto.Price,
+                    price = price, // price comes from query parameter now
                     quantity = orderDto.Quantity,
                     designName = designame,
                     size = size,
@@ -78,13 +87,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 };
 
                 // Set isActive to false for all orders created
-
                 // Set the status to pending
                 order.status = "to pay";
 
                 // Convert designId to hex string
                 string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
-
 
                 // Get the pastry material ID using just the design ID
                 string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
@@ -110,6 +117,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
             }
         }
+
 
 
         private async Task<string> GetPastryMaterialIdByDesignIds(string designIdHex)
