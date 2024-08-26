@@ -159,6 +159,57 @@ namespace CRUDFI.Models
         public DateTime? lastUpdatedAt { get; set; }
         public bool isActive { get; set; }
     }
+    public class CheckOutDetails
+    {
+        public Guid OrderId { get; set; }
+        public string Status { get; set; }
+        public string PaymentMethod { get; set; }
+        public string OrderType { get; set; }
+        public DateTime? PickupDateTime { get; set; }
+        public double OrderTotal { get; set; }
+
+        // List to hold all suborders
+        public List<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+    }
+
+    public class OrderItem
+    {
+        public Guid SuborderId { get; set; }
+        public Guid OrderId { get; set; }
+        public Guid CustomerId { get; set; }
+        public Guid EmployeeId { get; set; }
+        public string EmployeeName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string Status { get; set; }
+        public string PastryId { get; set; }
+        public string Color { get; set; }
+        public string Shape { get; set; }
+        public string Tier { get; set; }
+        public byte[] DesignId { get; set; }
+        public string DesignName { get; set; }
+        public double Price { get; set; }
+        public int Quantity { get; set; }
+        public string LastUpdatedBy { get; set; }
+        public DateTime? LastUpdatedAt { get; set; }
+        public bool IsActive { get; set; }
+        public string Description { get; set; }
+        public string Flavor { get; set; }
+        public string Size { get; set; }
+        public string CustomerName { get; set; }
+        public double SubOrderTotal {  get; set; }
+
+        // List to hold all add-ons for the order item
+        public List<OrderAddon> OrderAddons { get; set; } = new List<OrderAddon>();
+    }
+
+    public class OrderAddon
+    {
+        public int AddonId { get; set; }
+        public string Name { get; set; }
+        public int Quantity { get; set; }
+        public double Price { get; set; }
+        public double AddOnTotal { get; set; }
+    }
 
     public class OrderDTO
     {
