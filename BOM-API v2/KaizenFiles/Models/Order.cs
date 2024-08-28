@@ -213,8 +213,24 @@ namespace CRUDFI.Models
 
     public class OrderDTO
     {
+        public double Price { get; set; }
         public int Quantity { get; set; }
+        public string DesignName { get; set; }
+        public string Description { get; set; }
+        public string Flavor { get; set; }
+        public string Size { get; set; }
+        public string Color { get; set; }
+        public string Shape { get; set; }
+        public string Tier { get; set; }
     }
+    public class CheckOutRequest
+    {
+        public string Type { get; set; }
+        public string PickupDate { get; set; } = "yyyy-mm-dd";
+        public string PickupTime { get; set; } = "hh:mm AM/PM";
+        public string Payment { get; set; }
+    }
+
     public class FinalOrder
     {
         public string OrderId { get; set; }

@@ -30,18 +30,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("current/user/add-to-cart")]
+        [HttpPost("customer/add-to-cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateOrder(
-    [FromBody] OrderDTO orderDto,
-    [FromQuery] string designName,
-    [FromQuery] string Description,
-    [FromQuery] string flavor,
-    [FromQuery] string size,
-    [FromQuery] string color,
-    [FromQuery] string shape,
-    [FromQuery] string tier,
-    [FromQuery] double price) // price is now from query
+        public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
         {
             try
             {
@@ -60,35 +51,36 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Get the design's ID using the provided design name
-                byte[] designId = await GetDesignIdByDesignName(designName);
+                byte[] designId = await GetDesignIdByDesignName(orderDto.DesignName);
                 if (designId == null || designId.Length == 0)
                 {
                     return BadRequest("Design not found");
                 }
 
-                string designame = await getDesignName(designName);
+                string designame = await getDesignName(orderDto.DesignName);
 
                 // Generate a new Guid for the Order's Id
                 var order = new Order
                 {
                     orderId = Guid.NewGuid(),
                     suborderId = Guid.NewGuid(),
-                    price = price, // price comes from query parameter now
+                    price = orderDto.Price,
                     quantity = orderDto.Quantity,
                     designName = designame,
-                    size = size,
-                    flavor = flavor,
+                    size = orderDto.Size,
+                    flavor = orderDto.Flavor,
                     isActive = false,
                     customerName = customerUsername, // Set customer name from authenticated user
-                    color = color,
-                    shape = shape,
-                    tier = tier,
-                    Description = Description
+                    color = orderDto.Color,
+                    shape = orderDto.Shape,
+                    tier = orderDto.Tier,
+                    Description = orderDto.Description
                 };
 
                 // Set isActive to false for all orders created
+
                 // Set the status to pending
-                order.status = "to pay";
+                order.status = "pending";
 
                 // Convert designId to hex string
                 string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
@@ -97,16 +89,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
 
                 // Get the pastry material ID using the design ID and size
-                string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, size);
+                string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderDto.Size);
 
                 // Get the pastry material sub-variant ID using the pastry material ID and size
-                string subVariantId = await GetPastryMaterialSubVariantId(subersId, size);
+                string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderDto.Size);
 
                 // Determine the appropriate pastryId to use
                 string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
 
                 // Insert the order into the database using the determined pastryId
-                await InsertOrder(order, designId, flavor, size, pastryId, customerId, color, shape, tier, Description);
+                await InsertOrder(order, designId, orderDto.Flavor, orderDto.Size, pastryId, customerId, orderDto.Color, orderDto.Shape, orderDto.Tier, orderDto.Description);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -117,7 +109,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
             }
         }
-
 
 
         private async Task<string> GetPastryMaterialIdByDesignIds(string designIdHex)
@@ -196,10 +187,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate(
     [FromQuery] string suborderid,
-    [FromQuery] string type,
-    [FromQuery] string pickupDate,
-    [FromQuery] string pickupTime,
-    [FromQuery] string payment)
+    [FromBody] CheckOutRequest checkOutRequest)
         {
             try
             {
@@ -218,27 +206,27 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Validate type
-                if (!type.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
-                    !type.Equals("rush", StringComparison.OrdinalIgnoreCase))
+                if (!checkOutRequest.Type.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
+                    !checkOutRequest.Type.Equals("rush", StringComparison.OrdinalIgnoreCase))
                 {
                     return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
                 }
 
                 // Parse and validate the pickup date and time
-                if (!DateTime.TryParseExact(pickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate) ||
-                    !DateTime.TryParseExact(pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
+                if (!DateTime.TryParseExact(checkOutRequest.PickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate) ||
+                    !DateTime.TryParseExact(checkOutRequest.PickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
                 {
                     return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
                 }
 
                 // Combine the parsed date and time into a single DateTime object
                 DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
-                // Generate a new GUID for the OrderId
 
+                // Generate a new GUID for the OrderId
                 Guid orderId = Guid.NewGuid();
                 string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
 
-                string suborderIdBinary = ConvertGuidToBinary16((suborderid)).ToLower();
+                string suborderIdBinary = ConvertGuidToBinary16(suborderid).ToLower();
 
                 // Check if the suborder exists in the suborders table
                 if (!await DoesSuborderExist(suborderIdBinary))
@@ -247,17 +235,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Insert the new order with the same suborderid and other details
-                await InsertOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, type, payment);
+                await InsertOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, checkOutRequest.Type, checkOutRequest.Payment);
 
                 // Update the suborder with the suborderid using UNHEX
                 await UpdateSuborderWithOrderId(suborderIdBinary, orderIdBinary);
-
 
                 return Ok($"Order for suborder ID '{orderIdBinary}' has been successfully created.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request.");
+                _logger.LogError(ex, "An error occurred while processing the request.");
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
@@ -725,7 +712,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, HEX(DesignId) as DesignId, DesignName, price, quantity, last_updated_by, last_updated_at, isActive, Description, Flavor, Size, CustomerName, EmployeeName, shape, color, tier FROM suborders";
+                    string sql = "SELECT suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, PastryId, Status, HEX(DesignId) as DesignId, DesignName, price, quantity, last_updated_by, last_updated_at, isActive, Description, Flavor, Size, CustomerName, EmployeeName, shape, color, tier FROM suborders";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -758,6 +745,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     suborderId = suborderId,
                                     customerId = customerId,
                                     employeeId = employeeId,
+                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
                                     CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
                                     status = reader.GetString(reader.GetOrdinal("Status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
