@@ -1,6 +1,7 @@
 ﻿using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -12,27 +13,46 @@ namespace LiveChat
     {
         private readonly ILiveChatConnectionManager _connectionManager;
         private readonly DirectMessagesDB _directMessagesDB;
+        private readonly UserManager<APIUsers> _userManager;
         private const string CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME = "RecieveMessage";
 
-        public ChatHub(ILiveChatConnectionManager connectionManager, DirectMessagesDB directMessagesDB)
+        public ChatHub(ILiveChatConnectionManager connectionManager, DirectMessagesDB directMessagesDB, UserManager<APIUsers> userManager)
         {
-            _connectionManager = connectionManager; _directMessagesDB = directMessagesDB;
+            _connectionManager = connectionManager; _directMessagesDB = directMessagesDB; _userManager = userManager;
         }
 
         [HubMethodName("customer-send-message")]
-        public async Task CustomerSendMessage(string message, string connectionId)
+        public async Task CustomerSendMessage(string message, string accountId)
         {
             ClaimsPrincipal? currentUser = Context.User;
-            ConnectionInfo? messageRecipientConnectionInfo = null;
 
-            messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault();
+            MessageFormat formattedMessage = CreateFormattedMessage(accountId, message, currentUser);
+
+            if (currentUser != null) 
+            {
+                List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
+                
+                if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
+                //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
+
+                APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
+                APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
+
+                IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
+
+                if (recieverUserAccountRoles.Contains(UserRoles.Admin)
+                    || recieverUserAccountRoles.Contains(UserRoles.Manager))
+                {
+                    await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
+                }
+            }
+
+            ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
             if (messageRecipientConnectionInfo == null) 
             { 
-                messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault(); 
+                messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.AccountId == accountId).FirstOrDefault(); 
             }
             if (messageRecipientConnectionInfo == null) { return; }
-
-            MessageFormat formattedMessage = CreateFormattedMessage(connectionId, message, currentUser);
 
             ISingleClientProxy callerClientProxy = Clients.Caller;
             ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
@@ -41,7 +61,7 @@ namespace LiveChat
         }
 
         [HubMethodName("artist-send-message")]
-        public async Task ArtistSendMessage(string message, string connectionId)
+        public async Task ArtistSendMessage(string message, string accountId)
         {
             ClaimsPrincipal? currentUser = Context.User;
             if (currentUser == null) return;
@@ -49,14 +69,28 @@ namespace LiveChat
             List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
             if (roles.Count == 0) return;
             if (roles.Where(x => x.Value == UserRoles.Artist).FirstOrDefault() == null) return;
+            //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
 
-            ConnectionInfo? messageRecipientConnectionInfo = null;
+            MessageFormat formattedMessage = CreateFormattedMessage(Context.ConnectionId, message, currentUser);
 
-            messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault();
-            if (messageRecipientConnectionInfo == null) messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault();
+            APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
+            APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
+
+            if (currentUserAccount != null && recieverUserAccount != null)
+            {
+                IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
+
+                if (recieverUserAccountRoles.Contains(UserRoles.Artist)
+                    || recieverUserAccountRoles.Contains(UserRoles.Admin)
+                    || recieverUserAccountRoles.Contains(UserRoles.Manager))
+                {
+                    await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
+                }
+            }
+
+            ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
+            if (messageRecipientConnectionInfo == null) messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
             if (messageRecipientConnectionInfo == null) { return; }
-
-            MessageFormat formattedMessage = CreateFormattedMessage(connectionId, message, currentUser);
 
             ISingleClientProxy callerClientProxy = Clients.Caller;
             ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
@@ -64,7 +98,7 @@ namespace LiveChat
             await SendMessageToSenderAndRecepientClients(callerClientProxy, recepientClientProxy, formattedMessage);
         }
         [HubMethodName("manager-send-message")]
-        public async Task ManagerSendMessage(string message, string connectionId)
+        public async Task ManagerSendMessage(string message, string accountId)
         {
             ClaimsPrincipal? currentUser = Context.User;
             if (currentUser == null) return;
@@ -72,14 +106,29 @@ namespace LiveChat
             List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
             if (roles.Count == 0) return;
             if (roles.Where(x => x.Value == UserRoles.Artist).FirstOrDefault() == null) return;
+            //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
 
-            ConnectionInfo? messageRecipientConnectionInfo = null;
+            MessageFormat formattedMessage = CreateFormattedMessage(Context.ConnectionId, message, currentUser);
 
-            messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault();
-            if (messageRecipientConnectionInfo == null) messageRecipientConnectionInfo = _connectionManager.GetAllArtistConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault();
+            APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
+            APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
+
+            if (currentUserAccount != null && recieverUserAccount != null)
+            {
+                IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
+
+                if (recieverUserAccountRoles.Contains(UserRoles.Artist) 
+                    || recieverUserAccountRoles.Contains(UserRoles.Admin)
+                    || recieverUserAccountRoles.Contains(UserRoles.Manager))
+                {
+                    await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
+                }
+            }
+
+            ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
+            if (messageRecipientConnectionInfo == null) messageRecipientConnectionInfo = _connectionManager.GetAllArtistConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
             if (messageRecipientConnectionInfo == null) { return; }
 
-            MessageFormat formattedMessage = CreateFormattedMessage(connectionId, message, currentUser);
 
             ISingleClientProxy callerClientProxy = Clients.Caller;
             ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
@@ -88,7 +137,7 @@ namespace LiveChat
         }
 
         [HubMethodName("admin-send-message")]
-        public async Task AdminSendMessage(string message, string connectionId)
+        public async Task AdminSendMessage(string message, string accountId)
         {
             ClaimsPrincipal? currentUser = Context.User;
             if (currentUser == null) return;
@@ -96,14 +145,23 @@ namespace LiveChat
             List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
             if (roles.Count == 0) return;
             if (roles.Where(x => x.Value == UserRoles.Admin).FirstOrDefault() == null) return;
+            //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
 
-            ConnectionInfo? messageRecipientConnectionInfo = null;
+            MessageFormat formattedMessage = CreateFormattedMessage(Context.ConnectionId, message, currentUser);
 
-            messageRecipientConnectionInfo = _connectionManager.GetAllConnections().Where(x => x.ConnectionId == connectionId).FirstOrDefault();
+            APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
+            APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
 
-            if (messageRecipientConnectionInfo == null) { return; }
+            if (currentUserAccount != null && recieverUserAccount != null)
+            {
+                await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
+            }
 
-            MessageFormat formattedMessage = CreateFormattedMessage(connectionId, message, currentUser);
+            ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
+            if (messageRecipientConnectionInfo == null) 
+            {
+                return; 
+            }
 
             ISingleClientProxy callerClientProxy = Clients.Caller;
             ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
@@ -145,12 +203,19 @@ namespace LiveChat
                 sender_message_time_sent = DateTime.Now
             };
 
-            if (senderAccount == null) response.sender_name = "Anonymous";
+            if (senderAccount == null) 
+            { 
+                response.sender_name = "Anonymous";
+                response.sender_account_id = "N/A";
+            }
             else
             {
                 Claim? nameClaim = senderAccount.FindFirst(ClaimTypes.Name);
+                Claim? idClaim = senderAccount.FindFirst(ClaimTypes.NameIdentifier);
 
                 response.sender_name = nameClaim == null ? "N/A" : nameClaim.Value;
+                response.sender_account_id = idClaim == null ? "N/A" : idClaim.Value;
+
             }
 
             return response;
@@ -183,6 +248,7 @@ namespace LiveChat
     public class MessageFormat
     {
         public string sender_connection_id { get; set; }
+        public string? sender_account_id { get; set; }
         public string sender_name { get; set; }
         public string sender_message { get; set; }
         public DateTime sender_message_time_sent { get; set; }

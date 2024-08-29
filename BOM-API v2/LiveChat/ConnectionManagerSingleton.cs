@@ -24,7 +24,7 @@ namespace LiveChat
         public ConnectionInfo(string connectionId)
         {
             ConnectionId = connectionId;
-            AccountId = null;
+            AccountId = Guid.NewGuid().ToString();
             Name = null;
             Claims = null;
         }

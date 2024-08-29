@@ -137,6 +137,7 @@ namespace BOM_API_v2.Controllers
                 response.Add(new ChatConnection
                 {
                     connection_id = connectionInfo.ConnectionId,
+                    account_id = connectionInfo.AccountId,
                     name = connectionInfo.Name,
                     role = connectionInfo.Claims == null ? "Anonymous" : connectionInfo.Claims.FirstOrDefault()
                 });
@@ -159,6 +160,7 @@ namespace BOM_API_v2.Controllers
                 response.Add(new ChatConnection
                 {
                     connection_id = connectionInfo.ConnectionId,
+                    account_id = connectionInfo.AccountId,
                     name = connectionInfo.Name,
                     role = connectionInfo.Claims == null || connectionInfo.Claims.IsNullOrEmpty() ? "Anonymous" : connectionInfo.Claims.FirstOrDefault()
                 });
@@ -171,6 +173,7 @@ namespace BOM_API_v2.Controllers
     public class ChatConnection
     {
         public string connection_id { get; set; }
+        public string account_id { get; set; }
         public string? name { get; set; }
         public string? role { get; set; }
     }

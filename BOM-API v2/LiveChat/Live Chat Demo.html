@@ -9,7 +9,7 @@
   <body>
     <div>
       <input type="text" id="message" placeholder="Enter your message" />
-      <input type="text" id="bearer-token" />
+      <input type="text" id="bearer-token" placeholder="Bearer token"/>
       <select id="connection-options"></select>
       <button id="connection-options-refresh">Refresh connections</button>
       <br />
@@ -81,7 +81,7 @@
             jsonArray.forEach((element) => {
               var newOption = new Option(
                 element.name + " " + element.role,
-                element.connection_id
+                element.account_id
               );
               document
                 .getElementById("connection-options")
