@@ -23,7 +23,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public string main_variant_name { get; set; }
 
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
@@ -47,7 +47,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
@@ -61,7 +61,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
         [Required] public int add_ons_id { get; set; }
         [Required] public double amount { get; set; }
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
@@ -77,7 +77,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public string sub_variant_name { get; set; }
 
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
@@ -100,7 +100,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
@@ -113,7 +113,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][ForeignKey("PastryMaterialSubVariants")] public string pastry_material_sub_variant_id { get; set; }
         [Required] public int add_ons_id { get; set; }
         [Required] public double amount { get; set; }
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
@@ -157,7 +157,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
-        public bool isActive { get; set; }
+        [Column("is_active")] public bool isActive { get; set; }
 
         public PastryMaterials PastryMaterials { get; set; }
     }
@@ -174,7 +174,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
         
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
     }
@@ -196,7 +196,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
 
-        [Required] public bool isActive { get; set; }
+        [Required][Column("is_active")] public bool isActive { get; set; }
         [Required] public DateTime date_added { get; set; }
         [Required] public DateTime last_modified_date { get; set; }
 
@@ -210,14 +210,14 @@ namespace BillOfMaterialsAPI.Schemas
         [Column("DisplayName")][MaxLength(50)] public string display_name { get; set; }
         [Column("DisplayPictureURL")][MaxLength(50)] public string display_picture_url { get; set; }
         public string? cake_description { get; set; }
-        public bool isActive { get; set; }
+        [Column("is_active")] public bool isActive { get; set; }
     }
     [PrimaryKey("design_tag_id")]
     public class DesignTags
     {
         [Key] public Guid design_tag_id { get; set; }
         public string design_tag_name { get; set; }
-        public bool isActive { get; set; }
+        [Column("is_active")] public bool isActive { get; set; }
     }
     [PrimaryKey("design_tags_for_cake_id")]
     public class DesignTagsForCakes
@@ -227,7 +227,7 @@ namespace BillOfMaterialsAPI.Schemas
         [ForeignKey("Designs")]public byte[] design_id { get; set; }
         [ForeignKey("DesignTags")]public Guid design_tag_id { get; set; }
 
-        public bool isActive { get; set; }
+        [Column("is_active")] public bool isActive { get; set; }
 
         public Designs Designs { get; set; }
         public DesignTags DesignTags { get; set; }
@@ -238,7 +238,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Key] public Guid design_picture_id { get; set; }
         [ForeignKey("Designs")] public byte[] design_id { get; set; }
         public byte[] picture_data { get; set; }
-        public bool isActive { get; set; }
+        [Column("is_active")] public bool isActive { get; set; }
 
         public Designs Designs { get; set; }
     }
@@ -248,7 +248,7 @@ namespace BillOfMaterialsAPI.Schemas
         [Key] public Guid design_shape_id { get; set; }
         [ForeignKey("Designs")] public byte[] design_id { get; set; }
         public string shape_name { get; set; }
-        public bool isActive { get; set; }
+        [Column("is_active")] public bool isActive { get; set; }
 
         public Designs Designs { get; set; }
     }
