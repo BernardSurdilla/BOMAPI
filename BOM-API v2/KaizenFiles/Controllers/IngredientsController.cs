@@ -164,6 +164,75 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        [HttpPost("admin/threshold-config/{item_id}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> AddThresholdConfig(int item_id, [FromBody] AddThreshold addThreshold)
+        {
+            try
+            {
+                // Ensure that the AddThreshold object is not null
+                if (addThreshold == null)
+                {
+                    return BadRequest("Threshold data must be provided.");
+                }
+
+                // Ensure that the threshold values are valid
+                if (string.IsNullOrEmpty(addThreshold.good) || string.IsNullOrEmpty(addThreshold.mid) || string.IsNullOrEmpty(addThreshold.bad))
+                {
+                    return BadRequest("All threshold values (good, mid, bad) must be provided.");
+                }
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // Check if the item with the given ID exists
+                    string checkItemSql = "SELECT item_name FROM Items WHERE Id = @item_id";
+                    string itemName = null;
+
+                    using (var checkItemCommand = new MySqlCommand(checkItemSql, connection))
+                    {
+                        checkItemCommand.Parameters.AddWithValue("@item_id", item_id);
+
+                        using (var reader = await checkItemCommand.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                itemName = reader["item_name"].ToString();
+                            }
+                        }
+                    }
+
+                    if (string.IsNullOrEmpty(itemName))
+                    {
+                        return NotFound("No ingredient with the specified ID was found.");
+                    }
+
+                    // Insert the new threshold configuration
+                    string insertSql = @"
+                INSERT INTO thresholdconfig (item, good_threshold, mid_threshold, bad_threshold)
+                VALUES (@itemName, @goodThreshold, @midThreshold, @badThreshold)";
+
+                    using (var insertCommand = new MySqlCommand(insertSql, connection))
+                    {
+                        insertCommand.Parameters.AddWithValue("@itemName", itemName);
+                        insertCommand.Parameters.AddWithValue("@goodThreshold", addThreshold.good);
+                        insertCommand.Parameters.AddWithValue("@midThreshold", addThreshold.mid);
+                        insertCommand.Parameters.AddWithValue("@badThreshold", addThreshold.bad);
+
+                        await insertCommand.ExecuteNonQueryAsync();
+                    }
+                }
+
+                return Ok("Threshold configuration added successfully.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while adding the threshold configuration.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
 
         [HttpGet]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
