@@ -403,6 +403,40 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
+        [HttpPost("admin/assign-employee/{suborderId}")]//debug this 
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
+        {
+            try
+            {
+                // Convert the orderId from GUID string to binary(16) format without '0x' prefix
+                string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+
+                // Check if the order with the given ID exists
+                bool orderExists = await CheckOrderExists(suborderIdBinary);
+                if (!orderExists)
+                {
+                    return NotFound("Order does not exist. Please try another ID.");
+                }
+
+                // Check if the employee with the given username exists
+                byte[] employeeId = await GetEmployeeIdByUsername(employeeUsername);
+                if (employeeId == null || employeeId.Length == 0)
+                {
+                    return NotFound($"Employee with username '{employeeUsername}' not found. Please try another name.");
+                }
+
+                // Update the order with the employee ID and employee name
+                await UpdateOrderEmployeeId(suborderIdBinary, employeeId, employeeUsername);
+
+                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{suborderId}'.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
+            }
+        }
 
         /*[HttpPost("customer/add-to-suborder")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
@@ -3951,42 +3985,6 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 await command.ExecuteNonQueryAsync();
 
                 _logger.LogInformation($"Updated order details in orders table for order with ID '{orderIdBinary}'");
-            }
-        }
-
-
-        [HttpPatch("admin/assign-employee/{suborderId}")]//debug this 
-        [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
-        {
-            try
-            {
-                // Convert the orderId from GUID string to binary(16) format without '0x' prefix
-                string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
-
-                // Check if the order with the given ID exists
-                bool orderExists = await CheckOrderExists(suborderIdBinary);
-                if (!orderExists)
-                {
-                    return NotFound("Order does not exist. Please try another ID.");
-                }
-
-                // Check if the employee with the given username exists
-                byte[] employeeId = await GetEmployeeIdByUsername(employeeUsername);
-                if (employeeId == null || employeeId.Length == 0)
-                {
-                    return NotFound($"Employee with username '{employeeUsername}' not found. Please try another name.");
-                }
-
-                // Update the order with the employee ID and employee name
-                await UpdateOrderEmployeeId(suborderIdBinary, employeeId, employeeUsername);
-
-                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{suborderId}'.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
-                return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
             }
         }
 

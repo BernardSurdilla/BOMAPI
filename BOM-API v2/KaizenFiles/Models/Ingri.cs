@@ -54,6 +54,12 @@
         public string type { get; set; } = "";
 
     }
+    public class AddThreshold
+    {
+        public string good { get; set; }
+        public string mid { get; set; }
+        public string bad { get; set; }
+    }
 
     public class IngriDTP
     {
