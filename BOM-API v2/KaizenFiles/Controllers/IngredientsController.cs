@@ -106,7 +106,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         else
                         {
                             // If the ingredient does not exist, insert a new record
-                            string sqlInsert = "INSERT INTO Item(item_name, quantity, price, status, type, createdAt, last_updated_by, last_updated_at, measurements) VALUES(@item_name, @quantity, @price, @status, @type, @createdAt, @last_updated_by, @last_updated_at, @measurements)";
+                            string sqlInsert = "INSERT INTO Item(item_name, quantity, price, status, type, created_at, last_updated_by, last_updated_at, measurements) VALUES(@item_name, @quantity, @price, @status, @type, @createdAt, @last_updated_by, @last_updated_at, @measurements)";
                             using (var insertCommand = new MySqlCommand(sqlInsert, connection))
                             {
                                 insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
@@ -142,16 +142,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 connection.Open();
 
-                string sql = "SELECT GoodThreshold, MidThreshold, CriticalThreshold FROM ThresholdConfig WHERE Id = 1";
+                string sql = "SELECT good_threshold, mid_threshold, critical_threshold FROM thresholdconfig WHERE Id = 1";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     using (var reader = command.ExecuteReader())
                     {
                         if (reader.Read())
                         {
-                            int goodThreshold = reader.GetInt32("GoodThreshold");
-                            int midThreshold = reader.GetInt32("MidThreshold");
-                            int criticalThreshold = reader.GetInt32("CriticalThreshold");
+                            int goodThreshold = reader.GetInt32("good_threshold");
+                            int midThreshold = reader.GetInt32("mid_threshold");
+                            int criticalThreshold = reader.GetInt32("critical_threshold");
 
                             return (goodThreshold, midThreshold, criticalThreshold);
                         }
@@ -218,11 +218,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = status, // Use the determined status
                                     type = reader["type"].ToString(),
-                                    CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                    CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
-                                    isActive = Convert.ToBoolean(reader["isActive"])
+                                    isActive = Convert.ToBoolean(reader["is_active"])
                                 };
 
                                 ingredientsDtoList.Add(ingredientDto);
@@ -243,7 +243,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         // Helper method to fetch threshold values
         private async Task<ThresholdConfig> GetThresholdValuesAsync(MySqlConnection connection)
         {
-            string sql = "SELECT * FROM ThresholdConfig WHERE Id = 1"; // Assumes there's only one row with Id = 1
+            string sql = "SELECT * FROM thresholdconfig WHERE Id = 1"; // Assumes there's only one row with Id = 1
 
             using (var command = new MySqlCommand(sql, connection))
             {
@@ -253,9 +253,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         return new ThresholdConfig
                         {
-                            GoodThreshold = reader.GetInt32("GoodThreshold"),
-                            MidThreshold = reader.GetInt32("MidThreshold"),
-                            CriticalThreshold = reader.GetInt32("CriticalThreshold")
+                            GoodThreshold = reader.GetInt32("good_threshold"),
+                            MidThreshold = reader.GetInt32("mid_threshold"),
+                            CriticalThreshold = reader.GetInt32("critical_threshold")
                         };
                     }
                     else
@@ -313,7 +313,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 connection.Open();
 
-                string sql = "SELECT * FROM Item WHERE isActive = @isActive";
+                string sql = "SELECT * FROM Item WHERE is_active = @isActive";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@isActive", true);
@@ -330,11 +330,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
-                                isActive = Convert.ToBoolean(reader["isActive"])
+                                isActive = Convert.ToBoolean(reader["is_active"])
                             };
 
                             activeIngredients.Add(ingredient);
@@ -357,7 +357,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     connection.Open();
 
-                    string sql = "SELECT * FROM Item WHERE id = @id";
+                    string sql = "SELECT * FROM Item WHERE Id = @id";
                     using (var command = new MySqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@id", id);
@@ -368,12 +368,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 var ingredient = new
                                 {
-                                    Id = Convert.ToInt32(reader["id"]),
+                                    Id = Convert.ToInt32(reader["Id"]),
                                     name = reader["item_name"].ToString(),
                                     Quantity = Convert.ToDouble(reader["quantity"]),
                                     Price = Convert.ToDecimal(reader["price"]),
                                     Status = reader["status"].ToString(),
-                                    CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                    CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                     LastUpdatedBy = reader["last_updated_by"] != DBNull.Value ? reader["last_updated_by"].ToString() : null,
                                     LastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : (DateTime?)null,
                                     Measurements = reader["measurements"].ToString()
@@ -610,7 +610,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sqlUpdate = "UPDATE thresholdconfig SET GoodThreshold = @goodThreshold, MidThreshold = @midThreshold, CriticalThreshold = @criticalThreshold WHERE Id = 1";
+                    string sqlUpdate = "UPDATE thresholdconfig SET good_threshold = @goodThreshold, mid_threshold = @midThreshold, critical_threshold = @criticalThreshold WHERE Id = 1";
 
                     using (var command = new MySqlCommand(sqlUpdate, connection))
                     {
@@ -649,7 +649,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     connection.Open();
 
                     // Check if the ingredient exists
-                    string sqlCheck = "SELECT COUNT(*) FROM Item WHERE id = @id";
+                    string sqlCheck = "SELECT COUNT(*) FROM Item WHERE Id = @id";
                     using (var checkCommand = new MySqlCommand(sqlCheck, connection))
                     {
                         checkCommand.Parameters.AddWithValue("@id", id);
@@ -662,7 +662,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
 
                     // Set isActive to false instead of deleting
-                    string sqlUpdate = "UPDATE Item SET isActive = @isActive WHERE id = @id";
+                    string sqlUpdate = "UPDATE Item SET is_active = @isActive WHERE Id = @id";
                     using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
                         updateCommand.Parameters.AddWithValue("@id", id);
@@ -704,7 +704,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
 
                     // Reactivate the ingredient by setting isActive to true
-                    string sqlUpdate = "UPDATE Item SET isActive = @isActive WHERE Id = @id";
+                    string sqlUpdate = "UPDATE Item SET is_active = @isActive WHERE Id = @id";
                     using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
                         updateCommand.Parameters.AddWithValue("@id", restore);
@@ -770,7 +770,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     connection.Open();
 
-                    string sql = "SELECT * FROM Item WHERE isActive = @isActive";
+                    string sql = "SELECT * FROM Item WHERE is_active = @isActive";
                     using (var command = new MySqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@isActive", false);
@@ -781,17 +781,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 Ingri ingredient = new Ingri
                                 {
-                                    Id = Convert.ToInt32(reader["id"]),
+                                    Id = Convert.ToInt32(reader["Id"]),
                                     name = reader["item_name"].ToString(),
                                     quantity = Convert.ToDouble(reader["quantity"]),
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
-                                    CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                    CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
-                                    isActive = Convert.ToBoolean(reader["isActive"]) // Ensure this matches your database type
+                                    isActive = Convert.ToBoolean(reader["is_active"]) // Ensure this matches your database type
                                 };
 
                                 ingredients.Add(ingredient);
@@ -861,13 +861,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["id"]),
+                                Id = Convert.ToInt32(reader["Id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -902,13 +902,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["id"]),
+                                Id = Convert.ToInt32(reader["Id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -943,13 +943,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["id"]),
+                                Id = Convert.ToInt32(reader["Id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -982,13 +982,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             return new Ingri
                             {
-                                Id = reader.GetInt32(reader.GetOrdinal("id")),
+                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["createdAt"]),
+                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -1008,7 +1008,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 connection.Open();
 
-                string sql = "UPDATE Item SET item_name = @item_name, quantity = @quantity, price = @price, status = @status, type = @type, measurements = @measurements, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at, isActive = @isActive WHERE id = @id";
+                string sql = "UPDATE Item SET item_name = @item_name, quantity = @quantity, price = @price, status = @status, type = @type, measurements = @measurements, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at, is_active = @isActive WHERE Id = @id";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@id", ingredient.Id);

@@ -30,7 +30,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("customer/add-to-cart")]
+        [HttpPost("current/user/add-to-cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
         {
@@ -154,8 +154,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
                 string sql = @"INSERT INTO suborders (
-            suborder_id, OrderId, CustomerId, CustomerName, EmployeeId, CreatedAt, Status, DesignId, price, quantity, 
-            last_updated_by, last_updated_at, isActive, Description, Flavor, Size, color, shape, tier, DesignName, PastryId) 
+            suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
+            last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, tier, design_name, pastry_id) 
             VALUES (
             UNHEX(REPLACE(UUID(), '-', '')), NULL, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
             @quantity, NULL, NULL, @isActive, @Description, @Flavor, @Size, @color, @shape, @tier, @DesignName, @PastryId)";
@@ -183,10 +183,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("current/user/checkout-cart")]
+        [HttpPost("current/user/checkout-cart/{suborderid}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate(
-    [FromQuery] string suborderid,
+    string suborderid,
     [FromBody] CheckOutRequest checkOutRequest)
         {
             try
@@ -271,7 +271,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 // Prepare the SQL query to update the suborder
-                string sql = "UPDATE suborders SET OrderId = UNHEX(@orderid) WHERE suborder_id = UNHEX(@suborderid)";
+                string sql = "UPDATE suborders SET order_id = UNHEX(@orderid) WHERE suborder_id = UNHEX(@suborderid)";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     // Define and add the necessary parameters
@@ -291,7 +291,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (OrderId, CustomerId, CustomerName, PickupDateTime, Type, Payment, Status, CreatedAt) 
+                string sql = @"INSERT INTO orders (order_id, customer_id, customer_name, pickup_date, type, payment, status, created_at) 
                        VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, @payment, 'for update', NOW())";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -307,9 +307,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("current/user/confirm-cancel-order")]
+        [HttpPost("current/user/confirm-cancel-order/{orderId}")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> ConfirmOrCancelOrder([FromQuery] string orderId, [FromQuery] string action)
+        public async Task<IActionResult> ConfirmOrCancelOrder(string orderId, [FromQuery] string action)
         {
             // Validate action parameter
             if (action != "confirm" && action != "cancel")
@@ -355,7 +355,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"
         SELECT COUNT(1) 
         FROM orders 
-        WHERE OrderId = UNHEX(@orderIdBinary)";
+        WHERE order_id = UNHEX(@orderIdBinary)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -373,9 +373,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string sql = @"
-        UPDATE orders
-        SET isActive = @isActive, Status = @status
-        WHERE OrderId = UNHEX(@orderIdBinary)";
+UPDATE orders 
+SET is_active = @isActive, status = @status 
+WHERE order_id = UNHEX(@orderIdBinary);
+
+UPDATE suborders 
+SET is_active = @isActive, status = @status 
+WHERE order_id = UNHEX(@orderIdBinary);";
+
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -712,7 +717,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, PastryId, Status, HEX(DesignId) as DesignId, DesignName, price, quantity, last_updated_by, last_updated_at, isActive, Description, Flavor, Size, CustomerName, EmployeeName, shape, color, tier FROM suborders";
+                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, HEX(design_id) as design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color, tier FROM suborders";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -720,21 +725,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
-                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
                                                 ? (Guid?)null
-                                                : new Guid((byte[])reader["OrderId"]);
+                                                : new Guid((byte[])reader["order_id"]);
 
                                 Guid suborderId = new Guid((byte[])reader["suborder_id"]);
-                                Guid customerId = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                Guid customerId = reader.IsDBNull(reader.GetOrdinal("customer_id"))
                                                   ? Guid.Empty
-                                                  : new Guid((byte[])reader["CustomerId"]);
+                                                  : new Guid((byte[])reader["customer_id"]);
 
-                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
                                                   ? Guid.Empty
-                                                  : new Guid((byte[])reader["EmployeeId"]);
-                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                                  : new Guid((byte[])reader["employee_id"]);
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
                                                    ? null
-                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"));
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
                                 string? LastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
@@ -745,25 +750,25 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     suborderId = suborderId,
                                     customerId = customerId,
                                     employeeId = employeeId,
-                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
-                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                    status = reader.GetString(reader.GetOrdinal("Status")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     tier = reader.GetString(reader.GetOrdinal("tier")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
-                                    designName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = LastUpdatedBy,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                    Description = reader.GetString(reader.GetOrdinal("Description")),
-                                    flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                    size = reader.GetString(reader.GetOrdinal("Size")),
-                                    customerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    Description = reader.GetString(reader.GetOrdinal("description")),
+                                    flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                    size = reader.GetString(reader.GetOrdinal("size")),
+                                    customerName = reader.GetString(reader.GetOrdinal("customer_name")),
                                     employeeName = employeeName
                                 });
                             }
@@ -811,12 +816,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     string sql = @"
             SELECT 
-                suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
-                HEX(DesignId) as DesignId, DesignName, price, quantity, 
-                last_updated_by, last_updated_at, isActive, Description, 
-                Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
+                suborder_id, order_id, customer_id, employee_id, created_at, status, 
+                HEX(design_id) as design_id, design_name, price, quantity, 
+                last_updated_by, last_updated_at, is_active, description, 
+                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
             FROM suborders 
-            WHERE CustomerId = @customerId AND Status IN('to pay')";
+            WHERE customer_id = @customerId AND status IN('to pay')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -826,22 +831,22 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
-                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
                                                 ? (Guid?)null
-                                                : new Guid((byte[])reader["OrderId"]);
+                                                : new Guid((byte[])reader["order_id"]);
 
                                 Guid suborderId = new Guid((byte[])reader["suborder_id"]);
-                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
                                                         ? Guid.Empty
-                                                        : new Guid((byte[])reader["CustomerId"]);
+                                                        : new Guid((byte[])reader["customer_id"]);
 
-                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
                                                   ? Guid.Empty
-                                                  : new Guid((byte[])reader["EmployeeId"]);
+                                                  : new Guid((byte[])reader["employee_id"]);
 
-                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
                                                    ? null
-                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"));
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
 
                                 string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
                                                     ? null
@@ -853,25 +858,25 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     suborderId = suborderId,
                                     CustomerId = customerIdFromDb,
                                     employeeId = employeeId,
-                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
-                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                    Status = reader.GetString(reader.GetOrdinal("Status")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    Status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     tier = reader.GetString(reader.GetOrdinal("tier")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
-                                    DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                    Description = reader.GetString(reader.GetOrdinal("Description")),
-                                    Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                    Size = reader.GetString(reader.GetOrdinal("Size")),
-                                    CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    Description = reader.GetString(reader.GetOrdinal("description")),
+                                    Flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                    Size = reader.GetString(reader.GetOrdinal("size")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
                                     employeeName = employeeName
                                 });
                             }
@@ -919,11 +924,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     string sql = @"
     SELECT 
-        suborder_id, OrderId, CustomerId, CreatedAt, Status, 
-        HEX(DesignId) as DesignId, DesignName, price, quantity, 
-        last_updated_by, last_updated_at, isActive, CustomerName, PastryId 
+        suborder_id, order_id, customer_id, created_at, status, 
+        HEX(design_id) as design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
     FROM suborders 
-    WHERE CustomerId = @customerId AND Status IN('to receive')";
+    WHERE customer_id = @customerId AND status IN('to receive')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -933,14 +938,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
-                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
                                                 ? (Guid?)null
-                                                : new Guid((byte[])reader["OrderId"]);
+                                                : new Guid((byte[])reader["order_id"]);
 
                                 Guid suborderId = new Guid((byte[])reader["suborder_id"]);
-                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
                                                         ? Guid.Empty
-                                                        : new Guid((byte[])reader["CustomerId"]);
+                                                        : new Guid((byte[])reader["customer_id"]);
 
                                 string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
                                                     ? null
@@ -951,18 +956,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     Id = orderId, // Handle null values for orderId
                                     suborderId = suborderId,
                                     CustomerId = customerIdFromDb,
-                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
-                                    DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy ?? "",
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                    CustomerName = reader.GetString(reader.GetOrdinal("CustomerName"))
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name"))
                                 });
                             }
                         }
@@ -981,9 +986,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpGet("current/user/to-receive/full-details")]
+        [HttpGet("current/user/to-receive/full-details/{suborderid}")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetToReceiveOrdersByCustomerId([FromQuery] string suborderid)
+        public async Task<IActionResult> GetToReceiveOrdersByCustomerId(string suborderid)
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -1019,12 +1024,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     string sql = @"
     SELECT 
-        suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
-        HEX(DesignId) as DesignId, DesignName, price, quantity, 
-        last_updated_by, last_updated_at, isActive, Description, 
-        Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
-    FROM suborders 
-    WHERE CustomerId = @customerId AND Status IN ('to receive') AND suborder_id = UNHEX(@suborderIdBinary)";
+                suborder_id, order_id, customer_id, employee_id, created_at, status, 
+                HEX(design_id) as design_id, design_name, price, quantity, 
+                last_updated_by, last_updated_at, is_active, description, 
+                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+            FROM suborders 
+            WHERE customer_id = @customerId AND status IN ('to receive') AND suborder_id = UNHEX(@suborderIdBinary)";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -1035,22 +1040,22 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
-                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("OrderId"))
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
                                                 ? (Guid?)null
-                                                : new Guid((byte[])reader["OrderId"]);
+                                                : new Guid((byte[])reader["order_id"]);
 
                                 Guid suborderIdFromDb = new Guid((byte[])reader["suborder_id"]);
-                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
                                                         ? Guid.Empty
-                                                        : new Guid((byte[])reader["CustomerId"]);
+                                                        : new Guid((byte[])reader["customer_id"]);
 
-                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
                                                   ? Guid.Empty
-                                                  : new Guid((byte[])reader["EmployeeId"]);
+                                                  : new Guid((byte[])reader["employee_id"]);
 
-                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
                                                    ? null
-                                                   : reader.GetString(reader.GetOrdinal("EmployeeName"));
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
 
                                 string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
                                                     ? null
@@ -1063,25 +1068,25 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     CustomerId = customerIdFromDb,
                                     employeeId = employeeId,
                                     employeeName = employeeName ?? string.Empty,
-                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                    Status = reader.GetString(reader.GetOrdinal("Status")),
-                                    pastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    Status = reader.GetString(reader.GetOrdinal("status")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     tier = reader.GetString(reader.GetOrdinal("tier")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
-                                    DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy ?? string.Empty,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                    isActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                    Description = reader.GetString(reader.GetOrdinal("Description")),
-                                    Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                    Size = reader.GetString(reader.GetOrdinal("Size")),
-                                    CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    Description = reader.GetString(reader.GetOrdinal("description")),
+                                    Flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                    Size = reader.GetString(reader.GetOrdinal("size")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
                                 });
                             }
                         }
@@ -1122,9 +1127,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         private async Task<OrderDetails?> GetOrderDetailsByOrderId(MySqlConnection connection, string orderIdBinary)
         {
             string sql = @"
-        SELECT OrderId, Status, payment, type, PickupDateTime 
+        SELECT order_id, status, payment, type, pickup_date 
         FROM orders 
-        WHERE OrderId = UNHEX(@orderIdBinary)";
+        WHERE order_id = UNHEX(@orderIdBinary)";
 
             using (var command = new MySqlCommand(sql, connection))
             {
@@ -1136,13 +1141,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         return new OrderDetails
                         {
-                            orderId = new Guid((byte[])reader["OrderId"]),
-                            Status = reader.GetString(reader.GetOrdinal("Status")),
+                            orderId = new Guid((byte[])reader["order_id"]),
+                            Status = reader.GetString(reader.GetOrdinal("status")),
                             payment = reader.GetString(reader.GetOrdinal("payment")),
                             type = reader.GetString(reader.GetOrdinal("type")),
-                            PickupDateTime = reader.IsDBNull(reader.GetOrdinal("PickupDateTime"))
+                            PickupDateTime = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
                                             ? (DateTime?)null
-                                            : reader.GetDateTime(reader.GetOrdinal("PickupDateTime"))
+                                            : reader.GetDateTime(reader.GetOrdinal("pickup_date"))
                         };
                     }
                 }
@@ -1151,9 +1156,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return null;
         }
 
-        [HttpGet("final-order-details")]
+        [HttpGet("final-order-details/{orderId}")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetFinalOrderDetailsByOrderId([FromQuery] string orderId)
+        public async Task<IActionResult> GetFinalOrderDetailsByOrderId(string orderId)
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -1216,9 +1221,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string orderSql = @"
-    SELECT OrderId, Status, payment, type, PickupDateTime 
+    SELECT order_id, status, payment, type, pickup_date 
     FROM orders 
-    WHERE OrderId = UNHEX(@orderIdBinary)";
+    WHERE order_id = UNHEX(@orderIdBinary)";
 
                 using (var command = new MySqlCommand(orderSql, connection))
                 {
@@ -1230,13 +1235,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             return new CheckOutDetails
                             {
-                                OrderId = new Guid((byte[])reader["OrderId"]),
-                                Status = reader.GetString(reader.GetOrdinal("Status")),
+                                OrderId = new Guid((byte[])reader["order_id"]),
+                                Status = reader.GetString(reader.GetOrdinal("status")),
                                 PaymentMethod = reader.GetString(reader.GetOrdinal("payment")),
                                 OrderType = reader.GetString(reader.GetOrdinal("type")),
-                                PickupDateTime = reader.IsDBNull(reader.GetOrdinal("PickupDateTime"))
+                                PickupDateTime = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
                                     ? (DateTime?)null
-                                    : reader.GetDateTime(reader.GetOrdinal("PickupDateTime"))
+                                    : reader.GetDateTime(reader.GetOrdinal("pickup_date"))
                             };
                         }
                     }
@@ -1255,12 +1260,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 string suborderSql = @"
     SELECT 
-        suborder_id, OrderId, CustomerId, EmployeeId, CreatedAt, Status, 
-        HEX(DesignId) as DesignId, DesignName, price, quantity, 
-        last_updated_by, last_updated_at, isActive, Description, 
-        Flavor, Size, CustomerName, EmployeeName, shape, color, tier, PastryId 
+        suborder_id, order_id, customer_id, employee_id, created_at, status, 
+        HEX(design_id) as design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, description, 
+        flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
     FROM suborders 
-    WHERE OrderId = UNHEX(@orderIdBinary)";
+    WHERE order_id = UNHEX(@orderIdBinary)";
 
                 using (var command = new MySqlCommand(suborderSql, connection))
                 {
@@ -1273,24 +1278,24 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             var suborder = new OrderItem
                             {
                                 SuborderId = new Guid((byte[])reader["suborder_id"]),
-                                OrderId = new Guid((byte[])reader["OrderId"]),
-                                CustomerId = reader.IsDBNull(reader.GetOrdinal("CustomerId"))
+                                OrderId = new Guid((byte[])reader["order_id"]),
+                                CustomerId = reader.IsDBNull(reader.GetOrdinal("customer_id"))
                                     ? Guid.Empty
-                                    : new Guid((byte[])reader["CustomerId"]),
-                                EmployeeId = reader.IsDBNull(reader.GetOrdinal("EmployeeId"))
+                                    : new Guid((byte[])reader["customer_id"]),
+                                EmployeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
                                     ? Guid.Empty
-                                    : new Guid((byte[])reader["EmployeeId"]),
-                                EmployeeName = reader.IsDBNull(reader.GetOrdinal("EmployeeName"))
+                                    : new Guid((byte[])reader["employee_id"]),
+                                EmployeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
                                     ? string.Empty
-                                    : reader.GetString(reader.GetOrdinal("EmployeeName")),
-                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("CreatedAt")),
-                                Status = reader.GetString(reader.GetOrdinal("Status")),
-                                PastryId = reader.GetString(reader.GetOrdinal("PastryId")),
+                                    : reader.GetString(reader.GetOrdinal("employee_name")),
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                Status = reader.GetString(reader.GetOrdinal("status")),
+                                PastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                 Color = reader.GetString(reader.GetOrdinal("color")),
                                 Shape = reader.GetString(reader.GetOrdinal("shape")),
                                 Tier = reader.GetString(reader.GetOrdinal("tier")),
-                                DesignId = FromHexString(reader.GetString(reader.GetOrdinal("DesignId"))),
-                                DesignName = reader.GetString(reader.GetOrdinal("DesignName")),
+                                DesignId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                 Price = reader.GetDouble(reader.GetOrdinal("price")),
                                 Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 LastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
@@ -1299,11 +1304,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 LastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
                                     ? (DateTime?)null
                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                IsActive = reader.GetBoolean(reader.GetOrdinal("isActive")),
-                                Description = reader.GetString(reader.GetOrdinal("Description")),
-                                Flavor = reader.GetString(reader.GetOrdinal("Flavor")),
-                                Size = reader.GetString(reader.GetOrdinal("Size")),
-                                CustomerName = reader.GetString(reader.GetOrdinal("CustomerName")),
+                                IsActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                Description = reader.GetString(reader.GetOrdinal("description")),
+                                Flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                Size = reader.GetString(reader.GetOrdinal("size")),
+                                CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
                                 SubOrderTotal = reader.GetDouble(reader.GetOrdinal("price")) * reader.GetInt32(reader.GetOrdinal("quantity")) // Calculate Total
                             };
 
@@ -1325,9 +1330,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string addOnsSql = @"
-    SELECT addOnsId, quantity, Total, name, price
+    SELECT add_ons_id, quantity, total, name, price
     FROM orderaddons
-    WHERE OrderId = UNHEX(@suborderIdBinary)";
+    WHERE order_id = UNHEX(@suborderIdBinary)";
 
                 using (var command = new MySqlCommand(addOnsSql, connection))
                 {
@@ -1340,9 +1345,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             addons.Add(new OrderAddon
                             {
-                                AddonId = reader.GetInt32(reader.GetOrdinal("addOnsId")),
-                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")), // Corrected to Int32
-                                AddOnTotal = reader.GetDouble(reader.GetOrdinal("Total")),
+                                AddonId = reader.GetInt32(reader.GetOrdinal("add_ons_id")),
+                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                AddOnTotal = reader.GetDouble(reader.GetOrdinal("total")),
                                 Name = reader.GetString(reader.GetOrdinal("name")),
                                 Price = reader.GetDouble(reader.GetOrdinal("price"))
                             });
@@ -1589,7 +1594,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT DesignId, Size FROM suborders WHERE OrderId = UNHEX(@orderId)";
+                string sql = "SELECT designId, size FROM suborders WHERE order_id = UNHEX(@orderId)";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@orderId", orderIdBinary);
@@ -1598,9 +1603,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         if (await reader.ReadAsync())
                         {
-                            byte[] designIdBinary = (byte[])reader["DesignId"];
+                            byte[] designIdBinary = (byte[])reader["design_id"];
                             string designIdHex = BitConverter.ToString(designIdBinary).Replace("-", "").ToLower();
-                            string size = reader.GetString("Size");
+                            string size = reader.GetString("size");
 
                             return (designIdHex, size);
                         }
@@ -1725,7 +1730,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT name, price FROM addons WHERE addOnsId = @addOnsId";
+                string sql = "SELECT name, price FROM addons WHERE add_ons_id = @addOnsId";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@addOnsId", addOnsId);
@@ -1765,7 +1770,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT SUM(quantity) AS TotalQuantity FROM suborders WHERE isActive = TRUE";
+                    string sql = "SELECT SUM(quantity) AS TotalQuantity FROM suborders WHERE is_active = TRUE";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -2580,7 +2585,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }*/
 
 
-        [HttpGet("customer/cart")] //update this 
+        /*[HttpGet("customer/cart")] //update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetCartOrdersForUser()
         {
@@ -2660,7 +2665,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             return orders;
         }
-
+        */
 
         [HttpPatch("admin/update-price")] //change this
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
@@ -3451,15 +3456,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
          */
 
-        [HttpPatch("customer/manage-add-ons-by-material/{pastryMaterialId}")]
+        [HttpPatch("current/user/manage-add-ons-by-material/{pastryMaterialId}/{suborderId}/{modifiedAddOnId}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, [FromQuery] string suborderId, [FromQuery] int modifiedAddOnId, [FromBody] ManageAddOnAction action)
+        public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, string suborderId, int modifiedAddOnId, [FromBody] ManageAddOnAction action)
         {
             // Log the start of the process
             _logger.LogInformation($"Starting ManageAddOnsByPastryMaterialId for pastryMaterialId: {pastryMaterialId}, OrderId: {suborderId}, and AddOnId: {modifiedAddOnId}");
 
             // Convert OrderId to binary format
-            string orderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+            string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
 
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -3470,7 +3475,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     try
                     {
                         // Retrieve size from orders table
-                        string size = await GetOrderSize(connection, transaction, orderIdBinary);
+                        string size = await GetOrderSize(connection, transaction, suborderIdBinary);
+
+                        Debug.WriteLine(size);
 
                         // Retrieve add-ons based on pastryMaterialId and size
                         List<PastryMaterialAddOn> allAddOns = new List<PastryMaterialAddOn>();
@@ -3499,7 +3506,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             if (addOn.AddOnId == modifiedAddOnId)
                             {
-                                if (action.ActionType.ToLower() == "setquantity")
+                                if (action.ActionType.ToLower() == "quantity")
                                 {
                                     // Fetch add-on details
                                     if (addOnDetailsDict.TryGetValue(addOn.AddOnId, out var addOnDetails))
@@ -3508,13 +3515,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                         double total = action.Quantity * addOnDetails.Price;
 
                                         // Insert or update quantity for the specified add-on in orderaddons
-                                        await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, action.Quantity, total, addOnDetailsDict);
+                                        await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.AddOnId, action.Quantity, total, addOnDetailsDict);
                                     }
                                 }
                                 else if (action.ActionType.ToLower() == "remove")
                                 {
                                     // Set quantity to 0 and remove add-on from orderaddons
-                                    await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, 0, 0, addOnDetailsDict);
+                                    await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.AddOnId, 0, 0, addOnDetailsDict);
                                 }
                                 else
                                 {
@@ -3526,7 +3533,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 // Insert add-on without modifying its quantity or total
                                 var addOnDetails = addOnDetailsDict[addOn.AddOnId];
                                 double total = addOn.Quantity * addOnDetails.Price;
-                                await SetOrUpdateAddOn(connection, transaction, orderIdBinary, addOn.AddOnId, addOn.Quantity, total, addOnDetailsDict);
+                                await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.AddOnId, addOn.Quantity, total, addOnDetailsDict);
                             }
                         }
 
@@ -3547,7 +3554,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task<string> GetOrderSize(MySqlConnection connection, MySqlTransaction transaction, string orderId)
         {
-            string sql = @"SELECT Size
+            string sql = @"SELECT size
                    FROM suborders
                    WHERE suborder_id = UNHEX(@orderId)";
 
@@ -3635,7 +3642,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             string sql = @"SELECT name, price
                    FROM addons
-                   WHERE AddOnsId = @addOnId";
+                   WHERE add_ons_id = @addOnId";
 
             using (var command = new MySqlCommand(sql, connection, transaction))
             {
@@ -3670,7 +3677,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Check if the add-on already exists in orderaddons
                 string selectSql = @"SELECT COUNT(*) 
             FROM orderaddons 
-            WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
+            WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnId";
 
                 using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
                 {
@@ -3682,7 +3689,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     if (count == 0)
                     {
                         // Insert new add-on into orderaddons
-                        string insertSql = @"INSERT INTO orderaddons (OrderId, AddOnsId, quantity, total, name, price)
+                        string insertSql = @"INSERT INTO orderaddons (order_id, add_ons_id, quantity, total, name, price)
                     VALUES (UNHEX(@orderId), @addOnId, @quantity, @total, @name, @price)";
                         using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
                         {
@@ -3701,7 +3708,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         // Update quantity and total for existing add-on in orderaddons
                         string updateSql = @"UPDATE orderaddons 
                     SET quantity = @quantity, total = @total
-                    WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
+                    WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnId";
 
                         using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
                         {
@@ -3728,7 +3735,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task RemoveAddOnFromOrderAddOns(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, int addOnId)
         {
-            string deleteSql = @"DELETE FROM orderaddons WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnId";
+            string deleteSql = @"DELETE FROM orderaddons WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnId";
             using (var deleteCommand = new MySqlCommand(deleteSql, connection, transaction))
             {
                 deleteCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
@@ -3775,7 +3782,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             // Check if the add-on already exists in orderaddons
                             string selectSql = @"SELECT COUNT(*) 
                                          FROM orderaddons 
-                                         WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnsId";
+                                         WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnsId";
 
                             using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
                             {
@@ -3787,7 +3794,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 if (count == 0)
                                 {
                                     // Insert new add-on into orderaddons
-                                    string insertSql = @"INSERT INTO orderaddons (OrderId, AddOnsId, quantity, total)
+                                    string insertSql = @"INSERT INTO orderaddons (order_id, add_ons_id, quantity, total)
                                                  VALUES (UNHEX(@orderId), @addOnsId, @quantity, @total)";
 
                                     using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
@@ -3807,7 +3814,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     // Update existing add-on in orderaddons
                                     string updateSql = @"UPDATE orderaddons 
                                                  SET quantity = @quantity, total = @total 
-                                                 WHERE OrderId = UNHEX(@orderId) AND AddOnsId = @addOnsId";
+                                                 WHERE order_id = UNHEX(@orderId) AND add_on_id = @addOnsId";
 
                                     using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
                                     {
@@ -3849,7 +3856,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT addOnsId, name, price FROM addons WHERE name = @name";
+                string sql = "SELECT add_ons_id, name, price FROM addons WHERE name = @name";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3861,7 +3868,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             return new AddOnDSOS
                             {
-                                AddOnId = reader.GetInt32("addOnsId"),
+                                AddOnId = reader.GetInt32("add_ons_id"),
                                 AddOnName = reader.GetString("name"),
                                 PricePerUnit = reader.GetDouble("price")
                             };
@@ -3877,16 +3884,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPatch("customer/{orderId}/update-order-details")]//update this 
+        [HttpPatch("current/user/{suborderId}/update-order-details")]//update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> UpdateOrderDetails(string orderId, [FromBody] UpdateOrderDetailsRequest request)
+        public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest request)
         {
             try
             {
-                _logger.LogInformation($"Starting UpdateOrderDetails for orderId: {orderId}");
+                _logger.LogInformation($"Starting UpdateOrderDetails for orderId: {suborderId}");
 
                 // Convert orderId to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+                string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -3897,7 +3904,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         try
                         {
                             // Update order details in the orders table
-                            await UpdateOrderDetailsInDatabase(connection, transaction, orderIdBinary, request);
+                            await UpdateOrderDetailsInDatabase(connection, transaction, suborderIdBinary, request);
 
                             await transaction.CommitAsync();
                         }
@@ -3914,20 +3921,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error updating order details for order with ID '{orderId}'");
-                return StatusCode(500, $"An error occurred while updating order details for order with ID '{orderId}'.");
+                _logger.LogError(ex, $"Error updating order details for order with ID '{suborderId}'");
+                return StatusCode(500, $"An error occurred while updating order details for order with ID '{suborderId}'.");
             }
         }
 
         private async Task UpdateOrderDetailsInDatabase(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, UpdateOrderDetailsRequest request)
         {
             // Prepare SQL statement for updating orders table
-            string updateSql = @"UPDATE orders 
-                         SET Description = @description, 
+            string updateSql = @"UPDATE suborders 
+                         SET description = @description, 
                              quantity = @quantity,
-                             Size = @size,
-                             Flavor = @flavor
-                         WHERE OrderId = UNHEX(@orderId)";
+                             size = @size,
+                             flavor = @flavor,
+                             color = @color, shape = @shape
+                         WHERE suborder_id = UNHEX(@suborderId)";
 
             using (var command = new MySqlCommand(updateSql, connection, transaction))
             {
@@ -3935,7 +3943,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 command.Parameters.AddWithValue("@quantity", request.Quantity);
                 command.Parameters.AddWithValue("@size", request.Size);
                 command.Parameters.AddWithValue("@flavor", request.Flavor);
-                command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                command.Parameters.AddWithValue("@color", request.color);
+                command.Parameters.AddWithValue("@shape", request.shape);
+                command.Parameters.AddWithValue("@suborderId", orderIdBinary);
+
 
                 await command.ExecuteNonQueryAsync();
 
@@ -3944,17 +3955,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPatch("admin/assign-employee")]//update this 
+        [HttpPatch("admin/assign-employee/{suborderId}")]//debug this 
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AssignEmployeeToOrder([FromQuery] string orderId, [FromQuery] string employeeUsername)
+        public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
         {
             try
             {
                 // Convert the orderId from GUID string to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+                string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
 
                 // Check if the order with the given ID exists
-                bool orderExists = await CheckOrderExists(orderIdBinary);
+                bool orderExists = await CheckOrderExists(suborderIdBinary);
                 if (!orderExists)
                 {
                     return NotFound("Order does not exist. Please try another ID.");
@@ -3968,18 +3979,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Update the order with the employee ID and employee name
-                await UpdateOrderEmployeeId(orderIdBinary, employeeId, employeeUsername);
+                await UpdateOrderEmployeeId(suborderIdBinary, employeeId, employeeUsername);
 
-                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{orderId}'.");
+                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{suborderId}'.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
-                return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{orderId}'.");
+                _logger.LogError(ex, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
             }
         }
 
-        [HttpDelete("customer/remove-cart/{orderId}")] //update this 
+        [HttpDelete("customer/remove-cart/{orderId}")] //debug this  
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> RemoveCart(string orderId)
         {
@@ -4029,8 +4040,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"
             SELECT COUNT(*) 
             FROM orders 
-            WHERE OrderId = UNHEX(@orderId) 
-            AND CustomerId = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+            WHERE order_id = UNHEX(@orderId) 
+            AND customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -4049,7 +4060,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "DELETE FROM orders WHERE OrderId = UNHEX(@orderId)";
+                string sql = "DELETE FROM orders WHERE order_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -4062,7 +4073,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        private async Task<bool> CheckOrderExists(string orderIdBinary)
+        private async Task<bool> CheckOrderExists(string SuborderIdBinary)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -4070,8 +4081,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = "SELECT COUNT(*) FROM orders WHERE OrderId = UNHEX(@orderId)";
-                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    command.CommandText = "SELECT COUNT(*) FROM suborders WHERE suborder_id = UNHEX(@orderId)";
+                    command.Parameters.AddWithValue("@orderId", SuborderIdBinary);
 
                     var result = await command.ExecuteScalarAsync();
                     return Convert.ToInt32(result) > 0;
@@ -4112,7 +4123,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET EmployeeId = @employeeId, EmployeeName = @employeeName WHERE OrderId = UNHEX(@orderId)";
+                string sql = "UPDATE suborders SET employee_id = @employeeId, employee_name = @employeeName WHERE suborder_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -4156,7 +4167,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET isActive = @isActive WHERE OrderId = UNHEX(@orderId)";
+                string sql = "UPDATE orders SET is_active = @is_active WHERE order_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
