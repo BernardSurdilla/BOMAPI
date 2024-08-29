@@ -51,6 +51,8 @@ namespace CRUDFI.Models
         public int Quantity { get; set; }
         public string Size { get; set; }
         public string Flavor { get; set; }
+        public string color { get; set; }
+        public string shape { get; set; }
     }
 
     public class toPayInitial

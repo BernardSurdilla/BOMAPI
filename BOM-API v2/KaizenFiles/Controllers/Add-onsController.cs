@@ -67,7 +67,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 // SQL INSERT statement with measure and ingredient_type
-                string sql = @"INSERT INTO AddOns (name, price, size, measurement, ingredient_type, date_added, last_modified_date)
+                string sql = @"INSERT INTO addons (name, price, size, measurement, ingredient_type, date_added, last_modified_date)
                 VALUES (@Name, @PricePerUnit, @Size, @Measure, @IngredientType, @DateAdded, @LastModifiedDate);
                 SELECT LAST_INSERT_ID();";
 
@@ -117,7 +117,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT name, price, addOnsId, measurement, size, date_added, last_modified_date FROM addons";
+                string sql = "SELECT name, price, add_ons_id, measurement, size, date_added, last_modified_date FROM addons";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -129,7 +129,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 AddOnName = reader.GetString("name"),
                                 PricePerUnit = reader.GetDouble("price"),
-                                addOnsId = reader.GetInt32("addOnsId"),
+                                addOnsId = reader.GetInt32("add_ons_id"),
                                 Measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
                                 // DateAdded is assumed to be non-nullable and should be directly read
                                 DateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
@@ -162,9 +162,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         SET 
                             name = @AddOnName, 
                             measurement = @Measurement, 
-                            pricePerUnit = @PricePerUnit, 
-                            LastModifiedDate = @LastModifiedDate, 
-                        WHERE addOnsId = @AddOnsId";
+                            price = @PricePerUnit, 
+                            last_modified_date = @LastModifiedDate, 
+                        WHERE add_ons_id = @AddOnsId";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
