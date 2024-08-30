@@ -35,6 +35,7 @@
         public int MidThreshold { get; set; }
         public int CriticalThreshold { get; set; }
     }
+
     public class ItemUpdateRequest
     {
         public string name { get; set; } = "";
@@ -44,21 +45,23 @@
     {
 
         public string name { get; set; } = "";
-
         public double quantity { get; set; }
-
         public string measurements { get; set; } = "";
-
         public decimal price { get; set; }
-
         public string type { get; set; } = "";
+        public string good { get; set; }
+        public string bad { get; set; }
 
     }
-    public class AddThreshold
+    public class IngriDTOs
     {
-        public string good { get; set; }
-        public string mid { get; set; }
-        public string bad { get; set; }
+
+        public string name { get; set; } = "";
+        public double quantity { get; set; }
+        public string measurements { get; set; } = "";
+        public decimal price { get; set; }
+        public string type { get; set; } = "";
+
     }
 
     public class IngriDTP
