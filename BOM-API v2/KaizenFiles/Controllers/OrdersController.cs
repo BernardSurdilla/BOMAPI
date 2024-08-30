@@ -403,7 +403,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpPost("admin/assign-employee/{suborderId}")]//debug this 
+        [HttpPost("admin/assign-employee/{suborderId}")]//done 
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
         {

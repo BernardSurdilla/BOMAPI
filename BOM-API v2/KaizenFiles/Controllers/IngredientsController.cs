@@ -35,7 +35,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpPost("admin/add-ingredients/threshold")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public IActionResult CreateIngredient([FromBody] IngriDTO ingredientDto)
+        public async Task<IActionResult> CreateIngredient([FromBody] IngriDTO ingredientDto)
         {
             try
             {
@@ -122,20 +122,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         }
                     }
 
-                    // Insert or update threshold configuration
-                    string thresholdSql = @"
-            INSERT INTO thresholdconfig (item, good_threshold, critical_threshold)
-            VALUES (@itemName, @goodThreshold, @badThreshold)
-            ON DUPLICATE KEY UPDATE good_threshold = @goodThreshold, critical_threshold = @badThreshold";
+                    await InsertOrUpdateThresholdConfigAsync(connection, ingredientDto.name, Convert.ToInt32(ingredientDto.good), Convert.ToInt32(ingredientDto.bad));
 
-                    using (var thresholdCommand = new MySqlCommand(thresholdSql, connection))
-                    {
-                        thresholdCommand.Parameters.AddWithValue("@itemName", ingredientDto.name);
-                        thresholdCommand.Parameters.AddWithValue("@goodThreshold", ingredientDto.good);
-                        thresholdCommand.Parameters.AddWithValue("@badThreshold", ingredientDto.bad);
-
-                        thresholdCommand.ExecuteNonQuery();
-                    }
                 }
 
                 return Ok("Ingredient and threshold configuration added successfully.");
@@ -145,6 +133,55 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 _logger.LogError(ex, "An error occurred while processing the request");
                 ModelState.AddModelError("ingredient", "Sorry, but we encountered an exception while processing your request");
                 return BadRequest(ModelState);
+            }
+        }
+
+        private async Task InsertOrUpdateThresholdConfigAsync(MySqlConnection connection, string name, int good, int bad)
+        {
+            // Retrieve the item ID for thresholdconfig insertion or update
+            string sqlGetItemId = "SELECT Id FROM item WHERE item_name = @item_name";
+            int itemId;
+            using (var getItemIdCommand = new MySqlCommand(sqlGetItemId, connection))
+            {
+                getItemIdCommand.Parameters.AddWithValue("@item_name", name);
+                itemId = Convert.ToInt32(await getItemIdCommand.ExecuteScalarAsync());
+            }
+
+            // Check if the item_id already exists in the thresholdconfig table
+            string sqlThresholdCheck = "SELECT COUNT(*) FROM thresholdconfig WHERE item_id = @item_id";
+            int thresholdCount;
+            using (var thresholdCheckCommand = new MySqlCommand(sqlThresholdCheck, connection))
+            {
+                thresholdCheckCommand.Parameters.AddWithValue("@item_id", itemId);
+                thresholdCount = Convert.ToInt32(await thresholdCheckCommand.ExecuteScalarAsync());
+            }
+
+            if (thresholdCount > 0)
+            {
+                // If the item_id exists, update the thresholdconfig record
+                string sqlUpdateThreshold = "UPDATE thresholdconfig SET good_threshold = @goodThreshold, critical_threshold = @badThreshold WHERE item_id = @item_id";
+                using (var updateThresholdCommand = new MySqlCommand(sqlUpdateThreshold, connection))
+                {
+                    updateThresholdCommand.Parameters.AddWithValue("@goodThreshold", good);
+                    updateThresholdCommand.Parameters.AddWithValue("@badThreshold", bad);
+                    updateThresholdCommand.Parameters.AddWithValue("@item_id", itemId);
+
+                    await updateThresholdCommand.ExecuteNonQueryAsync();
+                }
+            }
+            else
+            {
+                // If the item_id does not exist, insert a new thresholdconfig record
+                string sqlInsertThreshold = "INSERT INTO thresholdconfig (item_id, item, good_threshold, critical_threshold) VALUES (@item_id, @itemName, @goodThreshold, @badThreshold)";
+                using (var insertThresholdCommand = new MySqlCommand(sqlInsertThreshold, connection))
+                {
+                    insertThresholdCommand.Parameters.AddWithValue("@item_id", itemId);
+                    insertThresholdCommand.Parameters.AddWithValue("@itemName", name);
+                    insertThresholdCommand.Parameters.AddWithValue("@goodThreshold", good);
+                    insertThresholdCommand.Parameters.AddWithValue("@badThreshold", bad);
+
+                    await insertThresholdCommand.ExecuteNonQueryAsync();
+                }
             }
         }
 
@@ -163,9 +200,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    // Fetch the threshold values
-                    var thresholds = await GetThresholdValuesAsync(connection);
-
                     // Fetch all ingredients
                     string sql = "SELECT * FROM Item"; // Adjust SQL query as per your database schema
 
@@ -176,25 +210,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             while (await reader.ReadAsync())
                             {
                                 double quantity = Convert.ToDouble(reader["quantity"]);
-                                string status;
-
-                                // Determine the status based on quantity and thresholds
-                                if (quantity <= thresholds.CriticalThreshold)
-                                {
-                                    status = "critical";
-                                }
-                                else if (quantity >= thresholds.MidThreshold && quantity < thresholds.GoodThreshold)
-                                {
-                                    status = "mid";
-                                }
-                                else if (quantity >= thresholds.GoodThreshold)
-                                {
-                                    status = "good";
-                                }
-                                else
-                                {
-                                    status = "normal"; // Default status if none of the conditions are met
-                                }
+                               
 
                                 IngriDTP ingredientDto = new IngriDTP
                                 {
@@ -202,7 +218,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     name = reader["item_name"].ToString(),
                                     quantity = quantity,
                                     price = Convert.ToDecimal(reader["price"]),
-                                    status = status, // Use the determined status
+                                    status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
                                     CreatedAt = Convert.ToDateTime(reader["created_at"]),
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
@@ -225,33 +241,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while fetching ingredients data.");
             }
         }
-
-        // Helper method to fetch threshold values
-        private async Task<ThresholdConfig> GetThresholdValuesAsync(MySqlConnection connection)
-        {
-            string sql = "SELECT * FROM thresholdconfig WHERE Id = 1"; // Assumes there's only one row with Id = 1
-
-            using (var command = new MySqlCommand(sql, connection))
-            {
-                using (var reader = await command.ExecuteReaderAsync())
-                {
-                    if (await reader.ReadAsync())
-                    {
-                        return new ThresholdConfig
-                        {
-                            GoodThreshold = reader.GetInt32("good_threshold"),
-                            MidThreshold = reader.GetInt32("mid_threshold"),
-                            CriticalThreshold = reader.GetInt32("critical_threshold")
-                        };
-                    }
-                    else
-                    {
-                        throw new Exception("Threshold configuration not found.");
-                    }
-                }
-            }
-        }
-
 
 
 
@@ -576,33 +565,30 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPatch("threshold/update")]
+        [HttpPatch("threshold/update/{Id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> UpdateThresholdConfig([FromQuery] int goodThreshold, [FromQuery] int midThreshold)
+        public async Task<IActionResult> UpdateThresholdConfig(int Id, [FromBody] thresholdUpdate thresholds)
         {
             try
             {
                 // Ensure that the thresholds are valid
-                if (goodThreshold <= midThreshold || midThreshold <= 0)
+                if (thresholds.good <= thresholds.critical || thresholds.critical <= 0)
                 {
-                    return BadRequest("Invalid threshold values. Ensure goodThreshold is greater than midThreshold and midThreshold is positive.");
+                    return BadRequest("Invalid threshold values. Ensure goodThreshold is greater than criticalThreshold and criticalThreshold is positive.");
                 }
-
-                // Calculate the criticalThreshold
-                int criticalThreshold = midThreshold - 1;
 
                 // Update the threshold configuration in the database
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     await connection.OpenAsync();
 
-                    string sqlUpdate = "UPDATE thresholdconfig SET good_threshold = @goodThreshold, mid_threshold = @midThreshold, critical_threshold = @criticalThreshold WHERE Id = 1";
+                    string sqlUpdate = "UPDATE thresholdconfig SET good_threshold = @goodThreshold, critical_threshold = @criticalThreshold WHERE item_id = @Id";
 
                     using (var command = new MySqlCommand(sqlUpdate, connection))
                     {
-                        command.Parameters.AddWithValue("@goodThreshold", goodThreshold);
-                        command.Parameters.AddWithValue("@midThreshold", midThreshold);
-                        command.Parameters.AddWithValue("@criticalThreshold", criticalThreshold);
+                        command.Parameters.AddWithValue("@goodThreshold", thresholds.good);
+                        command.Parameters.AddWithValue("@criticalThreshold", thresholds.critical);
+                        command.Parameters.AddWithValue("@Id", Id);
 
                         int rowsAffected = await command.ExecuteNonQueryAsync();
 
@@ -621,6 +607,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
+
 
 
 
