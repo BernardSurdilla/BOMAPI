@@ -531,24 +531,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     existingIngredient.measurements = updatedIngredient.measurements;
                 }
 
-                // Set the status based on the quantity
-                if (existingIngredient.quantity < 30)
-                {
-                    existingIngredient.status = "critical";
-                }
-                else if (existingIngredient.quantity == 50)
-                {
-                    existingIngredient.status = "mid";
-                }
-                else if (existingIngredient.quantity > 100)
-                {
-                    existingIngredient.status = "good";
-                }
-                else
-                {
-                    existingIngredient.status = "normal"; // Default status for quantities between 30 and 100
-                }
-
                 // Set the last updated fields
                 existingIngredient.lastUpdatedBy = lastUpdatedBy;
                 existingIngredient.lastUpdatedAt = DateTime.UtcNow;
@@ -981,14 +963,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 connection.Open();
 
-                string sql = "UPDATE Item SET item_name = @item_name, quantity = @quantity, price = @price, status = @status, type = @type, measurements = @measurements, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at, is_active = @isActive WHERE Id = @id";
+                string sql = "UPDATE Item SET item_name = @item_name, quantity = @quantity, price = @price, type = @type, measurements = @measurements, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at, is_active = @isActive WHERE Id = @id";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@id", ingredient.Id);
                     command.Parameters.AddWithValue("@item_name", ingredient.name);
                     command.Parameters.AddWithValue("@quantity", ingredient.quantity);
                     command.Parameters.AddWithValue("@price", ingredient.price);
-                    command.Parameters.AddWithValue("@status", ingredient.status);
                     command.Parameters.AddWithValue("@type", ingredient.type);
                     command.Parameters.AddWithValue("@last_updated_by", ingredient.lastUpdatedBy);
                     command.Parameters.AddWithValue("@last_updated_at", ingredient.lastUpdatedAt);
