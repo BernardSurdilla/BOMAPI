@@ -64,6 +64,12 @@
 
     }
 
+    public class thresholdUpdate
+    {
+        public int good { get; set; }
+        public int critical { get; set; }
+    }
+
     public class IngriDTP
     {
         public int Id { get; set; }
