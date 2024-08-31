@@ -350,5 +350,6 @@ namespace CRUDFI.Models
     public class employee
     {
         public string name { get; set; }
+        public Guid userId {  get; set; }
     }
 }
