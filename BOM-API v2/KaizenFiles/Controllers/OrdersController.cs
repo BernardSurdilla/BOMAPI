@@ -4237,7 +4237,13 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
 
 
-        [HttpPatch("{orderId}/add-new-add-ons")] //debug soon
+        [HttpPatch("{orderId}/add-ons")] //debug soon
+
+        // think this should be httppost (since it's adding a new one)
+        // also, this needs an accompanying httpdelete for removing add-ons
+        // httpput might be best solution, however. if httpput, we wouldnt need the httpdelete.
+        // - Francis
+
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
         {
@@ -4371,7 +4377,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
 
 
-        [HttpPatch("/culo-api/v1/current-user/{suborderId}/update-order-details")]//update this 
+        [HttpPatch("suborders/{suborderId}")]//update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest request)
         {
