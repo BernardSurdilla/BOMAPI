@@ -80,7 +80,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Set isActive to false for all orders created
 
                 // Set the status to pending
-                order.status = "pending";
+                order.status = "cart";
 
                 // Convert designId to hex string
                 string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
@@ -271,7 +271,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 // Prepare the SQL query to update the suborder
-                string sql = "UPDATE suborders SET order_id = UNHEX(@orderid) WHERE suborder_id = UNHEX(@suborderid)";
+                string sql = "UPDATE suborders SET order_id = UNHEX(@orderid), status = 'to pay' WHERE suborder_id = UNHEX(@suborderid)";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     // Define and add the necessary parameters
@@ -292,7 +292,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string sql = @"INSERT INTO orders (order_id, customer_id, customer_name, pickup_date, type, payment, status, created_at) 
-                       VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, @payment, 'for update', NOW())";
+                       VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, @payment, 'to pay', NOW())";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -334,17 +334,100 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
 
             // Perform the update based on the action
-            bool updateResult = await UpdateOrderStatus(orderIdBinary, action);
+            await UpdateOrderxxStatus(orderIdBinary, action);
 
-            if (updateResult)
+            // Return a success message based on the action
+            if (action == "confirm")
             {
-                return Ok("Order status updated successfully.");
+                return Ok("Order confirmed successfully.");
+            }
+            else if (action == "cancel")
+            {
+                return Ok("Order canceled successfully.");
             }
             else
             {
                 return StatusCode(500, "An error occurred while updating the order status.");
             }
         }
+
+        private async Task UpdateOrderxxStatus(string orderIdBinary, string action)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Determine the value of is_active based on the action
+                int isActive = action.Equals("confirm", StringComparison.OrdinalIgnoreCase) ? 1 :
+                               action.Equals("cancel", StringComparison.OrdinalIgnoreCase) ? 0 :
+                               throw new ArgumentException("Invalid action. Please choose 'confirm' or 'cancel'.");
+
+                string sql = "UPDATE orders SET is_active = @isActive, status = 'for approval' WHERE order_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@isActive", isActive);
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        private async Task UpdateOrderxxxStatus(string orderIdBinary, string action)//decide whether to use or nahh
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Determine the value of is_active based on the action
+                int isActive = action.Equals("confirm", StringComparison.OrdinalIgnoreCase) ? 1 :
+                               action.Equals("cancel", StringComparison.OrdinalIgnoreCase) ? 0 :
+                               throw new ArgumentException("Invalid action. Please choose 'confirm' or 'cancel'.");
+
+                string sql = "UPDATE suborders SET is_active = @isActive, status = 'for approval' WHERE suborder_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@isActive", isActive);
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+        private async Task<string> UpdateOrderxxxxStatus(string orderIdBinary)//decide whether to use or nahh
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Specify the columns you want to select
+                string sql = "SELECT suborder_id FROM suborders WHERE order_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    // Use ExecuteReaderAsync to execute the SELECT query
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            // Assuming you want to return the order_id as a string
+                            // Convert the byte[] order_id to a string representation if needed
+                            byte[] orderIdBytes = (byte[])reader["order_id"];
+                            string resultOrderId = BitConverter.ToString(orderIdBytes).Replace("-", "").ToLower();
+                            return resultOrderId;
+                        }
+                        else
+                        {
+                            // Return null or handle cases where no rows are found
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+
 
         private async Task<bool> CheckOrderExistx(string orderIdBinary)
         {
@@ -824,7 +907,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current/user/to-pay")]
+        [HttpGet("current/user/cart")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
@@ -857,7 +940,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 last_updated_by, last_updated_at, is_active, description, 
                 flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
             FROM suborders 
-            WHERE customer_id = @customerId AND status IN('to pay')";
+            WHERE customer_id = @customerId AND status IN('cart')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -932,9 +1015,9 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current/user/to-receive/partial-details")]
+        [HttpGet("current/user/to-pay/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetToPayInitialOrdersByCustomerId()
+        public async Task<IActionResult> GetToPayInitialOrdersByCustomerIds()
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -964,7 +1047,237 @@ WHERE order_id = UNHEX(@orderIdBinary);";
         HEX(design_id) as design_id, design_name, price, quantity, 
         last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
     FROM suborders 
-    WHERE customer_id = @customerId AND status IN('to receive')";
+    WHERE customer_id = @customerId AND status IN('to pay')";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@customerId", customerId);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["order_id"]);
+
+                                Guid suborderId = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["customer_id"]);
+
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new toPayInitial
+                                {
+                                    Id = orderId, // Handle null values for orderId
+                                    suborderId = suborderId,
+                                    CustomerId = customerIdFromDb,
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy ?? "",
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name"))
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        [HttpGet("current/user/to-pay/full-details/{suborderid}")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToPayOrdersByCustomerId(string suborderid)
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            // Convert suborderId to binary format
+            string suborderIdBinary = ConvertGuidToBinary16((suborderid)).ToLower();
+
+            // Check if the suborder exists in the suborders table
+            if (!await DoesSuborderExist(suborderIdBinary))
+            {
+                return NotFound($"Suborder with ID '{suborderIdBinary}' not found.");
+            }
+            Debug.Write(suborderIdBinary);
+
+            try
+            {
+                List<Full> orders = new List<Full>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+    SELECT 
+                suborder_id, order_id, customer_id, employee_id, created_at, status, 
+                HEX(design_id) as design_id, design_name, price, quantity, 
+                last_updated_by, last_updated_at, is_active, description, 
+                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+            FROM suborders 
+            WHERE customer_id = @customerId AND status IN ('to pay') AND suborder_id = UNHEX(@suborderIdBinary)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@customerId", customerId);
+                        command.Parameters.AddWithValue("@suborderIdBinary", suborderIdBinary);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["order_id"]);
+
+                                Guid suborderIdFromDb = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["customer_id"]);
+
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["employee_id"]);
+
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
+
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new Full
+                                {
+                                    suborderId = suborderIdFromDb,
+                                    orderId = orderId,
+                                    CustomerId = customerIdFromDb,
+                                    employeeId = employeeId,
+                                    employeeName = employeeName ?? string.Empty,
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    Status = reader.GetString(reader.GetOrdinal("status")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    color = reader.GetString(reader.GetOrdinal("color")),
+                                    shape = reader.GetString(reader.GetOrdinal("shape")),
+                                    tier = reader.GetString(reader.GetOrdinal("tier")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy ?? string.Empty,
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    Description = reader.GetString(reader.GetOrdinal("description")),
+                                    Flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                    Size = reader.GetString(reader.GetOrdinal("size")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                });
+                            }
+                        }
+                    }
+
+                    if (orders.Count > 0)
+                    {
+                        // Scan the orders table using the retrieved orderId from the suborders table
+                        foreach (var order in orders)
+                        {
+                            if (order.orderId.HasValue)
+                            {
+                                // Convert orderId to binary format
+                                string orderIdBinary = ConvertGuidToBinary16(order.orderId.Value.ToString()).ToLower();
+                                Debug.Write(orderIdBinary);
+
+                                var orderDetails = await GetOrderDetailsByOrderId(connection, orderIdBinary);
+                                if (orderDetails != null)
+                                {
+                                    // Populate additional fields from the orders table
+                                    order.payment = orderDetails.payment;
+                                    order.PickupDateTime = orderDetails.PickupDateTime;
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                // Return the orders list
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+
+        [HttpGet("current/user/to-receive/partial-details")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToReceiveInitialOrdersByCustomerId()
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            try
+            {
+                List<toPayInitial> orders = new List<toPayInitial>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+    SELECT 
+        suborder_id, order_id, customer_id, created_at, status, 
+        HEX(design_id) as design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
+    FROM suborders 
+    WHERE customer_id = @customerId AND status IN('for pick up')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -1065,7 +1378,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 last_updated_by, last_updated_at, is_active, description, 
                 flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
             FROM suborders 
-            WHERE customer_id = @customerId AND status IN ('to receive') AND suborder_id = UNHEX(@suborderIdBinary)";
+            WHERE customer_id = @customerId AND status IN ('for pick up') AND suborder_id = UNHEX(@suborderIdBinary)";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -2925,7 +3238,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpPatch("admin/approved-order/{orderId}")] // debug this
+        [HttpPatch("admin/approval-order/{orderId}")] // done
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderxStatus(string orderId, [FromQuery] string action)
         {
@@ -2972,11 +3285,11 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                     switch (action.ToLower())
                     {
                         case "half":
-                            sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = 'half', last_updated_by = @lastUpdatedBy, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
+                            sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = 'half', last_updated_by = @lastUpdatedBy, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
                             break;
 
                         case "full":
-                            sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = 'full', last_updated_by = @lastUpdatedBy, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
+                            sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = 'full', last_updated_by = @lastUpdatedBy, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
                             break;
 
                         default:
@@ -3140,14 +3453,14 @@ WHERE order_id = UNHEX(@orderIdBinary);";
         }
 
 
-        [HttpPatch("artist/update-order-status")] //update this
+        [HttpPatch("artist/update-order-status/{suborderId}")] //done
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
-        public async Task<IActionResult> PatchOrderStatus([FromQuery] string orderId, [FromQuery] string action)
+        public async Task<IActionResult> PatchOrderStatus(string suborderId, [FromQuery] string action)
         {
             try
             {
                 // Convert the orderId from GUID string to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+                string orderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
 
                 // Update the order status based on the action
                 if (action.Equals("send", StringComparison.OrdinalIgnoreCase))
@@ -3172,12 +3485,12 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                     return BadRequest("Invalid action. Please choose 'send' or 'done'.");
                 }
 
-                return Ok($"Order with ID '{orderId}' has been successfully updated to '{action}'.");
+                return Ok($"Order with ID '{suborderId}' has been successfully updated to '{action}'.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"An error occurred while processing the request to update order status for '{orderId}'.");
-                return StatusCode(500, $"An error occurred while processing the request to update order status for '{orderId}'.");
+                _logger.LogError(ex, $"An error occurred while processing the request to update order status for '{suborderId}'.");
+                return StatusCode(500, $"An error occurred while processing the request to update order status for '{suborderId}'.");
             }
         }
 
@@ -3249,22 +3562,22 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
                 using (var command = connection.CreateCommand())
                 {
-                    command.CommandText = @"SELECT o.DesignName, o.price, o.EmployeeId, o.CreatedAt, o.quantity, 
+                    command.CommandText = @"SELECT o.design_name, o.price, o.employee_id, o.created_at, o.quantity, 
                                     u.Contact, u.Email 
-                                    FROM orders o
-                                    JOIN users u ON o.EmployeeId = u.UserId
-                                    WHERE o.OrderId = UNHEX(@orderId)";
+                                    FROM suborders o
+                                    JOIN users u ON o.employee_id = u.UserId
+                                    WHERE o.suborder_id = UNHEX(@orderId)";
                     command.Parameters.AddWithValue("@orderId", orderIdBytes);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         if (reader.Read())
                         {
-                            var name = reader.GetString("DesignName");
+                            var name = reader.GetString("design_name");
                             var cost = reader.GetDouble("price");
                             var contact = reader.GetString("Contact").Trim(); // Adjust for CHAR(10)
                             var email = reader.GetString("Email");
-                            var date = reader.GetDateTime("CreatedAt");
+                            var date = reader.GetDateTime("created_at");
                             var total = reader.GetInt32("quantity");
 
                             // Debugging output using Debug.WriteLine
@@ -3339,7 +3652,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE sales SET total = @newTotal WHERE DesignName = @orderName";
+                string sql = "UPDATE sales SET Total = @newTotal WHERE Name = @orderName";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3360,30 +3673,15 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 {
                     await connection.OpenAsync();
 
-                    // Update the status of the order
-                    string orderSql = "UPDATE orders SET Status = @status WHERE OrderId = UNHEX(@orderId)";
-                    using (var orderCommand = new MySqlCommand(orderSql, connection))
-                    {
-                        orderCommand.Parameters.AddWithValue("@status", status);
-                        orderCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
-                        await orderCommand.ExecuteNonQueryAsync();
-                    }
-
-                    // Determine the suborders status based on the order status
-                    string subOrderStatus = status == "confirmed" ? "to receive" : status == "cancelled" ? "cancelled" : null;
-
-                    if (subOrderStatus != null)
-                    {
                         // Update the status of the suborders
-                        string subOrderSql = "UPDATE suborders SET Status = @subOrderStatus WHERE OrderId = UNHEX(@orderId)";
+                        string subOrderSql = "UPDATE suborders SET status = @subOrderStatus WHERE suborder_id = UNHEX(@orderId)";
                         using (var subOrderCommand = new MySqlCommand(subOrderSql, connection))
                         {
-                            subOrderCommand.Parameters.AddWithValue("@subOrderStatus", subOrderStatus);
+                            subOrderCommand.Parameters.AddWithValue("@subOrderStatus", status);
                             subOrderCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
                             await subOrderCommand.ExecuteNonQueryAsync();
                         }
                     }
-                }
             }
             catch (Exception ex)
             {
@@ -4372,7 +4670,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET is_active = @is_active WHERE order_id = UNHEX(@orderId)";
+                string sql = "UPDATE suborders SET is_active = @isActive WHERE suborder_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -4390,7 +4688,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             {
                 await connection.OpenAsync();
 
-                string sql = "UPDATE orders SET last_updated_at = NOW() WHERE OrderId = UNHEX(@orderId)";
+                string sql = "UPDATE suborders SET last_updated_at = NOW() WHERE suborder_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
