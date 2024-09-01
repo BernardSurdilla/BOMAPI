@@ -1959,7 +1959,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("/suborders/{suborderId}/add-ons")] //done (might remove this)
+        [HttpGet("suborders/{suborderId}/add-ons")] //done (might remove this)
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string suborderId)
         {
