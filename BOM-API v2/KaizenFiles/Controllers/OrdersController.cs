@@ -30,7 +30,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("current/user/add-to-cart")]
+        [HttpPost("/culo-api/v1/current-user/cart/add")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
         {
@@ -183,7 +183,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("current/user/checkout-cart/{suborderid}")]
+        [HttpPost("/culo-api/v1/current-user/cart/checkout/{suborderid}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderTypeAndPickupDate(
     string suborderid,
@@ -307,7 +307,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("current/user/confirm-cancel-order/{orderId}")]
+        [HttpPost("/culo-api/v1/current-user/confirm-cancel-order/{orderId}")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> ConfirmOrCancelOrder(string orderId, [FromQuery] string action)
         {
@@ -486,7 +486,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpPost("admin/assign-employee/{suborderId}")]//done 
+        [HttpPost("suborders/{suborderId}/assign-employee")]//done 
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
         {
@@ -907,7 +907,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current/user/cart")]
+        [HttpGet("/culo-api/v1/current-user/cart/")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
@@ -1015,7 +1015,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current/user/to-pay/partial-details")]
+        [HttpGet("/culo-api/v1/current-user/to-pay/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToPayInitialOrdersByCustomerIds()
         {
@@ -1105,7 +1105,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current/user/to-pay/full-details/{suborderid}")]
+        [HttpGet("/culo-api/v1/current-user/to-pay/full-details/{suborderid}")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToPayOrdersByCustomerId(string suborderid)
         {
@@ -1245,7 +1245,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
         }
 
 
-        [HttpGet("current/user/to-receive/partial-details")]
+        [HttpGet("/culo-api/v1/current-user/to-receive/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToReceiveInitialOrdersByCustomerId()
         {
@@ -1335,7 +1335,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current/user/to-receive/full-details/{suborderid}")]
+        [HttpGet("/culo-api/v1/current-user/to-receive/full-details/{suborderid}")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToReceiveOrdersByCustomerId(string suborderid)
         {
@@ -1506,7 +1506,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             return null;
         }
 
-        [HttpGet("current/artist/to-do")]
+        [HttpGet("current-user/artist/to-do")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderxByCustomerId()
         {
@@ -1614,7 +1614,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("final-order-details/{orderId}")]
+        [HttpGet("{orderId}/final-order-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetFinalOrderDetailsByOrderId(string orderId)
         {
@@ -1913,7 +1913,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
         }
         */
 
-        [HttpGet("admin/employees-name")] //done
+        [HttpGet("employees-name")] //done
         public async Task<IActionResult> GetEmployeesOfType2()
         {
             try
@@ -1959,7 +1959,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current-user/{suborderId}/add-ons")] //done (might remove this)
+        [HttpGet("/suborders/{suborderId}/add-ons")] //done (might remove this)
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string suborderId)
         {
@@ -2224,7 +2224,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
 
 
-        [HttpGet("admin/total-orders")] //done
+        [HttpGet("total-orders")] //done
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetTotalQuantities()
         {
@@ -2576,7 +2576,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
 
 
-        [HttpGet("current-user/order-type/{type}")] //update this 
+        [HttpGet("/culo-api/v1/current-user/{type}")] //update this 
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public IActionResult GetOrdersByType(string type)
         {
@@ -3943,7 +3943,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
          */
 
-        [HttpPatch("current/user/manage-add-ons-by-material/{pastryMaterialId}/{suborderId}/{modifiedAddOnId}")]
+        [HttpPatch("/culo-api/v1/current-user/manage-add-ons-by-material/{pastryMaterialId}/{suborderId}/{modifiedAddOnId}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> ManageAddOnsByPastryMaterialId(string pastryMaterialId, string suborderId, int modifiedAddOnId, [FromBody] ManageAddOnAction action)
         {
@@ -4237,7 +4237,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
 
 
-        [HttpPatch("customer/{orderId}/add-new-add-ons")] //debug soon
+        [HttpPatch("{orderId}/add-new-add-ons")] //debug soon
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
         {
@@ -4371,7 +4371,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
 
 
-        [HttpPatch("current/user/{suborderId}/update-order-details")]//update this 
+        [HttpPatch("/culo-api/v1/current-user/{suborderId}/update-order-details")]//update this 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest request)
         {
@@ -4441,7 +4441,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpDelete("customer/remove-cart/{orderId}")] //debug this  
+        [HttpDelete("/culo-api/v1/current-user/cart/remove/{orderId}")] //debug this  
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> RemoveCart(string orderId)
         {

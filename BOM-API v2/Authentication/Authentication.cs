@@ -106,8 +106,9 @@ namespace JWTAuthentication.Authentication
 }
 
 
-namespace JWTAuthentication.Controllers
-{
+namespace JWTAuthentication.Controllers {
+
+    [Route("users")]
     [ApiController]
     public class AuthenticateController : ControllerBase
     {
@@ -351,7 +352,7 @@ namespace JWTAuthentication.Controllers
             return response;
         }
 
-        [Authorize][HttpGet("user/current")]
+        [Authorize][HttpGet("/culo-api/v1/current-user")]
         public async Task<GetUser> CurrentUser()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -370,7 +371,7 @@ namespace JWTAuthentication.Controllers
             //await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
             return response;
         }
-        [Authorize][HttpPost("user/current/send-confirmation-email/")]
+        [Authorize][HttpPost("/culo-api/v1/current-user/send-confirmation-email/")]
         public async Task<IActionResult> SendEmailConfirmationEmail()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -418,7 +419,7 @@ namespace JWTAuthentication.Controllers
                 return StatusCode(500, new { message = "Email failed to send to " + email });
             }
         }
-        [Authorize][HttpPost("user/current/confirm-email/")]
+        [Authorize][HttpPost("/culo-api/v1/current-user/confirm-email/")]
         public async Task<IActionResult> ConfirmUserEmail(string confirmationCode)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -450,7 +451,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new { message = "Email confirmed successfully" });
         }
 
-        [Authorize][HttpGet("user/current/profile-picture")]
+        [Authorize][HttpGet("/culo-api/v1/current-user/profile-picture")]
         public async Task<byte[]?> CurrentUserProfilePicture()
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -464,7 +465,7 @@ namespace JWTAuthentication.Controllers
             return currentUserImage.picture_data;
             
         }
-        [Authorize][HttpPost("user/current/upload-profile-picture")]
+        [Authorize][HttpPost("/culo-api/v1/current-user/upload-profile-picture")]
         public async Task<IActionResult> UploadProfilePicture([FromBody] byte[] picture_data)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -481,7 +482,7 @@ namespace JWTAuthentication.Controllers
             return Ok(new { message = "Image uploaded for " + currentUser.Id });
         }
 
-        [Authorize][HttpPatch("user/current/update/")]
+        [Authorize][HttpPatch("/culo-api/v1/current-user/update/")]
         public async Task<IActionResult> UpdateUser(PatchUser input)
         {
             var currentUser = await userManager.GetUserAsync(User);
@@ -498,7 +499,7 @@ namespace JWTAuthentication.Controllers
             else { return BadRequest(new { message = "Something unexpected occured in saving the account in the inventory accounts" }); }
             
         }
-        [Authorize][HttpPatch("user/current/profile-picture")]
+        [Authorize][HttpPatch("/culo-api/v1/current-user/profile-picture")]
         public async Task<IActionResult> UpdateUserProfileImage([FromBody] byte[] picture_data)
         {
             var currentUser = await userManager.GetUserAsync(User);
