@@ -486,6 +486,141 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
+        [HttpPost("{suborderId}/add-ons")] //done
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> AddNewAddOnToOrder(string suborderId, [FromBody] AddNewAddOnRequest request)
+        {
+            try
+            {
+                _logger.LogInformation($"Starting AddNewAddOnToOrder for orderId: {suborderId}");
+
+                // Convert orderId to binary(16) format without '0x' prefix
+                string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+
+                // Retrieve the add-on details from the AddOns table based on the name
+                var addOnDSOS = await GetAddOnByNameFromDatabase(request.AddOnName);
+                if (addOnDSOS == null)
+                {
+                    return BadRequest($"Add-on '{request.AddOnName}' not found in the AddOns table.");
+                }
+
+                // Calculate total price
+                double total = request.Quantity * addOnDSOS.PricePerUnit;
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    using (var transaction = await connection.BeginTransactionAsync())
+                    {
+                        try
+                        {
+                            // Check if the add-on already exists in orderaddons
+                            string selectSql = @"SELECT COUNT(*) 
+                                         FROM orderaddons 
+                                         WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnsId";
+
+                            using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
+                            {
+                                selectCommand.Parameters.AddWithValue("@orderId", suborderIdBinary);
+                                selectCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);
+
+                                int count = Convert.ToInt32(await selectCommand.ExecuteScalarAsync());
+
+                                if (count == 0)
+                                {
+                                    // Insert new add-on into orderaddons
+                                    string insertSql = @"INSERT INTO orderaddons (order_id, add_ons_id, quantity, total, name, price)
+                                                 VALUES (UNHEX(@orderId), @addOnsId, @quantity, @total, @name, @price)";
+
+                                    using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
+                                    {
+                                        insertCommand.Parameters.AddWithValue("@orderId", suborderIdBinary);
+                                        insertCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);
+                                        insertCommand.Parameters.AddWithValue("@name", addOnDSOS.AddOnName);
+                                        insertCommand.Parameters.AddWithValue("@price", addOnDSOS.PricePerUnit);
+                                        insertCommand.Parameters.AddWithValue("@quantity", request.Quantity);
+                                        insertCommand.Parameters.AddWithValue("@total", total);
+
+                                        _logger.LogInformation($"Inserting add-on '{request.AddOnName}' with quantity '{request.Quantity}', price '{addOnDSOS.PricePerUnit}', and total '{total}' into orderaddons");
+
+                                        await insertCommand.ExecuteNonQueryAsync();
+                                    }
+                                }
+                                else
+                                {
+                                    // Update existing add-on in orderaddons
+                                    string updateSql = @"UPDATE orderaddons 
+                                                 SET quantity = @quantity, total = @total 
+                                                 WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnsId";
+
+                                    using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
+                                    {
+                                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity);
+                                        updateCommand.Parameters.AddWithValue("@total", total);
+                                        updateCommand.Parameters.AddWithValue("@orderId", suborderIdBinary);
+                                        updateCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);
+
+                                        _logger.LogInformation($"Updating add-on '{request.AddOnName}' to quantity '{request.Quantity}' and total '{total}' in orderaddons");
+
+                                        await updateCommand.ExecuteNonQueryAsync();
+                                    }
+                                }
+                            }
+
+                            await transaction.CommitAsync();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Transaction failed, rolling back");
+                            await transaction.RollbackAsync();
+                            throw;
+                        }
+                    }
+                }
+
+                return Ok("Add-on successfully added or updated in the order.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error adding or updating add-on to order with ID '{suborderId}'");
+                return StatusCode(500, $"An error occurred while adding or updating add-on to order with ID '{suborderId}'.");
+            }
+        }
+
+        private async Task<AddOnDSOS> GetAddOnByNameFromDatabase(string addOnName)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT add_ons_id, name, price FROM addons WHERE name = @name";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@name", addOnName);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return new AddOnDSOS
+                            {
+                                AddOnId = reader.GetInt32("add_ons_id"),
+                                AddOnName = reader.GetString("name"),
+                                PricePerUnit = reader.GetDouble("price")
+                            };
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+
+
         [HttpPost("suborders/{suborderId}/assign-employee")]//done 
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
@@ -522,6 +657,44 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 return StatusCode(500, $"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
             }
         }
+
+        [HttpDelete("add-ons/{suborderId}/{addonId}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> DeleteOrderAddon(string suborderId, int addonId)
+        {
+            if (string.IsNullOrEmpty(suborderId))
+            {
+                return BadRequest("SuborderId cannot be null or empty.");
+            }
+
+            // Convert suborderId to binary format for querying
+            string orderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "DELETE FROM orderaddons WHERE order_id = UNHEX(@suborderId) AND add_ons_id = @addonId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@suborderId", orderIdBinary);
+                    command.Parameters.AddWithValue("@addonId", addonId);
+
+                    int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                    if (rowsAffected > 0)
+                    {
+                        return Ok($"Addon with ID '{addonId}' successfully deleted from order '{suborderId}'.");
+                    }
+                    else
+                    {
+                        return NotFound($"No addon found with ID '{addonId}' for order '{suborderId}'.");
+                    }
+                }
+            }
+        }
+
 
         /*[HttpPost("customer/add-to-suborder")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
@@ -1244,6 +1417,234 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
+        [HttpGet("/culo-api/v1/current-user/process/partial-details")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToProcessInitialOrdersByCustomerIds()
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            try
+            {
+                List<toPayInitial> orders = new List<toPayInitial>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+    SELECT 
+        suborder_id, order_id, customer_id, created_at, status, 
+        HEX(design_id) as design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
+    FROM suborders 
+    WHERE customer_id = @customerId AND status IN('assigning artist', 'baking')";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@customerId", customerId);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["order_id"]);
+
+                                Guid suborderId = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["customer_id"]);
+
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new toPayInitial
+                                {
+                                    Id = orderId, // Handle null values for orderId
+                                    suborderId = suborderId,
+                                    CustomerId = customerIdFromDb,
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy ?? "",
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name"))
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        [HttpGet("/culo-api/v1/current-user/process/full-details/{suborderid}")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToProcessOrdersByCustomerId(string suborderid)
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            // Convert suborderId to binary format
+            string suborderIdBinary = ConvertGuidToBinary16((suborderid)).ToLower();
+
+            // Check if the suborder exists in the suborders table
+            if (!await DoesSuborderExist(suborderIdBinary))
+            {
+                return NotFound($"Suborder with ID '{suborderIdBinary}' not found.");
+            }
+            Debug.Write(suborderIdBinary);
+
+            try
+            {
+                List<Full> orders = new List<Full>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+    SELECT 
+                suborder_id, order_id, customer_id, employee_id, created_at, status, 
+                HEX(design_id) as design_id, design_name, price, quantity, 
+                last_updated_by, last_updated_at, is_active, description, 
+                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+            FROM suborders 
+            WHERE customer_id = @customerId AND status IN ('assigning artist','baking') AND suborder_id = UNHEX(@suborderIdBinary)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@customerId", customerId);
+                        command.Parameters.AddWithValue("@suborderIdBinary", suborderIdBinary);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["order_id"]);
+
+                                Guid suborderIdFromDb = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["customer_id"]);
+
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["employee_id"]);
+
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
+
+                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new Full
+                                {
+                                    suborderId = suborderIdFromDb,
+                                    orderId = orderId,
+                                    CustomerId = customerIdFromDb,
+                                    employeeId = employeeId,
+                                    employeeName = employeeName ?? string.Empty,
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    Status = reader.GetString(reader.GetOrdinal("status")),
+                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
+                                    color = reader.GetString(reader.GetOrdinal("color")),
+                                    shape = reader.GetString(reader.GetOrdinal("shape")),
+                                    tier = reader.GetString(reader.GetOrdinal("tier")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    DesignName = reader.GetString(reader.GetOrdinal("design_name")),
+                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    lastUpdatedBy = lastUpdatedBy ?? string.Empty,
+                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
+                                                    ? (DateTime?)null
+                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
+                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                    Description = reader.GetString(reader.GetOrdinal("description")),
+                                    Flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                    Size = reader.GetString(reader.GetOrdinal("size")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                });
+                            }
+                        }
+                    }
+
+                    if (orders.Count > 0)
+                    {
+                        // Scan the orders table using the retrieved orderId from the suborders table
+                        foreach (var order in orders)
+                        {
+                            if (order.orderId.HasValue)
+                            {
+                                // Convert orderId to binary format
+                                string orderIdBinary = ConvertGuidToBinary16(order.orderId.Value.ToString()).ToLower();
+                                Debug.Write(orderIdBinary);
+
+                                var orderDetails = await GetOrderDetailsByOrderId(connection, orderIdBinary);
+                                if (orderDetails != null)
+                                {
+                                    // Populate additional fields from the orders table
+                                    order.payment = orderDetails.payment;
+                                    order.PickupDateTime = orderDetails.PickupDateTime;
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                // Return the orders list
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
 
         [HttpGet("/culo-api/v1/current-user/to-receive/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
@@ -4235,149 +4636,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
         }
 
 
-
-
-        [HttpPatch("{orderId}/add-ons")] //debug soon
-
-        // think this should be httppost (since it's adding a new one)
-        // also, this needs an accompanying httpdelete for removing add-ons
-        // httpput might be best solution, however. if httpput, we wouldnt need the httpdelete.
-        // - Francis
-
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> AddNewAddOnToOrder(string orderId, [FromBody] AddNewAddOnRequest request)
-        {
-            try
-            {
-                _logger.LogInformation($"Starting AddNewAddOnToOrder for orderId: {orderId}");
-
-                // Convert orderId to binary(16) format without '0x' prefix
-                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
-
-                // Retrieve the add-on details from the AddOns table based on the name
-                var addOnDSOS = await GetAddOnByNameFromDatabase(request.AddOnName);
-                if (addOnDSOS == null)
-                {
-                    return BadRequest($"Add-on '{request.AddOnName}' not found in the AddOns table.");
-                }
-
-                // Calculate total price
-                double total = request.Quantity * addOnDSOS.PricePerUnit;
-
-                using (var connection = new MySqlConnection(connectionstring))
-                {
-                    await connection.OpenAsync();
-
-                    using (var transaction = await connection.BeginTransactionAsync())
-                    {
-                        try
-                        {
-                            // Check if the add-on already exists in orderaddons
-                            string selectSql = @"SELECT COUNT(*) 
-                                         FROM orderaddons 
-                                         WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnsId";
-
-                            using (var selectCommand = new MySqlCommand(selectSql, connection, transaction))
-                            {
-                                selectCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
-                                selectCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);
-
-                                int count = Convert.ToInt32(await selectCommand.ExecuteScalarAsync());
-
-                                if (count == 0)
-                                {
-                                    // Insert new add-on into orderaddons
-                                    string insertSql = @"INSERT INTO orderaddons (order_id, add_ons_id, quantity, total)
-                                                 VALUES (UNHEX(@orderId), @addOnsId, @quantity, @total)";
-
-                                    using (var insertCommand = new MySqlCommand(insertSql, connection, transaction))
-                                    {
-                                        insertCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
-                                        insertCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);
-                                        insertCommand.Parameters.AddWithValue("@quantity", request.Quantity);
-                                        insertCommand.Parameters.AddWithValue("@total", total);
-
-                                        _logger.LogInformation($"Inserting add-on '{request.AddOnName}' with quantity '{request.Quantity}', price '{addOnDSOS.PricePerUnit}', and total '{total}' into orderaddons");
-
-                                        await insertCommand.ExecuteNonQueryAsync();
-                                    }
-                                }
-                                else
-                                {
-                                    // Update existing add-on in orderaddons
-                                    string updateSql = @"UPDATE orderaddons 
-                                                 SET quantity = @quantity, total = @total 
-                                                 WHERE order_id = UNHEX(@orderId) AND add_on_id = @addOnsId";
-
-                                    using (var updateCommand = new MySqlCommand(updateSql, connection, transaction))
-                                    {
-                                        updateCommand.Parameters.AddWithValue("@quantity", request.Quantity);
-                                        updateCommand.Parameters.AddWithValue("@total", total);
-                                        updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
-                                        updateCommand.Parameters.AddWithValue("@addOnsId", addOnDSOS.AddOnId);
-
-                                        _logger.LogInformation($"Updating add-on '{request.AddOnName}' to quantity '{request.Quantity}' and total '{total}' in orderaddons");
-
-                                        await updateCommand.ExecuteNonQueryAsync();
-                                    }
-                                }
-                            }
-
-                            await transaction.CommitAsync();
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError(ex, "Transaction failed, rolling back");
-                            await transaction.RollbackAsync();
-                            throw;
-                        }
-                    }
-                }
-
-                return Ok("Add-on successfully added or updated in the order.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error adding or updating add-on to order with ID '{orderId}'");
-                return StatusCode(500, $"An error occurred while adding or updating add-on to order with ID '{orderId}'.");
-            }
-        }
-
-        private async Task<AddOnDSOS> GetAddOnByNameFromDatabase(string addOnName)
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT add_ons_id, name, price FROM addons WHERE name = @name";
-
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@name", addOnName);
-
-                    using (var reader = await command.ExecuteReaderAsync())
-                    {
-                        if (await reader.ReadAsync())
-                        {
-                            return new AddOnDSOS
-                            {
-                                AddOnId = reader.GetInt32("add_ons_id"),
-                                AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price")
-                            };
-                        }
-                        else
-                        {
-                            return null;
-                        }
-                    }
-                }
-            }
-        }
-
-
-
-        [HttpPatch("suborders/{suborderId}")]//update this 
+        [HttpPatch("suborders/{suborderId}")]//done 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest request)
         {
