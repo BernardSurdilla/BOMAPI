@@ -45,6 +45,104 @@ namespace CRUDFI.Models
 
         public string flavor { get; set; }
     }
+    public class Custom
+    {
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public string tier { get; set; } = string.Empty;
+        public int quantity { get; set; }
+        public string customerName { get; set; } = string.Empty;
+        public string cover { get; set; } = "";
+        public string Description { get; set; }
+        public string size { get; set; }
+        public string flavor { get; set; }
+        public string picture { get; set; }
+        public string PickupDate { get; set; } = "yyyy-mm-dd";
+        public string PickupTime { get; set; } = "hh:mm AM/PM";
+        public string message { get; set; }
+        public string type { get; set; }
+        public string description { get; set; }
+    }
+    public class PostCustomOrder
+    {
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public string tier { get; set; } = string.Empty;
+        public int quantity { get; set; }
+        public string cover { get; set; } = "";
+        public string Description { get; set; }
+        public string size { get; set; }
+        public string flavor { get; set; }
+        public string picture { get; set; }
+        public string message {  get; set; }
+        public string type { get; set; }
+        public string PickupDate { get; set; } = "yyyy-mm-dd";
+        public string PickupTime { get; set; } = "hh:mm AM/PM";
+    }
+    public class CustomOrderUpdateRequest
+    {
+        public string DesignName { get; set; }
+        public decimal Price { get; set; }
+    }
+
+    public class CustomPay
+    {
+        public string type { get; set; } = "";
+        public DateTime? PickupDateTime { get; set; }
+        public string payment { get; set; } = "";
+    }
+
+    public class CustomPartial
+    {
+        public Guid customId { get; set; }
+        public Guid? orderId { get; set; }
+        public Guid? designId { get; set; } = null;
+        public Guid CustomerId { get; set; }
+        public string CustomerName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? designName { get; set; }
+        public double? Price { get; set; }
+        public int Quantity { get; set; }
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public string tier { get; set; } = string.Empty;
+        public string cover { get; set; } = "";
+        public string Description { get; set; }
+        public string size { get; set; }
+        public string flavor { get; set; }
+        public string picture { get; set; }
+        public string message { get; set; }
+        public string type { get; set; }
+        public Guid? employeeId { get; set; }
+        public string? employeeName { get; set; } = string.Empty;
+    }
+    public class CustomOrderFull
+    {
+        public Guid customId { get; set; }
+        public Guid? orderId { get; set; }
+        public Guid? designId { get; set; } = null;
+        public Guid CustomerId { get; set; }
+        public string CustomerName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? designName { get; set; }
+        public double? Price { get; set; }
+        public int Quantity { get; set; }
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public string tier { get; set; } = string.Empty;
+        public int quantity { get; set; }
+        public string cover { get; set; } = "";
+        public string Description { get; set; }
+        public string size { get; set; }
+        public string flavor { get; set; }
+        public string picture { get; set; }
+        public string message { get; set; }
+        public string type { get; set; }
+        public Guid? employeeId { get; set; }
+        public string employeeName { get; set; } = string.Empty;
+        public string payment { get; set; } = "";
+        public DateTime? PickupDateTime { get; set; }
+    }
     public class UpdateOrderDetailsRequest
     {
         public string Description { get; set; }

@@ -79,7 +79,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     command.Parameters.AddWithValue("@Measure", "piece");
                     command.Parameters.AddWithValue("@IngredientType", "element");
                     command.Parameters.AddWithValue("@DateAdded", addOns.DateAdded);
-                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.LastModifiedDate ?? (object)DBNull.Value);
+                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.DateAdded);
 
                     // Execute scalar to get the inserted ID
                     int newAddOnsId = Convert.ToInt32(await command.ExecuteScalarAsync());
@@ -160,8 +160,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     string sql = @"
                         UPDATE AddOns 
                         SET 
-                            name = @AddOnName, 
-                            measurement = @Measurement, 
+                            name = @AddOnName,  
                             price = @PricePerUnit, 
                             last_modified_date = @LastModifiedDate, 
                         WHERE add_ons_id = @AddOnsId";
@@ -170,7 +169,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         command.Parameters.AddWithValue("@AddOnsId", addOnsId);
                         command.Parameters.AddWithValue("@AddOnName", updateRequest.AddOnName);
-                        command.Parameters.AddWithValue("@Measurement", updateRequest.Measurement ?? (object)DBNull.Value);
                         command.Parameters.AddWithValue("@PricePerUnit", updateRequest.PricePerUnit);
                         command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
 

@@ -14,7 +14,6 @@ namespace BOM_API_v2.KaizenFiles.Models
         public class UpdateAddOnRequest
         {
             public string AddOnName { get; set; }
-            public string? Measurement { get; set; }
             public double PricePerUnit { get; set; }
         }
 

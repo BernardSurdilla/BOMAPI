@@ -30,6 +30,127 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
+        [HttpPost("/culo-api/v1/current-user/custom-orders")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> CreateCustomOrder([FromBody] PostCustomOrder customOrder)
+        {
+            try
+            {
+                // Fetch customer username from claims
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                if (!DateTime.TryParseExact(customOrder.PickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate) ||
+                    !DateTime.TryParseExact(customOrder.PickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
+                {
+                    return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
+                }
+
+                // Combine the parsed date and time into a single DateTime object
+                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+
+                // Generate a new GUID for the OrderId
+                Guid orderId = Guid.NewGuid();
+                string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
+
+                // Create the custom order object
+                var order = new Custom
+                {
+                    quantity = customOrder.quantity,
+                    size = customOrder.size,
+                    flavor = customOrder.flavor,
+                    customerName = customerUsername, // Set customer name from authenticated user
+                    color = customOrder.color,
+                    shape = customOrder.shape,
+                    tier = customOrder.tier,
+                    Description = customOrder.Description,
+                    picture = customOrder.picture,
+                    description = customOrder.Description,
+                    message = customOrder.message,
+                    cover = customOrder.cover,
+                    type = customOrder.type
+                };
+
+                await InsertToOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, customOrder.type);
+                // Insert custom order into the database
+                await InsertCustomOrder(customOrder.quantity, orderIdBinary, customerId, customerUsername, customOrder.picture, customOrder.Description, customOrder.message, customOrder.size, customOrder.tier, customOrder.cover, customOrder.color, customOrder.shape, customOrder.flavor);
+                
+                
+
+                return Ok(); // Return 200 OK if the order is successfully created
+            }
+            catch (Exception ex)
+            {
+                // Log and return an error message if an exception occurs
+                _logger.LogError(ex, "An error occurred while creating the custom order");
+                return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
+            }
+        }
+
+
+        private async Task InsertCustomOrder(int quantity, string orderId, byte[] customerId, string customerName, string pictureUrl, string description, string message, string size, string tier, string cover, string color, string shape, string flavor)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"INSERT INTO customorders ( quantity, order_id ,custom_id, customer_id, customer_name, picture_url, description, message, size, 
+        tier, cover, color, shape, flavor, design_name, design_id, price, created_at, status)
+    VALUES ( @quantity, UNHEX(@orderid), UNHEX(REPLACE(UUID(), '-', '')), @CustomerId, @CustomerName, @PictureUrl, @Description, @Message, @Size, 
+        @Tier, @Cover, @Color, @Shape, @Flavor, NULL, UNHEX(REPLACE(UUID(), '-', '')), NULL, NOW(), 'to review')";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@quantity", quantity);
+                    command.Parameters.AddWithValue("@orderid", orderId);
+                    command.Parameters.AddWithValue("@CustomerId", customerId);
+                    command.Parameters.AddWithValue("@CustomerName", customerName);
+                    command.Parameters.AddWithValue("@PictureUrl", pictureUrl);
+                    command.Parameters.AddWithValue("@Description", description);
+                    command.Parameters.AddWithValue("@Message", message);
+                    command.Parameters.AddWithValue("@Size", size);
+                    command.Parameters.AddWithValue("@Tier", tier);
+                    command.Parameters.AddWithValue("@Cover", cover);
+                    command.Parameters.AddWithValue("@Color", color);
+                    command.Parameters.AddWithValue("@Shape", shape);
+                    command.Parameters.AddWithValue("@Flavor", flavor);
+
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        private async Task InsertToOrderWithOrderId(string orderIdBinary, string customerName, byte[] customerId, DateTime pickupDateTime, string type)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"INSERT INTO orders (order_id, customer_id, customer_name, pickup_date, type, status, created_at, last_updated_at) 
+                       VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, 'to review', NOW(), NOW())";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderid", orderIdBinary);
+                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@pickupDateTime", pickupDateTime);
+                    command.Parameters.AddWithValue("@CustomerName", customerName);
+                    command.Parameters.AddWithValue("@type", type);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
         [HttpPost("/culo-api/v1/current-user/cart/add")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
@@ -158,7 +279,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, tier, design_name, pastry_id) 
             VALUES (
             UNHEX(REPLACE(UUID(), '-', '')), NULL, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
-            @quantity, NULL, NULL, @isActive, @Description, @Flavor, @Size, @color, @shape, @tier, @DesignName, @PastryId)";
+            @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @tier, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -291,8 +412,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = @"INSERT INTO orders (order_id, customer_id, customer_name, pickup_date, type, payment, status, created_at) 
-                       VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, @payment, 'to pay', NOW())";
+                string sql = @"INSERT INTO orders (order_id, customer_id, customer_name, pickup_date, type, payment, status, created_at, last_updated_at) 
+                       VALUES (UNHEX(@orderid), @customerId, @CustomerName, @pickupDateTime, @type, @payment, 'to pay', NOW(), NOW())";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1094,6 +1215,388 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
+        [HttpGet("/culo-api/v1/admin/custom-order-partial-details")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetAllCustomInitialOrdersByCustomerIds([FromQuery] string? search = null)
+        {
+            try
+            {
+                List<CustomPartial> orders;
+
+                if (!string.IsNullOrEmpty(search))
+                {
+                    // Check if search matches a valid status
+                    if (search.Equals("to review", StringComparison.OrdinalIgnoreCase)){ 
+                        // Fetch by status if valid search value is provided
+                        orders = await FetchByStatusCustomInitialOrdersAsync(search);
+
+                    }
+                    else if (await IsEmployeeNameExistsAsync(search))
+                    {
+                        // Fetch by employee name if it exists in the database
+                        orders = await FetchCustomOrdersByEmployeeInitialOrdersAsync(search);
+
+                    }
+                    else
+                    {
+                        // If search does not match any valid status or employee name
+                        return NotFound($"{search} not found");
+                    }
+                }
+                else
+                {
+                    // Fetch all if no search value is provided
+                    orders = await FetchInitialCustomOrdersAsync();
+                }
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        private async Task<List<CustomPartial>> FetchByStatusCustomInitialOrdersAsync(string status)
+        {
+            List<CustomPartial> orders = new List<CustomPartial>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+        SELECT 
+            custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
+            design_id, design_name, quantity, customer_name
+        FROM customorders 
+        WHERE status = @status";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Add the status parameter to the SQL command
+                    command.Parameters.AddWithValue("@status", status);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                ? (Guid?)null
+                : new Guid((byte[])reader["order_id"]);
+
+                            Guid suborderId = new Guid((byte[])reader["custom_id"]);
+                            Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                    ? Guid.Empty
+                                                    : new Guid((byte[])reader["customer_id"]);
+                            Guid designId = new Guid((byte[])reader["design_id"]);
+                            double? Price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price"));
+
+                            orders.Add(new CustomPartial
+                            {
+                                orderId = orderId, // Handle null values for orderId
+                                customId = suborderId,
+                                CustomerId = customerIdFromDb,
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                designId = designId,
+                                Price = Price,
+                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                color = reader.IsDBNull(reader.GetOrdinal("color")) ? string.Empty : reader.GetString(reader.GetOrdinal("color")),
+                                designName = reader.IsDBNull(reader.GetOrdinal("design_name")) ? string.Empty : reader.GetString(reader.GetOrdinal("design_name")),
+                                shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? string.Empty : reader.GetString(reader.GetOrdinal("shape")),
+                                tier = reader.IsDBNull(reader.GetOrdinal("tier")) ? string.Empty : reader.GetString(reader.GetOrdinal("tier")),
+                                cover = reader.IsDBNull(reader.GetOrdinal("cover")) ? string.Empty : reader.GetString(reader.GetOrdinal("cover")),
+                                Description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? string.Empty : reader.GetString(reader.GetOrdinal("size")),
+                                flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? string.Empty : reader.GetString(reader.GetOrdinal("flavor")),
+                                picture = reader.IsDBNull(reader.GetOrdinal("picture_url")) ? string.Empty : reader.GetString(reader.GetOrdinal("picture_url")),
+                                message = reader.IsDBNull(reader.GetOrdinal("message")) ? string.Empty : reader.GetString(reader.GetOrdinal("message"))
+                            });
+
+                        }
+                    }
+                }
+            }
+
+            return orders; // Return the list of toPayInitial records
+        }
+
+        private async Task<List<CustomPartial>> FetchCustomOrdersByEmployeeInitialOrdersAsync(string name)
+        {
+            List<CustomPartial> orders = new List<CustomPartial>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+     SELECT 
+            custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
+            design_id, design_name, quantity, customer_name
+        FROM customorders 
+        WHERE employee_name = @name AND status != 'to review'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Add the status parameter to the SQL command
+                    command.Parameters.AddWithValue("@name", name);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                ? (Guid?)null
+                : new Guid((byte[])reader["order_id"]);
+
+                            Guid suborderId = new Guid((byte[])reader["custom_id"]);
+                            Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                    ? Guid.Empty
+                                                    : new Guid((byte[])reader["customer_id"]);
+                            Guid designId = new Guid((byte[])reader["design_id"]);
+
+                            orders.Add(new CustomPartial
+                            {
+                                orderId = orderId, // Handle null values for orderId
+                                customId = suborderId,
+                                CustomerId = customerIdFromDb,
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                designId = designId,
+                                Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                designName = reader.IsDBNull(reader.GetOrdinal("design_name")) ? string.Empty : reader.GetString(reader.GetOrdinal("design_name")),
+                                color = reader.IsDBNull(reader.GetOrdinal("color")) ? string.Empty : reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? string.Empty : reader.GetString(reader.GetOrdinal("shape")),
+                                tier = reader.IsDBNull(reader.GetOrdinal("tier")) ? string.Empty : reader.GetString(reader.GetOrdinal("tier")),
+                                cover = reader.IsDBNull(reader.GetOrdinal("cover")) ? string.Empty : reader.GetString(reader.GetOrdinal("cover")),
+                                Description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? string.Empty : reader.GetString(reader.GetOrdinal("size")),
+                                flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? string.Empty : reader.GetString(reader.GetOrdinal("flavor")),
+                                picture = reader.IsDBNull(reader.GetOrdinal("picture_url")) ? string.Empty : reader.GetString(reader.GetOrdinal("picture_url")),
+                                message = reader.IsDBNull(reader.GetOrdinal("message")) ? string.Empty : reader.GetString(reader.GetOrdinal("message"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
+        private async Task<List<CustomPartial>> FetchInitialCustomOrdersAsync()
+        {
+            List<CustomPartial> orders = new List<CustomPartial>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"SELECT custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
+            design_id, design_name, quantity, customer_name, employee_id, employee_name
+        FROM customorders
+WHERE status != 'to review'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                ? (Guid?)null
+                : new Guid((byte[])reader["order_id"]);
+
+                            Guid suborderId = new Guid((byte[])reader["custom_id"]);
+                            Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                    ? Guid.Empty
+                                                    : new Guid((byte[])reader["customer_id"]);
+                            Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["employee_id"]);
+                            string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
+                                               ? null
+                                               : reader.GetString(reader.GetOrdinal("employee_name"));
+                            Guid designId = new Guid((byte[])reader["design_id"]);
+                            double? Price = reader.IsDBNull(reader.GetOrdinal("price"))? (double?)null : reader.GetDouble(reader.GetOrdinal("price"));
+
+                            orders.Add(new CustomPartial
+                            {
+                                orderId = orderId, // Handle null values for orderId
+                                customId = suborderId,
+                                CustomerId = customerIdFromDb,
+                                employeeId = employeeId,
+                                employeeName = employeeName,
+                                CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                designId = designId,
+                                Price = Price,
+                                Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                designName = reader.IsDBNull(reader.GetOrdinal("design_name")) ? string.Empty : reader.GetString(reader.GetOrdinal("design_name")),
+                                CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                color = reader.IsDBNull(reader.GetOrdinal("color")) ? string.Empty : reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? string.Empty : reader.GetString(reader.GetOrdinal("shape")),
+                                tier = reader.IsDBNull(reader.GetOrdinal("tier")) ? string.Empty : reader.GetString(reader.GetOrdinal("tier")),
+                                cover = reader.IsDBNull(reader.GetOrdinal("cover")) ? string.Empty : reader.GetString(reader.GetOrdinal("cover")),
+                                Description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? string.Empty : reader.GetString(reader.GetOrdinal("size")),
+                                flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? string.Empty : reader.GetString(reader.GetOrdinal("flavor")),
+                                picture = reader.IsDBNull(reader.GetOrdinal("picture_url")) ? string.Empty : reader.GetString(reader.GetOrdinal("picture_url")),
+                                message = reader.IsDBNull(reader.GetOrdinal("message")) ? string.Empty : reader.GetString(reader.GetOrdinal("message"))
+                            });
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
+        [HttpGet("/culo-api/v1/admin/custom-order-full-details/{customid}")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetAllCustomOrdersByCustomerId(string customid)
+        {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
+            // Convert suborderId to binary format
+            string customidBinary = ConvertGuidToBinary16((customid)).ToLower();
+
+            // Check if the suborder exists in the suborders table
+            if (!await DoesCustomOrderExist(customidBinary))
+            {
+                return NotFound($"Suborder with ID '{customidBinary}' not found.");
+            }
+            Debug.Write(customidBinary);
+
+            try
+            {
+                List<CustomOrderFull> orders = new List<CustomOrderFull>();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                SELECT custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
+            design_id, design_name, quantity, customer_name, employee_id, employee_name
+        FROM customorders 
+            WHERE custom_id = UNHEX(@suborderIdBinary)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@suborderIdBinary", customidBinary);
+
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
+                    ? (Guid?)null
+                    : new Guid((byte[])reader["order_id"]);
+
+                                Guid suborderId = new Guid((byte[])reader["custom_id"]);
+                                Guid customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                        ? Guid.Empty
+                                                        : new Guid((byte[])reader["customer_id"]);
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
+                                                      ? Guid.Empty
+                                                      : new Guid((byte[])reader["employee_id"]);
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
+                                double? Price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price"));
+                                Guid designId = new Guid((byte[])reader["design_id"]);
+                                orders.Add(new CustomOrderFull
+                                {
+                                    orderId = orderId, // Handle null values for orderId
+                                    customId = suborderId,
+                                    CustomerId = customerIdFromDb,
+                                    employeeId = employeeId,
+                                    employeeName = employeeName,
+                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
+                                    designId = designId,
+                                    Price = Price,
+                                    Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    designName = reader.IsDBNull(reader.GetOrdinal("design_name")) ? string.Empty : reader.GetString(reader.GetOrdinal("design_name")),
+                                    CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                    color = reader.IsDBNull(reader.GetOrdinal("color")) ? string.Empty : reader.GetString(reader.GetOrdinal("color")),
+                                    shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? string.Empty : reader.GetString(reader.GetOrdinal("shape")),
+                                    tier = reader.IsDBNull(reader.GetOrdinal("tier")) ? string.Empty : reader.GetString(reader.GetOrdinal("tier")),
+                                    cover = reader.IsDBNull(reader.GetOrdinal("cover")) ? string.Empty : reader.GetString(reader.GetOrdinal("cover")),
+                                    Description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
+                                    size = reader.IsDBNull(reader.GetOrdinal("size")) ? string.Empty : reader.GetString(reader.GetOrdinal("size")),
+                                    flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? string.Empty : reader.GetString(reader.GetOrdinal("flavor")),
+                                    picture = reader.IsDBNull(reader.GetOrdinal("picture_url")) ? string.Empty : reader.GetString(reader.GetOrdinal("picture_url")),
+                                    message = reader.IsDBNull(reader.GetOrdinal("message")) ? string.Empty : reader.GetString(reader.GetOrdinal("message")),
+                                });
+                            }
+                        }
+                    }
+
+                    if (orders.Count > 0)
+                    {
+                        // Scan the orders table using the retrieved orderId from the suborders table
+                        foreach (var order in orders)
+                        {
+                            if (order.orderId.HasValue)
+                            {
+                                // Convert orderId to binary format
+                                string orderIdBinary = ConvertGuidToBinary16(order.orderId.Value.ToString()).ToLower();
+                                Debug.Write(orderIdBinary);
+
+                                var orderDetails = await GetOrderDetailsByOrderId(connection, orderIdBinary);
+                                if (orderDetails != null)
+                                {
+                                    // Populate additional fields from the orders table
+                                    order.payment = orderDetails.payment;
+                                    order.PickupDateTime = orderDetails.PickupDateTime;
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                // Return the orders list
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        private async Task<bool> DoesCustomOrderExist(string CustomorderId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT COUNT(1) FROM customorders WHERE custom_id = UNHEX(@suborderid)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@suborderid", CustomorderId);
+                    return Convert.ToInt32(await command.ExecuteScalarAsync()) > 0;
+                }
+            }
+        }
+
         [HttpGet("/culo-api/v1/admin/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllInitialOrdersByCustomerIds([FromQuery] string? search = null)
@@ -1109,7 +1612,6 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                         search.Equals("done", StringComparison.OrdinalIgnoreCase) ||
                         search.Equals("for pick up", StringComparison.OrdinalIgnoreCase) ||
                         search.Equals("for approval", StringComparison.OrdinalIgnoreCase) ||
-                        search.Equals("cancelled", StringComparison.OrdinalIgnoreCase) ||
                         search.Equals("baking", StringComparison.OrdinalIgnoreCase))
                     {
                         // Fetch by status if valid search value is provided
@@ -1161,8 +1663,9 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 SELECT 
     suborder_id, order_id, customer_id, created_at, status, 
     HEX(design_id) as design_id, design_name, price, quantity, 
-    last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
-FROM suborders";
+    last_updated_by, last_updated_at, is_active, customer_name, pastry_id
+FROM suborders
+WHERE order_id IS NOT NULL";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1182,6 +1685,7 @@ FROM suborders";
                             string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
                                                 ? null
                                                 : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
 
                             orders.Add(new toPayInitial
                             {
@@ -1223,7 +1727,7 @@ FROM suborders";
             HEX(design_id) as design_id, design_name, price, quantity, 
             last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
         FROM suborders 
-        WHERE status = @status";
+        WHERE status = @status AND order_id IS NOT NULL";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1287,7 +1791,7 @@ SELECT
     suborder_id, order_id, customer_id, created_at, status, 
     HEX(design_id) as design_id, design_name, price, quantity, 
     last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
-FROM suborders WHERE employee_name = @name";
+FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1971,7 +2475,7 @@ FROM suborders WHERE employee_name = @name";
         HEX(design_id) as design_id, design_name, price, quantity, 
         last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
     FROM suborders 
-    WHERE customer_id = @customerId AND status IN('assigning artist', 'baking')";
+    WHERE customer_id = @customerId AND status IN('assigning artist', 'baking', 'for approval')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -2072,7 +2576,7 @@ FROM suborders WHERE employee_name = @name";
                 last_updated_by, last_updated_at, is_active, description, 
                 flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
             FROM suborders 
-            WHERE customer_id = @customerId AND status IN ('assigning artist','baking') AND suborder_id = UNHEX(@suborderIdBinary)";
+            WHERE customer_id = @customerId AND status IN ('assigning artist','baking', 'for approval') AND suborder_id = UNHEX(@suborderIdBinary)";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -4566,7 +5070,7 @@ FROM suborders WHERE employee_name = @name";
             }
         }
 
-        private async Task<forSales> GetOrderDetails(string orderIdBytes)
+        private async Task<forSales> GetOrderDetails(string orderIdBytes) //update this
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -5247,7 +5751,7 @@ FROM suborders WHERE employee_name = @name";
         }
 
 
-        [HttpPatch("suborders/{suborderId}")]//done 
+        [HttpPatch("/culo-api/v1/current-user/manage-add-ons-by-material/suborders/{suborderId}")]//done 
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest request)
         {
@@ -5291,6 +5795,7 @@ FROM suborders WHERE employee_name = @name";
 
         private async Task UpdateOrderDetailsInDatabase(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, UpdateOrderDetailsRequest request)
         {
+
             // Prepare SQL statement for updating orders table
             string updateSql = @"UPDATE suborders 
                          SET description = @description, 
@@ -5317,7 +5822,57 @@ FROM suborders WHERE employee_name = @name";
             }
         }
 
-        [HttpDelete("/culo-api/v1/current-user/cart/remove/{orderId}")] //debug this  
+        [HttpPatch("/culo-api/v1/admin/set-price{customId}")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> PatchCustomOrder(string customId, [FromBody] CustomOrderUpdateRequest customReq)
+        {
+            if (customReq == null || string.IsNullOrWhiteSpace(customId))
+            {
+                return BadRequest("Invalid request data.");
+            }
+
+            string suborderIdBinary = ConvertGuidToBinary16(customId).ToLower();
+
+            string sql = @"
+            UPDATE customorders 
+            SET design_name = @designName, 
+                price = @price 
+            WHERE custom_id = UNHEX(@customId)";
+
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    using (MySqlCommand cmd = new MySqlCommand(sql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@designName", customReq.DesignName);
+                        cmd.Parameters.AddWithValue("@price", customReq.Price);
+                        cmd.Parameters.AddWithValue("@customId", suborderIdBinary);
+
+                        int rowsAffected = await cmd.ExecuteNonQueryAsync();
+
+                        if (rowsAffected > 0)
+                        {
+                            return Ok("Custom order updated successfully.");
+                        }
+                        else
+                        {
+                            return NotFound("Custom order not found.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the exception here (not shown)
+                return StatusCode(500, "Internal server error: " + ex.Message);
+            }
+        }
+    
+
+    [HttpDelete("/culo-api/v1/current-user/cart/remove/{orderId}")] //debug this  
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> RemoveCart(string orderId)
         {
