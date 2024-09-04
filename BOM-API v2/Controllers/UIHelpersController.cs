@@ -56,10 +56,10 @@ namespace BOM_API_v2.Controllers
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
             catch { return response; }
-            try { selectedDesign = await _context.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
+            try { selectedDesign = await _context.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
             catch (Exception e) { return response; }
 
-            try { selectedDesignPastryMaterial = await _context.PastryMaterials.Where(x => x.isActive == true && x.design_id.SequenceEqual(selectedDesign.design_id)).FirstAsync(); }
+            try { selectedDesignPastryMaterial = await _context.PastryMaterials.Where(x => x.is_active == true && x.design_id.SequenceEqual(selectedDesign.design_id)).FirstAsync(); }
             catch (Exception e) { return response; }
 
             GetPastryMaterial parsedData = await DataParser.CreatePastryMaterialResponseFromDBRow(selectedDesignPastryMaterial, _context, _kaizenTables);

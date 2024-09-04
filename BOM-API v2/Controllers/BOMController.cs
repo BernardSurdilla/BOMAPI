@@ -60,13 +60,13 @@ namespace API_TEST.Controllers
         [HttpGet("item-used/occurrence/")]
         public async Task<List<GetUsedItemsByOccurence>> GetMostCommonlyUsedItems(string? sortBy, string? sortOrder)
         {
-            List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
-            List<MaterialIngredients> materialIngredientsItems = _context.MaterialIngredients.Where(row => row.isActive == true).Select(row => new MaterialIngredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, Materials = row.Materials }).ToList();
+            List<Ingredients> ingredientsItems = _context.Ingredients.Where(row => row.is_active == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToList();
+            List<MaterialIngredients> materialIngredientsItems = _context.MaterialIngredients.Where(row => row.is_active == true).Select(row => new MaterialIngredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, Materials = row.Materials }).ToList();
 
             //Lists for checking if records referenced by ingredients and material_ingredients are active are active
-            List<Materials> activeMaterials = await _context.Materials.Where(x => x.isActive == true).Select(x => new Materials() { material_id = x.material_id, material_name = x.material_name }).ToListAsync();
-            List<Item> activeInventoryItems = await _kaizenTables.Item.Where(x => x.isActive == true).ToListAsync();  //Replace with function to get all active inventory items 
-            List<Designs> allDesigns = await _context.Designs.Where(x => x.isActive == true).ToListAsync();
+            List<Materials> activeMaterials = await _context.Materials.Where(x => x.is_active == true).Select(x => new Materials() { material_id = x.material_id, material_name = x.material_name }).ToListAsync();
+            List<Item> activeInventoryItems = await _kaizenTables.Item.Where(x => x.is_active == true).ToListAsync();  //Replace with function to get all active inventory items 
+            List<Designs> allDesigns = await _context.Designs.Where(x => x.is_active == true).ToListAsync();
 
             if (ingredientsItems.IsNullOrEmpty() && materialIngredientsItems.IsNullOrEmpty()) { return new List<GetUsedItemsByOccurence>(); }
             if (activeInventoryItems.IsNullOrEmpty()) { return new List<GetUsedItemsByOccurence>(); }
@@ -295,14 +295,14 @@ namespace API_TEST.Controllers
             List<Orders> ordersList = await _kaizenTables.Orders.Where(x => x.is_active == true).ToListAsync();
             if (ordersList.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
 
-            List<PastryMaterials> allPastryMaterials = await _context.PastryMaterials.Where(x => x.isActive == true).ToListAsync();
+            List<PastryMaterials> allPastryMaterials = await _context.PastryMaterials.Where(x => x.is_active == true).ToListAsync();
             if (allPastryMaterials.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
 
-            List<Item> allInventoryItems = await _kaizenTables.Item.Where(x => x.isActive == true).ToListAsync();
+            List<Item> allInventoryItems = await _kaizenTables.Item.Where(x => x.is_active == true).ToListAsync();
             if (allInventoryItems.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
 
-            List<Ingredients> ingredientsItems = await _context.Ingredients.Where(row => row.isActive == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToListAsync();
-            List<MaterialIngredients> materialIngredientsItems = await _context.MaterialIngredients.Where(x => x.Materials.isActive == true && x.isActive == true).ToListAsync();
+            List<Ingredients> ingredientsItems = await _context.Ingredients.Where(row => row.is_active == true).Select(row => new Ingredients() { item_id = row.item_id, ingredient_type = row.ingredient_type, PastryMaterials = row.PastryMaterials }).ToListAsync();
+            List<MaterialIngredients> materialIngredientsItems = await _context.MaterialIngredients.Where(x => x.Materials.is_active == true && x.is_active == true).ToListAsync();
             if (materialIngredientsItems.IsNullOrEmpty() && ingredientsItems.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
 
 
@@ -440,9 +440,9 @@ namespace API_TEST.Controllers
         [HttpGet("tags-used/occurrence/")]
         public async Task<List<GetTagOccurrence>> GetTagOccurrence(string? sortBy, string? sortOrder)
         {
-            List<DesignTags> allTags = await _context.DesignTags.Where(x => x.isActive == true).ToListAsync();
+            List<DesignTags> allTags = await _context.DesignTags.Where(x => x.is_active == true).ToListAsync();
             if (allTags.IsNullOrEmpty()) { return new List<GetTagOccurrence>(); }
-            List<DesignTagsForCakes> allTagsForCake = await _context.DesignTagsForCakes.Where(x => x.isActive == true).ToListAsync();
+            List<DesignTagsForCakes> allTagsForCake = await _context.DesignTagsForCakes.Where(x => x.is_active == true).ToListAsync();
 
             List<GetTagOccurrence> response = new List<GetTagOccurrence>();
 
@@ -548,7 +548,7 @@ namespace API_TEST.Controllers
             if (currentPastryMaterial == null) { return NotFound(new { message = "No pastry material with the specified id found" }); }
             if (currentPastryMaterial.pastry_material_id.Equals(variant_id) == false)
             {
-                try { sub_variant = await _context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id.Equals(variant_id)).FirstAsync(); }
+                try { sub_variant = await _context.PastryMaterialSubVariants.Where(x => x.is_active == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id.Equals(variant_id)).FirstAsync(); }
                 catch { return NotFound(new { message = "No variant with the id " + variant_id + " exists" }); }
             }
 

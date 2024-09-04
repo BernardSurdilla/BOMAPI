@@ -298,7 +298,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterial = await context.PastryMaterials.Where(x
-                => x.isActive == true).FirstAsync(x => x.pastry_material_id == pastry_material_id);
+                => x.is_active == true).FirstAsync(x => x.pastry_material_id == pastry_material_id);
 
                 return true;
             } 
@@ -311,7 +311,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentIngredient = await context.Ingredients.Where(x
-                => x.isActive == true && x.ingredient_id == ingredient_id).FirstAsync();
+                => x.is_active == true && x.ingredient_id == ingredient_id).FirstAsync();
 
                 return true;
             }
@@ -324,7 +324,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentIngredient = await context.Ingredients.Where(x
-                => x.isActive == true && x.ingredient_id == ingredient_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.ingredient_id == ingredient_id && x.pastry_material_id == pastry_material_id).FirstAsync();
 
                 return true;
             }
@@ -337,7 +337,7 @@ namespace BillOfMaterialsAPI.Helpers
             Designs? selectedDesign;
             try 
             { 
-                selectedDesign = await context.Designs.Where(x => x.isActive == true && x.design_id == designId).FirstAsync();
+                selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id == designId).FirstAsync();
                 return true;
             }
             catch { }
@@ -348,7 +348,7 @@ namespace BillOfMaterialsAPI.Helpers
             Item? currentInventoryItem;
             try
             {
-                currentInventoryItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(id)).FirstAsync();
+                currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(id)).FirstAsync();
                 return true;
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
@@ -372,7 +372,7 @@ namespace BillOfMaterialsAPI.Helpers
                     //Check if item id exists on the 'Materials' table
                     //or in the inventory
                     Materials? currentReferredMaterial = null;
-                    try { currentReferredMaterial = await context.Materials.Where(x => x.isActive == true && x.material_id == item_id).FirstAsync(); }
+                    try { currentReferredMaterial = await context.Materials.Where(x => x.is_active == true && x.material_id == item_id).FirstAsync(); }
                     catch { throw new NotFoundInDatabaseException("Id specified in the request does not exist in the database. Id " + item_id); }
                     if (ValidUnits.IsSameQuantityUnit(currentReferredMaterial.amount_measurement, amount_measurement) == false) { throw new InvalidAmountMeasurementException("Ingredient with the material item id " + currentReferredMaterial.material_id + " does not have the same quantity unit as the referred material"); }
                     break;
@@ -389,15 +389,15 @@ namespace BillOfMaterialsAPI.Helpers
             try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, context); }
             catch { throw; }
 
-            List<Ingredients> mainIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).ToListAsync();
+            List<Ingredients> mainIngredients = await context.Ingredients.Where(x => x.is_active == true && x.pastry_material_id == pastry_material_id).ToListAsync();
             response =
                 mainIngredients.Where(x => x.item_id == item_id && x.ingredient_type == ingredient_type).FirstOrDefault() != null;
             if (response == true) return response;
 
-            List<PastryMaterialSubVariants> subVariants = await context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id).ToListAsync();
+            List<PastryMaterialSubVariants> subVariants = await context.PastryMaterialSubVariants.Where(x => x.is_active == true && x.pastry_material_id == pastry_material_id).ToListAsync();
             foreach(PastryMaterialSubVariants variant in subVariants)
             {
-                List<PastryMaterialSubVariantIngredients> subVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == variant.pastry_material_sub_variant_id).ToListAsync();
+                List<PastryMaterialSubVariantIngredients> subVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.is_active == true && x.pastry_material_sub_variant_id == variant.pastry_material_sub_variant_id).ToListAsync();
 
                 response = subVariantIngredients.Where(x => x.item_id == item_id && x.ingredient_type == ingredient_type).FirstOrDefault() != null;
 
@@ -588,7 +588,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             newIngredientsEntry.amount = data.amount;
             newIngredientsEntry.amount_measurement = data.amount_measurement;
-            newIngredientsEntry.isActive = true;
+            newIngredientsEntry.is_active = true;
             newIngredientsEntry.date_added = currentTime;
             newIngredientsEntry.last_modified_date = currentTime;
 
@@ -615,7 +615,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             newIngredientImportanceEntry.date_added = currentTime;
             newIngredientImportanceEntry.last_modified_date = currentTime;
-            newIngredientImportanceEntry.isActive = true;
+            newIngredientImportanceEntry.is_active = true;
 
             await context.PastryMaterialIngredientImportance.AddAsync(newIngredientImportanceEntry);
 
@@ -634,7 +634,7 @@ namespace BillOfMaterialsAPI.Helpers
             newAddOnEntry.add_ons_id = data.add_ons_id;
             newAddOnEntry.amount = data.amount;
 
-            newAddOnEntry.isActive = true;
+            newAddOnEntry.is_active = true;
             newAddOnEntry.date_added = currentTime;
             newAddOnEntry.last_modified_date = currentTime;
 
@@ -661,7 +661,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             newSubVariantIngredient.date_added = currentTime;
             newSubVariantIngredient.last_modified_date = currentTime;
-            newSubVariantIngredient.isActive = true;
+            newSubVariantIngredient.is_active = true;
 
 
             await context.PastryMaterialSubVariantIngredients.AddAsync(newSubVariantIngredient);
@@ -684,7 +684,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             newSubVariantAddOn.date_added = currentTime;
             newSubVariantAddOn.last_modified_date = currentTime;
-            newSubVariantAddOn.isActive = true;
+            newSubVariantAddOn.is_active = true;
 
             await context.PastryMaterialSubVariantAddOns.AddAsync(newSubVariantAddOn);
 
@@ -700,7 +700,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterial = await context.PastryMaterials.Where(x
-                => x.isActive == true && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_id == pastry_material_id).FirstAsync();
 
                 return currentPastryMaterial;
             }
@@ -713,7 +713,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentIngredient = await context.Ingredients.Where(x
-                => x.isActive == true && x.ingredient_id == ingredient_id).FirstAsync();
+                => x.is_active == true && x.ingredient_id == ingredient_id).FirstAsync();
 
                 return currentIngredient;
             }
@@ -726,7 +726,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentIngredient = await context.Ingredients.Where(x
-                => x.isActive == true && x.ingredient_id == ingredient_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.ingredient_id == ingredient_id && x.pastry_material_id == pastry_material_id).FirstAsync();
 
                 return currentIngredient;
             }
@@ -739,7 +739,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x
-                => x.isActive == true && x.pastry_material_ingredient_importance_id == pastry_material_ingredient_importance_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_ingredient_importance_id == pastry_material_ingredient_importance_id).FirstAsync();
 
                 return currentIngredientImportance;
             }
@@ -752,7 +752,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x
-                => x.isActive == true && x.pastry_material_ingredient_importance_id == pastry_material_ingredient_importance_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_ingredient_importance_id == pastry_material_ingredient_importance_id && x.pastry_material_id == pastry_material_id).FirstAsync();
 
                 return currentIngredientImportance;
             }
@@ -764,7 +764,7 @@ namespace BillOfMaterialsAPI.Helpers
             PastryMaterialAddOns? currentPastryMaterialAddOn = null;
             try 
             { 
-                currentPastryMaterialAddOn = await context.PastryMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_add_on_id == pastry_material_add_on_id).FirstAsync();
+                currentPastryMaterialAddOn = await context.PastryMaterialAddOns.Where(x => x.is_active == true && x.pastry_material_add_on_id == pastry_material_add_on_id).FirstAsync();
                 return currentPastryMaterialAddOn;
             }
             catch { }
@@ -775,7 +775,7 @@ namespace BillOfMaterialsAPI.Helpers
             PastryMaterialAddOns? currentPastryMaterialAddOn = null;
             try
             {
-                currentPastryMaterialAddOn = await context.PastryMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_add_on_id == pastry_material_add_on_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                currentPastryMaterialAddOn = await context.PastryMaterialAddOns.Where(x => x.is_active == true && x.pastry_material_add_on_id == pastry_material_add_on_id && x.pastry_material_id == pastry_material_id).FirstAsync();
                 return currentPastryMaterialAddOn;
             }
             catch { }
@@ -788,7 +788,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterialSubVariant = await context.PastryMaterialSubVariants.Where(x
-                => x.isActive == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id).FirstAsync();
 
                 return currentPastryMaterialSubVariant;
             }
@@ -801,7 +801,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterialSubVariant = await context.PastryMaterialSubVariants.Where(x
-                => x.isActive == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id && x.pastry_material_id == pastry_material_id).FirstAsync();
 
                 return currentPastryMaterialSubVariant;
             }
@@ -814,7 +814,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterialSubVariantIngredient = await context.PastryMaterialSubVariantIngredients.Where(x
-                => x.isActive == true && x.pastry_material_sub_variant_ingredient_id == pastry_material_sub_variant_ingredient_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_sub_variant_ingredient_id == pastry_material_sub_variant_ingredient_id).FirstAsync();
 
                 return currentPastryMaterialSubVariantIngredient;
             }
@@ -827,7 +827,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterialSubVariant = await context.PastryMaterialSubVariants.Where(x
-                => x.isActive == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id && x.pastry_material_id == pastry_material_id).FirstAsync();
             }
             catch { throw new NotFoundInDatabaseException("No pastry material sub variant with the id " + pastry_material_sub_variant_id + " for the pastry material with the id " + pastry_material_id + " found in the database."); }
 
@@ -835,7 +835,7 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterialSubVariantIngredient = await context.PastryMaterialSubVariantIngredients.Where(x
-                => x.isActive == true && x.pastry_material_sub_variant_ingredient_id == pastry_material_sub_variant_ingredient_id && x.pastry_material_sub_variant_id == currentPastryMaterialSubVariant.pastry_material_sub_variant_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_sub_variant_ingredient_id == pastry_material_sub_variant_ingredient_id && x.pastry_material_sub_variant_id == currentPastryMaterialSubVariant.pastry_material_sub_variant_id).FirstAsync();
 
                 return currentPastryMaterialSubVariantIngredient;
             }
@@ -847,7 +847,7 @@ namespace BillOfMaterialsAPI.Helpers
             PastryMaterialSubVariantAddOns? currentPastryMaterialSubVariantAddOn = null;
             try
             {
-                currentPastryMaterialSubVariantAddOn = await context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_add_on_id == pastry_material_sub_variant_add_on_id).FirstAsync();
+                currentPastryMaterialSubVariantAddOn = await context.PastryMaterialSubVariantAddOns.Where(x => x.is_active == true && x.pastry_material_sub_variant_add_on_id == pastry_material_sub_variant_add_on_id).FirstAsync();
                 return currentPastryMaterialSubVariantAddOn;
             }
             catch { }
@@ -859,14 +859,14 @@ namespace BillOfMaterialsAPI.Helpers
             try
             {
                 currentPastryMaterialSubVariant = await context.PastryMaterialSubVariants.Where(x
-                => x.isActive == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id && x.pastry_material_id == pastry_material_id).FirstAsync();
+                => x.is_active == true && x.pastry_material_sub_variant_id == pastry_material_sub_variant_id && x.pastry_material_id == pastry_material_id).FirstAsync();
             }
             catch { throw new NotFoundInDatabaseException("No pastry material sub variant with the id " + pastry_material_sub_variant_id + " for the pastry material with the id " + pastry_material_id + " found in the database."); }
 
             PastryMaterialSubVariantAddOns? currentPastryMaterialSubVariantAddOn = null;
             try
             {
-                currentPastryMaterialSubVariantAddOn = await context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_add_on_id == pastry_material_sub_variant_add_on_id && x.pastry_material_sub_variant_id == currentPastryMaterialSubVariant.pastry_material_sub_variant_id).FirstAsync();
+                currentPastryMaterialSubVariantAddOn = await context.PastryMaterialSubVariantAddOns.Where(x => x.is_active == true && x.pastry_material_sub_variant_add_on_id == pastry_material_sub_variant_add_on_id && x.pastry_material_sub_variant_id == currentPastryMaterialSubVariant.pastry_material_sub_variant_id).FirstAsync();
                 return currentPastryMaterialSubVariantAddOn;
             }
             catch { }
@@ -879,7 +879,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             try 
             { 
-                currentInventoryItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(id)).FirstAsync();
+                currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(id)).FirstAsync();
                 return currentInventoryItem;
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
@@ -904,7 +904,7 @@ namespace BillOfMaterialsAPI.Helpers
         {
             GetPastryMaterial response = new GetPastryMaterial();
             response.design_id = Convert.ToBase64String(data.design_id);
-            try { Designs? selectedDesign = await context.Designs.Where(x => x.isActive == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.design_name = selectedDesign.display_name; }
+            try { Designs? selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.design_name = selectedDesign.display_name; }
             catch (Exception e) { response.design_name = "N/A"; }
 
             response.pastry_material_id = data.pastry_material_id;
@@ -919,9 +919,9 @@ namespace BillOfMaterialsAPI.Helpers
             List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
             double calculatedCost = 0.0;
 
-            List<Ingredients> currentPastryMaterialIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
-            List<PastryMaterialIngredientImportance> currentPastryMaterialIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
-            List<PastryMaterialAddOns> currentPastryMaterialAddOns = await context.PastryMaterialAddOns.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<Ingredients> currentPastryMaterialIngredients = await context.Ingredients.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastryMaterialIngredientImportance> currentPastryMaterialIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastryMaterialAddOns> currentPastryMaterialAddOns = await context.PastryMaterialAddOns.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
 
             Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
@@ -1009,7 +1009,7 @@ namespace BillOfMaterialsAPI.Helpers
                         }
                     case IngredientType.Material:
                         {
-                            Materials? currentReferencedMaterial = await context.Materials.Where(x => x.material_id == currentIngredient.item_id && x.isActive == true).FirstAsync();
+                            Materials? currentReferencedMaterial = await context.Materials.Where(x => x.material_id == currentIngredient.item_id && x.is_active == true).FirstAsync();
                             if (currentReferencedMaterial == null) { continue; }
 
                             newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
@@ -1036,7 +1036,7 @@ namespace BillOfMaterialsAPI.Helpers
                                             else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; }
                                             break;
                                         case IngredientType.Material:
-                                            Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.isActive == true).FirstAsync();
+                                            Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.is_active == true).FirstAsync();
                                             if (currentSubMaterialReferencedMaterial == null) { continue; }
                                             else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedMaterial.material_name; }
                                             break;
@@ -1109,7 +1109,7 @@ namespace BillOfMaterialsAPI.Helpers
                                 try { currentSubMaterial = subMaterials[subMaterialIngLoopIndex]; }
                                 catch (Exception e) { isLoopingThroughSubMaterials = false; break; }
 
-                                Materials currentReferencedMaterialForSub = await context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
+                                Materials currentReferencedMaterialForSub = await context.Materials.Where(x => x.is_active == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
 
                                 string refMatMeasurement = currentReferencedMaterialForSub.amount_measurement;
                                 double refMatAmount = currentReferencedMaterialForSub.amount;
@@ -1132,7 +1132,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                 double costMultiplier = refMatMeasurement == subMatMeasurement ? refMatAmount / subMatAmount : refMatAmount / UnitConverter.ConvertByName(subMatAmount, measurementQuantity, subMatMeasurement, refMatMeasurement);
 
-                                List<MaterialIngredients> subMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
+                                List<MaterialIngredients> subMaterialIngredients = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
                                 foreach (MaterialIngredients subMaterialIngredientsRow in subMaterialIngredients)
                                 {
                                     switch (subMaterialIngredientsRow.ingredient_type)
@@ -1239,7 +1239,7 @@ namespace BillOfMaterialsAPI.Helpers
                 responsePastryMaterialAddOns.Add(newResponseAddOnRow);
             }
 
-            List<PastryMaterialSubVariants> currentPastryMaterialSubVariants = await context.PastryMaterialSubVariants.Where(x => x.isActive == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            List<PastryMaterialSubVariants> currentPastryMaterialSubVariants = await context.PastryMaterialSubVariants.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             foreach (PastryMaterialSubVariants currentSubVariant in currentPastryMaterialSubVariants)
             {
                 GetPastryMaterialSubVariant newSubVariantListRow = new GetPastryMaterialSubVariant();
@@ -1251,8 +1251,8 @@ namespace BillOfMaterialsAPI.Helpers
                 newSubVariantListRow.ingredients_in_stock = response.ingredients_in_stock == true ? true : false;
                 double estimatedCostSubVariant = calculatedCost;
 
-                List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
-                List<PastryMaterialSubVariantAddOns> currentSubVariantAddOns = await context.PastryMaterialSubVariantAddOns.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+                List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.is_active == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
+                List<PastryMaterialSubVariantAddOns> currentSubVariantAddOns = await context.PastryMaterialSubVariantAddOns.Where(x => x.is_active == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
 
                 List<SubGetPastryMaterialSubVariantIngredients> currentSubVariantIngredientList = new List<SubGetPastryMaterialSubVariantIngredients>();
                 List<GetPastryMaterialSubVariantAddOns> currentSubVariantAddOnList = new List<GetPastryMaterialSubVariantAddOns>();
@@ -1341,7 +1341,7 @@ namespace BillOfMaterialsAPI.Helpers
                             }
                         case IngredientType.Material:
                             {
-                                Materials? currentReferencedMaterial = await context.Materials.Where(x => x.material_id == currentSubVariantIngredient.item_id && x.isActive == true).FirstAsync();
+                                Materials? currentReferencedMaterial = await context.Materials.Where(x => x.material_id == currentSubVariantIngredient.item_id && x.is_active == true).FirstAsync();
                                 if (currentReferencedMaterial == null) { continue; }
 
                                 newSubVariantIngredientListEntry.item_name = currentReferencedMaterial.material_name;
@@ -1366,7 +1366,7 @@ namespace BillOfMaterialsAPI.Helpers
                                                 newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; 
                                                 break;
                                             case IngredientType.Material:
-                                                Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.isActive == true).FirstAsync();
+                                                Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.is_active == true).FirstAsync();
                                                 if (currentSubMaterialReferencedMaterial == null) { continue; }
                                                 else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedMaterial.material_name; }
                                                 break;
@@ -1439,7 +1439,7 @@ namespace BillOfMaterialsAPI.Helpers
                                     try { currentSubMaterial = subMaterials[subMaterialIngLoopIndex]; }
                                     catch (Exception e) { isLoopingThroughSubMaterials = false; break; }
 
-                                    Materials currentReferencedMaterialForSub = await context.Materials.Where(x => x.isActive == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
+                                    Materials currentReferencedMaterialForSub = await context.Materials.Where(x => x.is_active == true && x.material_id == currentSubMaterial.item_id).FirstAsync();
 
                                     string refMatMeasurement = currentReferencedMaterialForSub.amount_measurement;
                                     double refMatAmount = currentReferencedMaterialForSub.amount;
@@ -1462,7 +1462,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                     double costMultiplier = refMatMeasurement == subMatMeasurement ? refMatAmount / subMatAmount : refMatAmount / UnitConverter.ConvertByName(subMatAmount, measurementQuantity, subMatMeasurement, refMatMeasurement);
 
-                                    List<MaterialIngredients> subMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
+                                    List<MaterialIngredients> subMaterialIngredients = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_id == currentReferencedMaterialForSub.material_id).ToListAsync();
                                     foreach (MaterialIngredients subMaterialIngredientsRow in subMaterialIngredients)
                                     {
                                         switch (subMaterialIngredientsRow.ingredient_type)
@@ -1581,11 +1581,11 @@ namespace BillOfMaterialsAPI.Helpers
             response.design_tags = new List<GetDesignTag>();
             response.design_shapes = new List<GetDesignShape>();
 
-            List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.isActive == true && x.design_id == data.design_id && x.DesignTags.isActive == true).ToListAsync();
-            List<DesignShapes> cakeShapes = await context.DesignShapes.Where(x => x.isActive == true && x.design_id == data.design_id).ToListAsync();
+            List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.is_active == true && x.design_id == data.design_id && x.DesignTags.is_active == true).ToListAsync();
+            List<DesignShapes> cakeShapes = await context.DesignShapes.Where(x => x.is_active == true && x.design_id == data.design_id).ToListAsync();
 
             DesignImage? image;
-            try { image = await context.DesignImage.Where(x => x.isActive == true && x.design_id == data.design_id).FirstAsync(); }
+            try { image = await context.DesignImage.Where(x => x.is_active == true && x.design_id == data.design_id).FirstAsync(); }
             catch { image = null; }
 
             foreach (DesignTagsForCakes currentTag in cakeTags)
@@ -1627,7 +1627,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
 
-            List<Ingredients> baseIngredients = await context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
+            List<Ingredients> baseIngredients = await context.Ingredients.Where(x => x.is_active == true && x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
             foreach (Ingredients currentBaseIngredient in baseIngredients)
             {
                 //Check if the measurement unit in the ingredient record is valid
@@ -1689,7 +1689,7 @@ namespace BillOfMaterialsAPI.Helpers
                         }
                     case IngredientType.Material:
                         {
-                            List<MaterialIngredients> currentMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentBaseIngredient.item_id).ToListAsync();
+                            List<MaterialIngredients> currentMaterialIngredients = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_id == currentBaseIngredient.item_id).ToListAsync();
 
                             //This block loops thru the retrieved ingredients above
                             //And adds all sub-ingredients for the "MAT" type entries
@@ -1703,7 +1703,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                 if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
                                 {
-                                    List<MaterialIngredients> newEntriesToLoopThru = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_ingredient_id == currentMatIngInLoop.material_ingredient_id).ToListAsync();
+                                    List<MaterialIngredients> newEntriesToLoopThru = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_ingredient_id == currentMatIngInLoop.material_ingredient_id).ToListAsync();
                                     currentMaterialIngredients.AddRange(newEntriesToLoopThru);
                                 }
                                 currentIndex += 1;
@@ -1751,7 +1751,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             if (selectedPastryMaterialSubVariant != null)
             {
-                List<PastryMaterialSubVariantIngredients> currentVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.isActive == true && x.pastry_material_sub_variant_id == selectedPastryMaterialSubVariant.pastry_material_sub_variant_id).ToListAsync();
+                List<PastryMaterialSubVariantIngredients> currentVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.is_active == true && x.pastry_material_sub_variant_id == selectedPastryMaterialSubVariant.pastry_material_sub_variant_id).ToListAsync();
 
                 foreach (PastryMaterialSubVariantIngredients currentSubVariantIngredient in currentVariantIngredients)
                 {
@@ -1812,7 +1812,7 @@ namespace BillOfMaterialsAPI.Helpers
                             }
                         case IngredientType.Material:
                             {
-                                List<MaterialIngredients> currentMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentSubVariantIngredient.item_id).ToListAsync();
+                                List<MaterialIngredients> currentMaterialIngredients = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_id == currentSubVariantIngredient.item_id).ToListAsync();
 
                                 //This block loops thru the retrieved ingredients above
                                 //And adds all sub-ingredients for the "MAT" type entries
@@ -1826,7 +1826,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                     if (currentMatIngInLoop.ingredient_type == IngredientType.Material)
                                     {
-                                        List<MaterialIngredients> newEntriesToLoopThru = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_ingredient_id == currentMatIngInLoop.material_ingredient_id).ToListAsync();
+                                        List<MaterialIngredients> newEntriesToLoopThru = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_ingredient_id == currentMatIngInLoop.material_ingredient_id).ToListAsync();
                                         currentMaterialIngredients.AddRange(newEntriesToLoopThru);
                                     }
                                     currentIndex += 1;
@@ -1905,7 +1905,7 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<double> CalculateSubMaterialCost(MaterialIngredients data, DatabaseContext context, KaizenTables kaizenTables)
         {
             Materials? currentReferencedMaterial = null;
-            try { currentReferencedMaterial = await context.Materials.Where(x => x.isActive == true && x.material_id == data.item_id).FirstAsync(); }
+            try { currentReferencedMaterial = await context.Materials.Where(x => x.is_active == true && x.material_id == data.item_id).FirstAsync(); }
             catch { return 0.0; }
             if (currentReferencedMaterial == null) { return 0.0; }
 
@@ -1921,14 +1921,14 @@ namespace BillOfMaterialsAPI.Helpers
             double totalCost = 0.0;
 
 
-            List<MaterialIngredients> currentReferencedMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterial.material_id).ToListAsync();
+            List<MaterialIngredients> currentReferencedMaterialIngredients = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_id == currentReferencedMaterial.material_id).ToListAsync();
             foreach (MaterialIngredients materialIngredients in currentReferencedMaterialIngredients)
             {
                 switch (materialIngredients.ingredient_type)
                 {
                     case IngredientType.InventoryItem:
                         Item? currentMatIngRefItem = null;
-                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
                         catch { continue; }
 
                         bool isInventoryItemMeasurementValid = ValidUnits.IsUnitValid(currentMatIngRefItem.measurements);
@@ -1950,7 +1950,7 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<double> CalculateSubMaterialCost(Ingredients data, DatabaseContext context, KaizenTables kaizenTables)
         {
             Materials? currentReferencedMaterial = null;
-            try { currentReferencedMaterial = await context.Materials.Where(x => x.isActive == true && x.material_id == data.item_id).FirstAsync(); }
+            try { currentReferencedMaterial = await context.Materials.Where(x => x.is_active == true && x.material_id == data.item_id).FirstAsync(); }
             catch { return 0.0; }
             if (currentReferencedMaterial == null) { return 0.0; }
 
@@ -1966,14 +1966,14 @@ namespace BillOfMaterialsAPI.Helpers
             double totalCost = 0.0;
 
 
-            List<MaterialIngredients> currentReferencedMaterialIngredients = await context.MaterialIngredients.Where(x => x.isActive == true && x.material_id == currentReferencedMaterial.material_id).ToListAsync();
+            List<MaterialIngredients> currentReferencedMaterialIngredients = await context.MaterialIngredients.Where(x => x.is_active == true && x.material_id == currentReferencedMaterial.material_id).ToListAsync();
             foreach (MaterialIngredients materialIngredients in currentReferencedMaterialIngredients)
             {
                 switch (materialIngredients.ingredient_type)
                 {
                     case IngredientType.InventoryItem:
                         Item? currentMatIngRefItem = null;
-                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.isActive == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
                         catch { continue; }
 
                         bool isInventoryItemMeasurementValid = ValidUnits.IsUnitValid(currentMatIngRefItem.measurements);

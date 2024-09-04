@@ -23,7 +23,7 @@ namespace BOM_API_v2.Controllers
         [HttpGet]
         public async Task<List<GetDesignTag>> GetAllDesignTags(int? page, int? record_per_page, string? sortBy, string? sortOrder)
         {
-            IQueryable<DesignTags> dbQuery = _databaseContext.DesignTags.Where(x => x.isActive == true);
+            IQueryable<DesignTags> dbQuery = _databaseContext.DesignTags.Where(x => x.is_active == true);
 
             List<DesignTags> current_design_records = new List<DesignTags>();
             List<GetDesignTag> response = new List<GetDesignTag>();
@@ -81,7 +81,7 @@ namespace BOM_API_v2.Controllers
         public async Task<GetTag> GetSpecificTag([FromRoute] Guid design_tag_id)
         {
             DesignTags? selectedTag = null;
-            try { selectedTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == design_tag_id).FirstAsync(); }
+            try { selectedTag = await _databaseContext.DesignTags.Where(x => x.is_active == true && x.design_tag_id == design_tag_id).FirstAsync(); }
             catch (Exception e) { return new GetTag(); }
 
             GetTag response = new GetTag();
@@ -100,7 +100,7 @@ namespace BOM_API_v2.Controllers
             DesignTags newTags = new DesignTags();
             newTags.design_tag_id = new Guid();
             newTags.design_tag_name = input.design_tag_name;
-            newTags.isActive = true;
+            newTags.is_active = true;
 
             await _databaseContext.DesignTags.AddAsync(newTags);
             await _databaseContext.SaveChangesAsync();
@@ -114,7 +114,7 @@ namespace BOM_API_v2.Controllers
         public async Task<IActionResult> UpdateTag(PostTags input, [FromRoute] Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;
-            try { selectedDesignTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == design_tag_id).FirstAsync(); }
+            try { selectedDesignTag = await _databaseContext.DesignTags.Where(x => x.is_active == true && x.design_tag_id == design_tag_id).FirstAsync(); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = "Specified design tag with the id " + design_tag_id + " does not exist" }); }
             catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
 
@@ -131,12 +131,12 @@ namespace BOM_API_v2.Controllers
         public async Task<IActionResult> DeleteDesignTag(Guid design_tag_id)
         {
             DesignTags? selectedDesignTag;
-            try { selectedDesignTag = await _databaseContext.DesignTags.Where(x => x.isActive == true && x.design_tag_id == design_tag_id).FirstAsync(); }
+            try { selectedDesignTag = await _databaseContext.DesignTags.Where(x => x.is_active == true && x.design_tag_id == design_tag_id).FirstAsync(); }
             catch (InvalidOperationException ex) { return BadRequest(new { message = "Specified design tag with the id " + design_tag_id + " does not exist" }); }
             catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
 
             _databaseContext.DesignTags.Update(selectedDesignTag);
-            selectedDesignTag.isActive = false;
+            selectedDesignTag.is_active = false;
 
             await _databaseContext.SaveChangesAsync();
             await _actionLogger.LogAction(User, "DELETE", "Delete design tag " + selectedDesignTag.design_tag_id);

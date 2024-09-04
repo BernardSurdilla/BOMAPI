@@ -31,7 +31,7 @@ namespace BOM_API_v2.Controllers
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
 
             //Base query for the materials database to retrieve rows
-            IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.isActive == true);
+            IQueryable<PastryMaterials> pastryMaterialQuery = _context.PastryMaterials.Where(row => row.is_active == true);
             //Row sorting algorithm
             if (sortBy != null)
             {
@@ -126,7 +126,7 @@ namespace BOM_API_v2.Controllers
             try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
             catch { return new GetPastryMaterial(); }
 
-            List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.isActive == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id).ToListAsync();
+            List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.is_active == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id).ToListAsync();
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
 
             GetPastryMaterial response;
@@ -144,7 +144,7 @@ namespace BOM_API_v2.Controllers
             try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
             catch { return new List<GetPastryMaterialIngredients>(); }
 
-            List<Ingredients> currentIngredient = await _context.Ingredients.Where(x => x.pastry_material_id == pastry_material_id && x.isActive == true).ToListAsync();
+            List<Ingredients> currentIngredient = await _context.Ingredients.Where(x => x.pastry_material_id == pastry_material_id && x.is_active == true).ToListAsync();
             List<GetPastryMaterialIngredients> response = new List<GetPastryMaterialIngredients>();
 
             if (currentIngredient == null || currentPastryMaterial == null) { return response; }
@@ -225,7 +225,7 @@ namespace BOM_API_v2.Controllers
             newPastryMaterialEntry.design_id = newEntry.design_id;
             newPastryMaterialEntry.date_added = currentTime;
             newPastryMaterialEntry.last_modified_date = currentTime;
-            newPastryMaterialEntry.isActive = true;
+            newPastryMaterialEntry.is_active = true;
 
             await _context.PastryMaterials.AddAsync(newPastryMaterialEntry);
             await _context.SaveChangesAsync();
@@ -247,7 +247,7 @@ namespace BOM_API_v2.Controllers
                     newSubMaterialDbEntry.sub_variant_name = entry_sub_variant.sub_variant_name;
                     newSubMaterialDbEntry.date_added = currentTime;
                     newSubMaterialDbEntry.last_modified_date = currentTime;
-                    newSubMaterialDbEntry.isActive = true;
+                    newSubMaterialDbEntry.is_active = true;
 
                     await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
                     await _context.SaveChangesAsync();
@@ -289,7 +289,7 @@ namespace BOM_API_v2.Controllers
 
             if (await DataVerification.DoesIngredientExistsInPastryMaterial(pastry_material_id, entry.item_id, entry.ingredient_type, _context) == false) { return BadRequest(new { message = "Item with the id " + entry.item_id + " does not exist in both the main variant and sub variants of the pastry material " + pastry_material_id }); }
 
-            PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id).FirstOrDefaultAsync();
+            PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.is_active == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id).FirstOrDefaultAsync();
 
             if (importanceForSelectedIngredient != null) return BadRequest(new { message = "Importance entry for the item with the id " + entry.item_id + " and ingredient type " + entry.ingredient_type + " already exists, please modify that instead" });
 
@@ -349,7 +349,7 @@ namespace BOM_API_v2.Controllers
             newSubMaterialDbEntry.sub_variant_name = entry.sub_variant_name;
             newSubMaterialDbEntry.date_added = currentTime;
             newSubMaterialDbEntry.last_modified_date = currentTime;
-            newSubMaterialDbEntry.isActive = true;
+            newSubMaterialDbEntry.is_active = true;
 
             await _context.PastryMaterialSubVariants.AddAsync(newSubMaterialDbEntry);
             await _context.SaveChangesAsync();
@@ -467,7 +467,7 @@ namespace BOM_API_v2.Controllers
 
             if (await DataVerification.DoesIngredientExistsInPastryMaterial(pastry_material_id, entry.item_id, entry.ingredient_type, _context) == false) { return BadRequest(new { message = "Item with the id " + entry.item_id + " does not exist in both the main variant and sub variants of the pastry material " + pastry_material_id }); }
 
-            PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.isActive == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id && x.pastry_material_ingredient_importance_id.Equals(currentIngredientImportance.pastry_material_ingredient_importance_id) == false).FirstOrDefaultAsync();
+            PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.is_active == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id && x.pastry_material_ingredient_importance_id.Equals(currentIngredientImportance.pastry_material_ingredient_importance_id) == false).FirstOrDefaultAsync();
 
             if (importanceForSelectedIngredient != null) return BadRequest(new { message = "Importance entry for the item with the id " + entry.item_id + " and ingredient type " + entry.ingredient_type + " already exists, please modify that instead" });
             
@@ -599,16 +599,16 @@ namespace BOM_API_v2.Controllers
 
             DateTime currentTime = DateTime.Now;
 
-            List<Ingredients> ingredients = await _context.Ingredients.Where(x => x.pastry_material_id == pastry_material_id && x.isActive == true).ToListAsync();
+            List<Ingredients> ingredients = await _context.Ingredients.Where(x => x.pastry_material_id == pastry_material_id && x.is_active == true).ToListAsync();
 
             foreach (Ingredients i in ingredients)
             {
                 _context.Ingredients.Update(i);
                 i.last_modified_date = currentTime;
-                i.isActive = false;
+                i.is_active = false;
             }
             _context.PastryMaterials.Update(currentPastryMaterial);
-            currentPastryMaterial.isActive = false;
+            currentPastryMaterial.is_active = false;
             currentPastryMaterial.last_modified_date = currentTime;
 
             await _context.SaveChangesAsync();
@@ -629,7 +629,7 @@ namespace BOM_API_v2.Controllers
             DateTime currentTime = DateTime.Now;
             _context.Ingredients.Update(ingredientAboutToBeDeleted);
             ingredientAboutToBeDeleted.last_modified_date = currentTime;
-            ingredientAboutToBeDeleted.isActive = false;
+            ingredientAboutToBeDeleted.is_active = false;
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "DELETE", "Delete Pastry Material Ingredient " + ingredient_id);
@@ -650,7 +650,7 @@ namespace BOM_API_v2.Controllers
 
             _context.PastryMaterialIngredientImportance.Update(currentIngredientImportance);
             currentIngredientImportance.last_modified_date = currentTime;
-            currentIngredientImportance.isActive = false;
+            currentIngredientImportance.is_active = false;
 
             await _context.SaveChangesAsync();
 
@@ -670,7 +670,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
             _context.PastryMaterialAddOns.Update(currentPastryMaterialAddOn);
-            currentPastryMaterialAddOn.isActive = false;
+            currentPastryMaterialAddOn.is_active = false;
             currentPastryMaterialAddOn.last_modified_date = DateTime.Now;
 
             await _context.SaveChangesAsync();
@@ -689,7 +689,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
             _context.PastryMaterialSubVariants.Update(currentPastryMaterialSubVariant);
-            currentPastryMaterialSubVariant.isActive = false;
+            currentPastryMaterialSubVariant.is_active = false;
             currentPastryMaterialSubVariant.last_modified_date = DateTime.Now;
             await _context.SaveChangesAsync();
 
@@ -712,7 +712,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
             _context.PastryMaterialSubVariantIngredients.Update(currentPastryMaterialSubVariantIngredient);
-            currentPastryMaterialSubVariantIngredient.isActive = false;
+            currentPastryMaterialSubVariantIngredient.is_active = false;
             currentPastryMaterialSubVariantIngredient.last_modified_date = DateTime.Now;
             await _context.SaveChangesAsync();
 
@@ -735,7 +735,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
             _context.PastryMaterialSubVariantAddOns.Update(currentPastryMaterialSubVariantAddOn);
-            currentPastryMaterialSubVariantAddOn.isActive = false;
+            currentPastryMaterialSubVariantAddOn.is_active = false;
             currentPastryMaterialSubVariantAddOn.last_modified_date = DateTime.Now;
 
             await _context.SaveChangesAsync();
