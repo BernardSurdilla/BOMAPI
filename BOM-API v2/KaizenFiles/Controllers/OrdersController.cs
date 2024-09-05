@@ -6112,7 +6112,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
             {
                 await connection.OpenAsync();
 
-                string designQuery = "SELECT DisplayName FROM designs WHERE DisplayName = @displayName";
+                string designQuery = "SELECT display_name FROM designs WHERE display_name = @displayName";
                 using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@displayName", design);
@@ -6135,7 +6135,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
             {
                 await connection.OpenAsync();
 
-                string designIdQuery = "SELECT DesignId FROM designs WHERE DisplayName = @DisplayName";
+                string designIdQuery = "SELECT design_id FROM designs WHERE display_name = @DisplayName";
                 using (var designIdCommand = new MySqlCommand(designIdQuery, connection))
                 {
                     designIdCommand.Parameters.AddWithValue("@DisplayName", designName);
