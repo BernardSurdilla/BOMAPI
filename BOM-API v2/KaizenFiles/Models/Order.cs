@@ -299,10 +299,10 @@ namespace CRUDFI.Models
         public double SubOrderTotal {  get; set; }
 
         // List to hold all add-ons for the order item
-        public List<OrderAddon> OrderAddons { get; set; } = new List<OrderAddon>();
+        public List<OrderAddon1> OrderAddons { get; set; } = new List<OrderAddon1>();
     }
 
-    public class OrderAddon
+    public class OrderAddon1
     {
         public int AddonId { get; set; }
         public string Name { get; set; }
@@ -321,7 +321,6 @@ namespace CRUDFI.Models
         public string Size { get; set; }
         public string Color { get; set; }
         public string Shape { get; set; }
-        public string Tier { get; set; }
     }
     public class CheckOutRequest
     {
@@ -329,7 +328,15 @@ namespace CRUDFI.Models
         public string PickupDate { get; set; } = "yyyy-mm-dd";
         public string PickupTime { get; set; } = "hh:mm AM/PM";
         public string Payment { get; set; }
+        public List<Guid> SuborderIds { get; set; }
     }
+
+
+    public class SuborderId
+    {
+        public Guid suborderId { get; set; }
+    }
+
 
     public class FinalOrder
     {
