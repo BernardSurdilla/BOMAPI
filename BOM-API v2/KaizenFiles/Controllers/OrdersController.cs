@@ -1177,7 +1177,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, HEX(design_id) as design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color, tier FROM suborders";
+                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, HEX(design_id) as design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color FROM suborders";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -1215,7 +1215,6 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -2041,7 +2040,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
                 HEX(design_id) as design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
             WHERE suborder_id = UNHEX(@suborderIdBinary)";
 
@@ -2086,7 +2085,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -2170,7 +2168,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
                 HEX(design_id) as design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
             WHERE customer_id = @customerId AND status IN('cart')";
 
@@ -2214,7 +2212,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                     Status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -2378,7 +2375,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
                 HEX(design_id) as design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
             WHERE customer_id = @customerId AND status IN ('to pay') AND suborder_id = UNHEX(@suborderIdBinary)";
 
@@ -2424,7 +2421,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -2607,7 +2603,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
                 HEX(design_id) as design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
             WHERE customer_id = @customerId AND status IN ('assigning artist','baking', 'for approval') AND suborder_id = UNHEX(@suborderIdBinary)";
 
@@ -2653,7 +2649,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -2836,7 +2831,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
                 HEX(design_id) as design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
             WHERE customer_id = @customerId AND status IN ('for pick up') AND suborder_id = UNHEX(@suborderIdBinary)";
 
@@ -2882,7 +2877,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -2997,7 +2991,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
                 HEX(design_id) as design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
             WHERE employee_id = @customerId AND status IN('confirmed')";
 
@@ -3041,7 +3035,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                     Status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    tier = reader.GetString(reader.GetOrdinal("tier")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                     Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -3181,7 +3174,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
         suborder_id, order_id, customer_id, employee_id, created_at, status, 
         HEX(design_id) as design_id, design_name, price, quantity, 
         last_updated_by, last_updated_at, is_active, description, 
-        flavor, size, customer_name, employee_name, shape, color, tier, pastry_id 
+        flavor, size, customer_name, employee_name, shape, color, pastry_id 
     FROM suborders 
     WHERE order_id = UNHEX(@orderIdBinary)";
 
@@ -3211,7 +3204,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                                 PastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                 Color = reader.GetString(reader.GetOrdinal("color")),
                                 Shape = reader.GetString(reader.GetOrdinal("shape")),
-                                Tier = reader.GetString(reader.GetOrdinal("tier")),
                                 DesignId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                 DesignName = reader.GetString(reader.GetOrdinal("design_name")),
                                 Price = reader.GetDouble(reader.GetOrdinal("price")),
@@ -4135,52 +4127,6 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
             }
         }
 
-        [HttpGet("admin/by-employee-username")] //update this
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetOrdersByUsername()
-        {
-            try
-            {
-                // Extract the EmployeeUsername from the token
-                var EmployeeUsername = User.FindFirst(ClaimTypes.Name)?.Value;
-
-                if (string.IsNullOrEmpty(EmployeeUsername))
-                {
-                    return Unauthorized("User is not authorized");
-                }
-
-                // Get the Employee's ID using the extracted username
-                byte[] employeeId = await GetUserIdByAllUsername(EmployeeUsername);
-                if (employeeId == null || employeeId.Length == 0)
-                {
-                    return BadRequest("Customer not found");
-                }
-
-                // Retrieve the binary UserId from the users table
-                byte[] userIdBytes = await GetUserIdByUsername(EmployeeUsername);
-                if (userIdBytes == null)
-                {
-                    return NotFound($"User with username '{EmployeeUsername}' not found.");
-                }
-
-                // Fetch orders with EmployeeId matching the retrieved UserId
-                List<Order> orders = await GetOrdersByEmployeeId(userIdBytes);
-
-                if (orders.Count == 0)
-                {
-                    return NotFound($"No orders found for the user with username '{EmployeeUsername}'.");
-                }
-
-                return Ok(orders);
-            }
-            catch (Exception ex)
-            {
-                var EmployeeUsername = User.FindFirst(ClaimTypes.Name)?.Value;
-                _logger.LogError(ex, $"An error occurred while fetching orders for username '{EmployeeUsername}'");
-                return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred while fetching orders for username '{EmployeeUsername}': {ex.Message}");
-            }
-        }
-
         private async Task<string> GetLastupdater(string username)
         {
             using (var connection = new MySqlConnection(connectionstring))
@@ -5020,12 +4966,10 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                 }
                 else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
                 {
-                    await ProcessOrderCompletion(orderIdBinary);
-
                     // Update the status in the database
                     await UpdateOrderStatus(orderIdBinary, false); // Set isActive to false
                     await UpdateStatus(orderIdBinary, "done");
-
+                    await ProcessOrderCompletion(orderIdBinary);
                     // Update the last_updated_at column
                     await UpdateLastUpdatedAt(orderIdBinary);
                 }
