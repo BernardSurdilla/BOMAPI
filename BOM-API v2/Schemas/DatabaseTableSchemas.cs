@@ -206,11 +206,11 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("design_id")]
     public class Designs
     {
-        [Column("DesignId")][MaxLength(16)][Key] public byte[] design_id { get; set; }
-        [Column("DisplayName")][MaxLength(50)] public string display_name { get; set; }
-        [Column("DisplayPictureURL")][MaxLength(50)] public string display_picture_url { get; set; }
+        [MaxLength(16)][Key] public byte[] design_id { get; set; }
+        [MaxLength(50)] public string display_name { get; set; }
+        [MaxLength(50)] public string display_picture_url { get; set; }
         public string? cake_description { get; set; }
-        [Column("is_active")] public bool is_active { get; set; }
+        public bool is_active { get; set; }
     }
     [PrimaryKey("design_tag_id")]
     public class DesignTags
