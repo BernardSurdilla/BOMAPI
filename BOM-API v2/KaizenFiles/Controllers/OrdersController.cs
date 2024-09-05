@@ -9,9 +9,12 @@ using JWTAuthentication.Authentication;
 using System.Data;
 using System.Globalization;
 using System.Security.Claims;
-using BOM_API_v2.Helpers;
 using System.Text.Json;
 using static BOM_API_v2.KaizenFiles.Models.Adds;
+using BillOfMaterialsAPI.Models;
+using BillOfMaterialsAPI.Schemas;
+using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
+
 
 
 namespace BOM_API_v2.KaizenFiles.Controllers
@@ -23,6 +26,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
     {
         private readonly string connectionstring;
         private readonly ILogger<OrdersController> _logger;
+        private readonly DatabaseContext _context;
+        private readonly KaizenTables _kaizenTables;
+
 
         public OrdersController(IConfiguration configuration, ILogger<OrdersController> logger)
         {
@@ -30,7 +36,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
-        [HttpPost("/culo-api/v1/current-user/custom-orders")]
+        [HttpPost("/culo-api/v1/current-user/custom-orders/add")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateCustomOrder([FromBody] PostCustomOrder customOrder)
         {
@@ -178,48 +184,34 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return BadRequest("Design not found");
                 }
 
-                string designame = await getDesignName(orderDto.DesignName);
+                string designName = await getDesignName(orderDto.DesignName);
+                string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
 
-                // Generate a new Guid for the Order's Id
+                // Get the pastry material ID using just the design ID
+                string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
+                string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderDto.Size);
+                string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderDto.Size);
+                string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
                 var order = new Order
                 {
                     orderId = Guid.NewGuid(),
                     suborderId = Guid.NewGuid(),
-                    price = orderDto.Price,
+                    price = orderDto.Price, // Use the calculated price from the response
                     quantity = orderDto.Quantity,
-                    designName = designame,
+                    designName = designName,
                     size = orderDto.Size,
                     flavor = orderDto.Flavor,
                     isActive = false,
                     customerName = customerUsername, // Set customer name from authenticated user
                     color = orderDto.Color,
                     shape = orderDto.Shape,
-                    tier = orderDto.Tier,
-                    Description = orderDto.Description
+                    Description = orderDto.Description,
+                    status = "cart"
                 };
 
-                // Set isActive to false for all orders created
-
-                // Set the status to pending
-                order.status = "cart";
-
-                // Convert designId to hex string
-                string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
-
-                // Get the pastry material ID using just the design ID
-                string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
-
-                // Get the pastry material ID using the design ID and size
-                string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderDto.Size);
-
-                // Get the pastry material sub-variant ID using the pastry material ID and size
-                string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderDto.Size);
-
-                // Determine the appropriate pastryId to use
-                string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
-
                 // Insert the order into the database using the determined pastryId
-                await InsertOrder(order, designId, orderDto.Flavor, orderDto.Size, pastryId, customerId, orderDto.Color, orderDto.Shape, orderDto.Tier, orderDto.Description);
+                await InsertOrder(order, designId, orderDto.Flavor, orderDto.Size, pastryId, customerId, orderDto.Color, orderDto.Shape, orderDto.Description);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             }
@@ -231,6 +223,41 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+
+
+        private async Task<string> GetShapeByDesignIds(string designIdHex) //not sure yet where table
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT shape_name FROM designshapes WHERE design_id = UNHEX(@designId)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@designId", designIdHex);
+
+                    var result = await command.ExecuteScalarAsync();
+                    return result != null && result != DBNull.Value ? result.ToString() : null;
+                }
+            }
+        }
+
+        private async Task<string> GetTierByDesignIds(string designIdHex) //dunno yet where table
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT tier FROM designshapes WHERE design_id = UNHEX(@designId)";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@designId", designIdHex);
+
+                    var result = await command.ExecuteScalarAsync();
+                    return result != null && result != DBNull.Value ? result.ToString() : null;
+                }
+            }
+        }
 
         private async Task<string> GetPastryMaterialIdByDesignIds(string designIdHex)
         {
@@ -267,7 +294,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string tier, string Description)
+
+
+        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -276,10 +305,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 string sql = @"INSERT INTO suborders (
             suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
-            last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, tier, design_name, pastry_id) 
+            last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
             VALUES (
             UNHEX(REPLACE(UUID(), '-', '')), NULL, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
-            @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @tier, @DesignName, @PastryId)";
+            @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -292,7 +321,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     command.Parameters.AddWithValue("@isActive", order.isActive);
                     command.Parameters.AddWithValue("@color", order.color);
                     command.Parameters.AddWithValue("@shape", order.shape);
-                    command.Parameters.AddWithValue("@tier", order.tier);
                     command.Parameters.AddWithValue("@Description", order.Description);
                     command.Parameters.AddWithValue("@Flavor", flavor);
                     command.Parameters.AddWithValue("@Size", size);
@@ -304,11 +332,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("/culo-api/v1/current-user/cart/checkout/{suborderid}")]
+
+
+        [HttpPost("/culo-api/v1/current-user/cart/checkout")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> PatchOrderTypeAndPickupDate(
-    string suborderid,
-    [FromBody] CheckOutRequest checkOutRequest)
+        public async Task<IActionResult> PatchOrderTypeAndPickupDate([FromBody] CheckOutRequest checkOutRequest)
         {
             try
             {
@@ -316,14 +344,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
                 if (string.IsNullOrEmpty(customerUsername))
                 {
-                    return Unauthorized("User is not authorized");
+                    return Unauthorized("User is not authorized.");
                 }
 
                 // Retrieve customerId from username
                 byte[] customerId = await GetUserIdByAllUsername(customerUsername);
                 if (customerId == null || customerId.Length == 0)
                 {
-                    return BadRequest("Customer not found");
+                    return BadRequest("Customer not found.");
                 }
 
                 // Validate type
@@ -343,25 +371,29 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Combine the parsed date and time into a single DateTime object
                 DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
 
-                // Generate a new GUID for the OrderId
+                // Generate a new GUID for the OrderId (this order will be shared across multiple suborders)
                 Guid orderId = Guid.NewGuid();
                 string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
 
-                string suborderIdBinary = ConvertGuidToBinary16(suborderid).ToLower();
-
-                // Check if the suborder exists in the suborders table
-                if (!await DoesSuborderExist(suborderIdBinary))
-                {
-                    return NotFound($"Suborder with ID '{suborderIdBinary}' not found.");
-                }
-
-                // Insert the new order with the same suborderid and other details
+                // Insert a new order
                 await InsertOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, checkOutRequest.Type, checkOutRequest.Payment);
 
-                // Update the suborder with the suborderid using UNHEX
-                await UpdateSuborderWithOrderId(suborderIdBinary, orderIdBinary);
+                // Loop through each suborderid in the request and update them with the new orderId
+                foreach (var suborderId in checkOutRequest.SuborderIds)
+                {
+                    string suborderIdBinary = ConvertGuidToBinary16(suborderId.ToString()).ToLower();
 
-                return Ok($"Order for suborder ID '{orderIdBinary}' has been successfully created.");
+                    // Check if the suborder exists in the suborders table
+                    if (!await DoesSuborderExist(suborderIdBinary))
+                    {
+                        return NotFound($"Suborder with ID '{suborderId}' not found.");
+                    }
+
+                    // Update the suborder with the new orderId
+                    await UpdateSuborderWithOrderId(suborderIdBinary, orderIdBinary);
+                }
+
+                return Ok($"Order for {checkOutRequest.SuborderIds.Count} suborder(s) has been successfully created with order ID '{orderIdBinary}'.");
             }
             catch (Exception ex)
             {
@@ -369,6 +401,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
+
 
         private async Task<bool> DoesSuborderExist(string suborderId)
         {
@@ -3206,9 +3239,9 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
             return suborders;
         }
 
-        private async Task<List<OrderAddon>> GetOrderAddonsDetails(Guid suborderId)
+        private async Task<List<OrderAddon1>> GetOrderAddonsDetails(Guid suborderId)
         {
-            var addons = new List<OrderAddon>();
+            var addons = new List<OrderAddon1>();
 
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -3228,7 +3261,7 @@ FROM suborders WHERE employee_name = @name AND order_id IS NOT NULL";
                     {
                         while (await reader.ReadAsync())
                         {
-                            addons.Add(new OrderAddon
+                            addons.Add(new OrderAddon1
                             {
                                 AddonId = reader.GetInt32(reader.GetOrdinal("add_ons_id")),
                                 Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
