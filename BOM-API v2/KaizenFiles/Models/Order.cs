@@ -420,6 +420,7 @@ namespace CRUDFI.Models
         public string AddOnName { get; set; }
         public string? Measurement { get; set; }
         public double PricePerUnit { get; set; }
+        public double? size { get; set; }
         public DateTime DateAdded { get; set; }
         public DateTime? LastModifiedDate { get; set; }
     }

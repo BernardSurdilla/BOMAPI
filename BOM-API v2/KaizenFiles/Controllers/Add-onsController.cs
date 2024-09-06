@@ -131,6 +131,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 PricePerUnit = reader.GetDouble("price"),
                                 addOnsId = reader.GetInt32("add_ons_id"),
                                 Measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? null : reader.GetDouble("size"),
                                 // DateAdded is assumed to be non-nullable and should be directly read
                                 DateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
                                 // Handle LastModifiedDate as nullable
@@ -148,8 +149,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return addOnDSOSList;
         }
 
-        [HttpPatch("update-add-on")] //test this soon
-        public async Task<IActionResult> UpdateAddOn([FromQuery] int addOnsId, [FromBody] Models.Adds.UpdateAddOnRequest updateRequest)
+        [HttpPatch("{addOnsId}/update-add-on")] //test this soon
+        public async Task<IActionResult> UpdateAddOn(int addOnsId, [FromBody] Models.Adds.UpdateAddOnRequest updateRequest)
         {
             try
             {
@@ -158,11 +159,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     await connection.OpenAsync();
 
                     string sql = @"
-                        UPDATE AddOns 
+                        UPDATE addons 
                         SET 
                             name = @AddOnName,  
                             price = @PricePerUnit, 
-                            last_modified_date = @LastModifiedDate, 
+                            last_modified_date = @LastModifiedDate 
                         WHERE add_ons_id = @AddOnsId";
 
                     using (var command = new MySqlCommand(sql, connection))
