@@ -593,9 +593,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpDelete("ingredients/{id}")]
+        [HttpDelete("{id}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult DeleteIngredient([FromQuery] int id)
+        public IActionResult DeleteIngredient(int id)
         {
             try
             {
