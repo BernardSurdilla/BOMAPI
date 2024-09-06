@@ -301,6 +301,10 @@ namespace CRUDFI.Models
         // List to hold all add-ons for the order item
         public List<OrderAddon1> OrderAddons { get; set; } = new List<OrderAddon1>();
     }
+    public class AssignEmp
+    {
+        public string name { get; set; }
+    }
 
     public class OrderAddon1
     {

@@ -791,7 +791,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
 
         [HttpPost("suborders/{suborderId}/assign-employee")]//done 
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromQuery] string employeeUsername)
+        public async Task<IActionResult> AssignEmployeeToOrder(string suborderId, [FromBody] AssignEmp assign)
         {
             try
             {
@@ -806,18 +806,18 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 }
 
                 // Check if the employee with the given username exists
-                byte[] employeeId = await GetEmployeeIdByUsername(employeeUsername);
+                byte[] employeeId = await GetEmployeeIdByUsername(assign.name);
                 if (employeeId == null || employeeId.Length == 0)
                 {
-                    return NotFound($"Employee with username '{employeeUsername}' not found. Please try another name.");
+                    return NotFound($"Employee with username '{assign}' not found. Please try another name.");
                 }
 
                 // Update the order with the employee ID and employee name
-                await UpdateOrderEmployeeId(suborderIdBinary, employeeId, employeeUsername);
+                await UpdateOrderEmployeeId(suborderIdBinary, employeeId, assign.name);
 
                 await UpdateOrderStatusToBaking(suborderIdBinary);
 
-                return Ok($"Employee with username '{employeeUsername}' has been successfully assigned to order with ID '{suborderId}'.");
+                return Ok($"Employee with username '{assign}' has been successfully assigned to order with ID '{suborderId}'.");
             }
             catch (Exception ex)
             {
