@@ -281,6 +281,9 @@ namespace BOM_API_v2.Controllers
 
             newEntry.is_active = true;
 
+            //Remove dupes
+            input.design_tag_ids = input.design_tag_ids.Distinct().ToList();
+
             List<DesignTagsForCakes> newTagRelationships = new List<DesignTagsForCakes>();
             if (input.design_tag_ids != null)
             {

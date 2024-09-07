@@ -293,15 +293,15 @@ namespace BillOfMaterialsAPI.Schemas
         public string measurements { get; set; }
     }
     [PrimaryKey("add_ons_id")]
-    [Table("addOns")]
+    [Table("addons")]
     public class AddOns
     {
         [Key] public int add_ons_id { get; set; }
         [MaxLength(50)] public string name { get; set; }
         public double price { get; set; }
-        [MaxLength(50)] public string measurement { get; set; }
-        public double size { get; set; }
-        [MaxLength(50)] public string ingredient_type { get; set; }
+        [MaxLength(50)] public string? measurement { get; set; }
+        public double? size { get; set; }
+        [MaxLength(50)] public string? ingredient_type { get; set; }
         public DateTime date_added { get; set; }
         public DateTime? last_modified_date { get; set; }
     }

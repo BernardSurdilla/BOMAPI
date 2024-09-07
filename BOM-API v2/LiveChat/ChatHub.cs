@@ -14,6 +14,7 @@ namespace LiveChat
         private readonly ILiveChatConnectionManager _connectionManager;
         private readonly DirectMessagesDB _directMessagesDB;
         private readonly UserManager<APIUsers> _userManager;
+
         private const string CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME = "RecieveMessage";
 
         public ChatHub(ILiveChatConnectionManager connectionManager, DirectMessagesDB directMessagesDB, UserManager<APIUsers> userManager)
