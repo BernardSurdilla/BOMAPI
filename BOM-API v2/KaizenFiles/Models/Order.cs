@@ -152,6 +152,22 @@ namespace CRUDFI.Models
         public string color { get; set; }
         public string shape { get; set; }
     }
+    public class AdminInitial
+    {
+        public Guid? Id { get; set; }
+        public byte[]? DesignId { get; set; }
+        public Guid CustomerId { get; set; }
+        public string CustomerName { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string Payment { get; set; }
+        public string Status { get; set; }
+        public string Type { get; set; }
+        public string DesignName { get; set; }
+        public DateTime? Pickup { get; set; }
+        public string lastUpdatedBy { get; set; } = "";
+        public DateTime? lastUpdatedAt { get; set; }
+        public bool isActive { get; set; }
+    }
 
     public class toPayInitial
     {
