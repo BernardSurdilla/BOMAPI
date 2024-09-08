@@ -464,6 +464,7 @@ namespace BOM_API_v2.Controllers
             foundEntry.display_picture_url = input.display_picture_url;
 
             List<DesignTagsForCakes> allDesignTagsForCakes = await _databaseContext.DesignTagsForCakes.Where(x => x.is_active == true && x.design_id == foundEntry.design_id).ToListAsync();
+
             List<Guid> normalizedInputTagIdList = input.design_tag_ids != null ? input.design_tag_ids.Distinct().ToList() : new List<Guid>();
 
             foreach (Guid currentTagId in normalizedInputTagIdList)
@@ -484,6 +485,24 @@ namespace BOM_API_v2.Controllers
                     await _databaseContext.DesignTagsForCakes.AddAsync(newTagConnection);
                 }
             }
+            List<DesignShapes> allShapesForDesign = await _databaseContext.DesignShapes.Where(x => x.is_active == true && x.design_id == foundEntry.design_id).ToListAsync();
+            List<string> normalizedShapeNames = input.design_shape_names != null ? input.design_shape_names.Distinct().ToList() : new List<string>();
+            foreach (string shapeName in normalizedShapeNames)
+            {
+                DesignShapes? duplicateCheck = allShapesForDesign.Where(x => x.shape_name == shapeName).FirstOrDefault();
+
+                if (duplicateCheck != null) continue;
+                DesignShapes newShapeAssociation = new DesignShapes
+                {
+                    design_id = foundEntry.design_id,
+                    design_shape_id = Guid.NewGuid(),
+                    shape_name = shapeName,
+                    is_active = true
+                };
+                await _databaseContext.DesignShapes.AddAsync(newShapeAssociation);
+            }
+
+
             if (input.display_picture_data != null)
             {
                 DesignImage? designImage = null;
@@ -496,7 +515,7 @@ namespace BOM_API_v2.Controllers
                     designImage.design_picture_id = new Guid();
                     designImage.picture_data = input.display_picture_data;
                     designImage.is_active = true;
-                    _databaseContext.DesignImage.Add(designImage);
+                    await _databaseContext.DesignImage.AddAsync(designImage);
                 }
                 else
                 {
@@ -504,7 +523,6 @@ namespace BOM_API_v2.Controllers
                     _databaseContext.DesignImage.Update(designImage);
                 }
             }
-
             await _databaseContext.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH", "Update design " + decodedId);
