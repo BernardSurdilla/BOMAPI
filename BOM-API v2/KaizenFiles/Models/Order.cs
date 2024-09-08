@@ -331,6 +331,15 @@ namespace CRUDFI.Models
         public double AddOnTotal { get; set; }
     }
 
+    public class BuyNow
+    {
+        public string Type { get; set; }
+        public string PickupDate { get; set; } = "yyyy-mm-dd";
+        public string PickupTime { get; set; } = "hh:mm AM/PM";
+        public string Payment { get; set; }
+        public List<OrderDTO> orderItem { get; set; } = new List<OrderDTO>();
+    }
+
     public class OrderDTO
     {
         public double Price { get; set; }
@@ -342,6 +351,7 @@ namespace CRUDFI.Models
         public string Color { get; set; }
         public string Shape { get; set; }
     }
+
     public class CheckOutRequest
     {
         public string Type { get; set; }

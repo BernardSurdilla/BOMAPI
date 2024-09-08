@@ -36,6 +36,136 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             _logger = logger;
         }
 
+        [HttpPost("/culo-api/v1/current-user/cart/buy-now")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> BuyNow([FromBody] BuyNow buyNowRequest)
+        {
+            try
+            {
+                // Fetch customer username from claims
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Retrieve customerId from username
+                byte[] customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found.");
+                }
+
+                // Validate and parse pickup date and time
+                if (!DateTime.TryParseExact(buyNowRequest.PickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate) ||
+                    !DateTime.TryParseExact(buyNowRequest.PickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
+                {
+                    return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
+                }
+                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
+
+                // Validate the order type
+                if (!buyNowRequest.Type.Equals("normal", StringComparison.OrdinalIgnoreCase) &&
+                    !buyNowRequest.Type.Equals("rush", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
+                }
+
+                // Create and save orders for each item in the orderItem list
+                foreach (var orderItem in buyNowRequest.orderItem)
+                {
+                    // Get the design's ID using the provided design name
+                    byte[] designId = await GetDesignIdByDesignName(orderItem.DesignName);
+                    if (designId == null || designId.Length == 0)
+                    {
+                        return BadRequest($"Design '{orderItem.DesignName}' not found.");
+                    }
+
+                    // Retrieve the design name and pastry material ID
+                    string designName = await getDesignName(orderItem.DesignName);
+                    string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
+                    string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
+                    string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderItem.Size);
+                    string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderItem.Size);
+                    string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
+                    // Generate new orderId for each item
+                    Guid orderId = Guid.NewGuid();
+                    string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
+                    
+                    // Insert the new order into the 'orders' table
+                    await InsertOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, buyNowRequest.Type, buyNowRequest.Payment);
+                    
+                    // Create the order object
+                    var order = new Order
+                    {
+                        suborderId = Guid.NewGuid(),
+                        price = orderItem.Price,
+                        quantity = orderItem.Quantity,
+                        designName = designName,
+                        size = orderItem.Size,
+                        flavor = orderItem.Flavor,
+                        isActive = false,
+                        customerName = customerUsername,
+                        color = orderItem.Color,
+                        shape = orderItem.Shape,
+                        Description = orderItem.Description,
+                        status = "to pay"
+                    };
+
+                    // Insert the order with the determined pastryId
+                    await InsertsOrder(order, orderIdBinary, designId, orderItem.Flavor, orderItem.Size, pastryId, customerId, orderItem.Color, orderItem.Shape, orderItem.Description);
+
+                }
+
+                return Ok($"Order has been successfully created for {buyNowRequest.orderItem.Count} item(s).");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while processing the request.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        private async Task InsertsOrder(Order order, string orderId, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+
+                string sql = @"INSERT INTO suborders (
+            suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
+            last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
+            VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(@orderid), @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
+            @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderid", orderId);
+                    command.Parameters.AddWithValue("@customerId", customerId);
+                    command.Parameters.AddWithValue("@CustomerName", order.customerName);
+                    command.Parameters.AddWithValue("@designId", designId);
+                    command.Parameters.AddWithValue("@status", order.status);
+                    command.Parameters.AddWithValue("@price", order.price);
+                    command.Parameters.AddWithValue("@quantity", order.quantity);
+                    command.Parameters.AddWithValue("@isActive", order.isActive);
+                    command.Parameters.AddWithValue("@color", order.color);
+                    command.Parameters.AddWithValue("@shape", order.shape);
+                    command.Parameters.AddWithValue("@Description", order.Description);
+                    command.Parameters.AddWithValue("@Flavor", flavor);
+                    command.Parameters.AddWithValue("@Size", size);
+                    command.Parameters.AddWithValue("@DesignName", order.designName);
+                    command.Parameters.AddWithValue("@PastryId", pastryId);
+
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+
+
         [HttpPost("/culo-api/v1/current-user/custom-orders/add")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateCustomOrder([FromBody] PostCustomOrder customOrder)
@@ -2312,7 +2442,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                 isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
                                 CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
                                 Payment = reader.GetString(reader.GetOrdinal("payment")),
-                                Type = reader.GetString(reader.GetOrdinal("payment")),
+                                Type = reader.GetString(reader.GetOrdinal("type")),
                                 Pickup = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
                                          ? (DateTime?)null
                                          : reader.GetDateTime(reader.GetOrdinal("pickup_date")),
@@ -3879,7 +4009,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-        [HttpGet("suborders/{suborderId}/add-ons")] //done (might remove this)
+        [HttpGet("{suborderId}/add-ons")] //done (might remove this)
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string suborderId)
         {
@@ -6319,7 +6449,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
     [HttpDelete("/culo-api/v1/current-user/cart/remove/{orderId}")] //debug this  
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
-        public async Task<IActionResult> RemoveCart(string orderId)
+        public async Task<IActionResult> RemoveOrder(string orderId)
         {
             try
             {
@@ -6392,6 +6522,167 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    int rowsAffected = await command.ExecuteNonQueryAsync();
+                    return rowsAffected > 0;
+                }
+            }
+        }
+
+        [HttpDelete("/culo-api/v1/current-user/suborder-single/remove/{suborderId}")] //debug this  
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
+        public async Task<IActionResult> RemoveCart(string suborderId)
+        {
+            try
+            {
+                // Get the current user's username
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("No valid customer username found.");
+                }
+
+                // Convert the hex orderId to binary format
+                string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+
+                // Check if the order belongs to the current user
+                bool isOrderOwnedByUser = await IsSuborderOwnedByUser(customerUsername, suborderIdBinary);
+                if (!isOrderOwnedByUser)
+                {
+                    return Unauthorized("You do not have permission to delete this order.");
+                }
+
+                // Delete the order from the database
+                bool deleteSuccess = await DeleteOrderBySuborderId(suborderIdBinary);
+                if (deleteSuccess)
+                {
+                    return Ok("Order removed successfully.");
+                }
+                else
+                {
+                    return NotFound("Order not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing cart");
+                return StatusCode(500, $"An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<bool> IsSuborderOwnedByUser(string customerUsername, string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT COUNT(*) 
+            FROM suborders 
+            WHERE suborder_id = UNHEX(@orderId) 
+            AND customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
+
+                    var count = Convert.ToInt32(await command.ExecuteScalarAsync());
+                    return count > 0;
+                }
+            }
+        }
+
+        private async Task<bool> DeleteOrderBySuborderId(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "DELETE FROM suborders WHERE suborder_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    int rowsAffected = await command.ExecuteNonQueryAsync();
+                    return rowsAffected > 0;
+                }
+            }
+        }
+
+        [HttpDelete("/culo-api/v1/current-user/suborder-all/remove")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
+        public async Task<IActionResult> RemoveAllCart()
+        {
+            try
+            {
+                // Get the current user's username
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("No valid customer username found.");
+                }
+
+                // Check if the suborders belong to the current user
+                bool isOrderOwnedByUser = await SuborderOwnedByUser(customerUsername);
+                if (!isOrderOwnedByUser)
+                {
+                    return Unauthorized("You do not have permission to delete this order.");
+                }
+
+                // Delete all suborders belonging to the current user
+                bool deleteSuccess = await DeleteAllSubordersByCustomerUsername(customerUsername);
+                if (deleteSuccess)
+                {
+                    return Ok("All suborders removed successfully.");
+                }
+                else
+                {
+                    return NotFound("No suborders found for this user.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error removing cart");
+                return StatusCode(500, $"An error occurred while processing the request.");
+            }
+        }
+
+        private async Task<bool> SuborderOwnedByUser(string customerUsername)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+        SELECT COUNT(*) 
+        FROM suborders 
+        WHERE customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
+
+                    var count = Convert.ToInt32(await command.ExecuteScalarAsync());
+                    return count > 0;
+                }
+            }
+        }
+
+        private async Task<bool> DeleteAllSubordersByCustomerUsername(string customerUsername)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+        DELETE FROM suborders 
+        WHERE customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customerUsername", customerUsername);
 
                     int rowsAffected = await command.ExecuteNonQueryAsync();
                     return rowsAffected > 0;
