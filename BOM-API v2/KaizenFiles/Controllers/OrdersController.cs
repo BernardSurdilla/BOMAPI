@@ -1867,7 +1867,7 @@ WHERE status != 'to review'";
             }
         }
 
-        [HttpGet("/culo-api/v1/admin/partial-details")]
+        [HttpGet("admin/partial-details")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllInitialOrdersByCustomerIds([FromQuery] string? search = null)
         {
@@ -4082,7 +4082,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 {
                     await connection.OpenAsync();
 
-                    string sql = @"SELECT DisplayName AS Name, UserId FROM users WHERE Type = 2";
+                    string sql = @"SELECT Username AS Name, UserId FROM users WHERE Type = 2";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
