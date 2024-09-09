@@ -12,7 +12,6 @@ using System.Security.Claims;
 using System.Text.Json;
 using static BOM_API_v2.KaizenFiles.Models.Adds;
 using BillOfMaterialsAPI.Models;
-using BillOfMaterialsAPI.Schemas;
 using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
 
 
@@ -26,9 +25,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
     {
         private readonly string connectionstring;
         private readonly ILogger<OrdersController> _logger;
-        private readonly DatabaseContext _context;
-        private readonly KaizenTables _kaizenTables;
-
 
         public OrdersController(IConfiguration configuration, ILogger<OrdersController> logger)
         {
@@ -72,6 +68,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
                 }
 
+                // List to collect suborderId responses
+                var responses = new List<SuborderResponse>();
+
                 // Create and save orders for each item in the orderItem list
                 foreach (var orderItem in buyNowRequest.orderItem)
                 {
@@ -90,17 +89,49 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderItem.Size);
                     string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
 
+                    // Retrieve list of add_ons_id from pastymaterialaddons table
+                    var mainVariantAddOnsId = await GetsMainVariantAddOns(pastryId, orderItem.Size);
+
+                    // Initialize a list to store add-on IDs
+                    var addOnIds = new List<string>();
+
+                    // Check if the main variant add-ons list is empty
+                    if (mainVariantAddOnsId == null || mainVariantAddOnsId.Count == 0)
+                    {
+                        // If no main variant add-ons found, call GetsSubVariantAddOns instead
+                        var subVariantAddOnsId = await GetsSubVariantAddOns(pastryId);
+
+                        // Handle sub-variant add-ons as needed
+                        if (subVariantAddOnsId != null && subVariantAddOnsId.Count > 0)
+                        {
+                            addOnIds.AddRange(subVariantAddOnsId.Select(id => id.ToString()));
+                        }
+                        else
+                        {
+                            return BadRequest($"No add-ons found with pastryId: {pastryMaterialId}");
+                        }
+                    }
+                    else
+                    {
+                        // Add main variant add-ons to the list
+                        addOnIds.AddRange(mainVariantAddOnsId.Select(id => id.ToString()));
+                    }
+
                     // Generate new orderId for each item
                     Guid orderId = Guid.NewGuid();
                     string orderIdBinary = ConvertGuidToBinary16(orderId.ToString()).ToLower();
-                    
+
                     // Insert the new order into the 'orders' table
                     await InsertOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, buyNowRequest.Type, buyNowRequest.Payment);
-                    
+
+                    // Generate suborderId
+                    Guid suborderId = Guid.NewGuid();
+                    string suborderIdBinary = ConvertGuidToBinary16(suborderId.ToString()).ToLower();
+
                     // Create the order object
                     var order = new Order
                     {
-                        suborderId = Guid.NewGuid(),
+                        suborderId = suborderId,
                         price = orderItem.Price,
                         quantity = orderItem.Quantity,
                         designName = designName,
@@ -117,9 +148,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     // Insert the order with the determined pastryId
                     await InsertsOrder(order, orderIdBinary, designId, orderItem.Flavor, orderItem.Size, pastryId, customerId, orderItem.Color, orderItem.Shape, orderItem.Description);
 
+                    // Add suborderId and add-ons to the response list
+                    responses.Add(new SuborderResponse
+                    {
+                        suborderId = suborderIdBinary,
+                        pastryId = pastryId,
+                        addonId = addOnIds
+                    });
                 }
 
-                return Ok($"Order has been successfully created for {buyNowRequest.orderItem.Count} item(s).");
+                return Ok(responses); // Return the list of suborderIds and add-ons
             }
             catch (Exception ex)
             {
@@ -127,6 +165,73 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
+
+
+        private async Task<List<int>> GetsMainVariantAddOns(string pastryMaterialId, string size)
+        {
+            var addOnsIds = new List<int>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+    SELECT pma.add_ons_id
+    FROM pastymaterialaddons pma
+    JOIN pastrymaterials pm ON pm.pastry_material_id = pma.pastry_material_id
+    WHERE pma.pastry_material_id = @pastryMaterialId
+      AND pm.main_variant_name = @size";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@pastryMaterialId", pastryMaterialId);
+                    command.Parameters.AddWithValue("@size", size);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var addOnsId = reader.GetInt32("add_ons_id");
+                            addOnsIds.Add(addOnsId);
+                        }
+                    }
+                }
+            }
+
+            return addOnsIds;
+        }
+
+        private async Task<List<int>> GetsSubVariantAddOns(string subVariantId)
+        {
+            var addOnsIds = new List<int>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+    SELECT add_ons_id
+    FROM pastrymaterialsubvariantaddons
+    WHERE pastry_material_sub_variant_id = @subVariantId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@subVariantId", subVariantId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            var addOnsId = reader.GetInt32("add_ons_id");
+                            addOnsIds.Add(addOnsId);
+                        }
+                    }
+                }
+            }
+
+            return addOnsIds;
+        }
+
 
         private async Task InsertsOrder(Order order, string orderId, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
         {
@@ -166,7 +271,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPost("/culo-api/v1/current-user/custom-orders/add")]
+        [HttpPost("/culo-api/v1/current-user/custom-orders")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateCustomOrder([FromBody] PostCustomOrder customOrder)
         {
@@ -287,7 +392,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("/culo-api/v1/current-user/cart/add")]
+        [HttpPost("/culo-api/v1/current-user/cart")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
         {
@@ -323,6 +428,38 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderDto.Size);
                 string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
 
+                // List to collect suborderId responses
+                var responses = new List<SuborderResponse>();
+
+                // Retrieve list of add_ons_id from pastymaterialaddons table
+                var mainVariantAddOnsId = await GetsMainVariantAddOns(pastryId, orderDto.Size);
+
+                // Check if the main variant add-ons list is empty
+                // Initialize a list to store add-on IDs
+                var addOnIds = new List<string>();
+
+                // Check if the main variant add-ons list is empty
+                if (mainVariantAddOnsId == null || mainVariantAddOnsId.Count == 0)
+                {
+                    // If no main variant add-ons found, call GetsSubVariantAddOns instead
+                    var subVariantAddOnsId = await GetsSubVariantAddOns(pastryId);
+
+                    // Handle sub-variant add-ons as needed
+                    if (subVariantAddOnsId != null && subVariantAddOnsId.Count > 0)
+                    {
+                        addOnIds.AddRange(subVariantAddOnsId.Select(id => id.ToString()));
+                    }
+                    else
+                    {
+                        return BadRequest($"No add-ons found with pastryId: {pastryMaterialId}");
+                    }
+                }
+                else
+                {
+                    // Add main variant add-ons to the list
+                    addOnIds.AddRange(mainVariantAddOnsId.Select(id => id.ToString()));
+                }
+
                 var order = new Order
                 {
                     orderId = Guid.NewGuid(),
@@ -340,52 +477,25 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     status = "cart"
                 };
 
+                string suborderIdBinary = ConvertGuidToBinary16(order.suborderId.ToString()).ToLower();
+
                 // Insert the order into the database using the determined pastryId
                 await InsertOrder(order, designId, orderDto.Flavor, orderDto.Size, pastryId, customerId, orderDto.Color, orderDto.Shape, orderDto.Description);
 
-                return Ok(); // Return 200 OK if the order is successfully created
+                responses.Add(new SuborderResponse
+                {
+                    suborderId = suborderIdBinary,
+                    pastryId = pastryId,
+                    addonId = addOnIds
+                });
+
+                return Ok(responses); // Return the list of suborderIds and add-ons
             }
             catch (Exception ex)
             {
                 // Log and return an error message if an exception occurs
                 _logger.LogError(ex, "An error occurred while creating the order");
                 return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
-            }
-        }
-
-
-
-        private async Task<string> GetShapeByDesignIds(string designIdHex) //not sure yet where table
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT shape_name FROM designshapes WHERE design_id = UNHEX(@designId)";
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@designId", designIdHex);
-
-                    var result = await command.ExecuteScalarAsync();
-                    return result != null && result != DBNull.Value ? result.ToString() : null;
-                }
-            }
-        }
-
-        private async Task<string> GetTierByDesignIds(string designIdHex) //dunno yet where table
-        {
-            using (var connection = new MySqlConnection(connectionstring))
-            {
-                await connection.OpenAsync();
-
-                string sql = "SELECT tier FROM designshapes WHERE design_id = UNHEX(@designId)";
-                using (var command = new MySqlCommand(sql, connection))
-                {
-                    command.Parameters.AddWithValue("@designId", designIdHex);
-
-                    var result = await command.ExecuteScalarAsync();
-                    return result != null && result != DBNull.Value ? result.ToString() : null;
-                }
             }
         }
 
@@ -423,8 +533,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
-
-
 
         private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
         {
@@ -6678,7 +6786,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                 string sql = @"
         DELETE FROM suborders 
-        WHERE customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+        WHERE order_id IS NULL AND customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {

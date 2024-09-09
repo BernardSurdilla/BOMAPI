@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System.Text.Json.Serialization;
 
 namespace CRUDFI.Models
@@ -362,9 +363,11 @@ namespace CRUDFI.Models
     }
 
 
-    public class SuborderId
+    public class SuborderResponse
     {
-        public Guid suborderId { get; set; }
+        public string suborderId { get; set; }
+        public string pastryId { get; set; }
+        public List<string> addonId {  get; set; }
     }
 
 
