@@ -343,9 +343,8 @@ namespace CRUDFI.Models
 
     public class OrderDTO
     {
-        public double Price { get; set; }
         public int Quantity { get; set; }
-        public string DesignName { get; set; }
+        public byte[] DesignId { get; set; }
         public string Description { get; set; }
         public string Flavor { get; set; }
         public string Size { get; set; }
