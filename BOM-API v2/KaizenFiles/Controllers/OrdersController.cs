@@ -74,20 +74,24 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Create and save orders for each item in the orderItem list
                 foreach (var orderItem in buyNowRequest.orderItem)
                 {
-                    // Get the design's ID using the provided design name
-                    byte[] designId = await GetDesignIdByDesignName(orderItem.DesignName);
-                    if (designId == null || designId.Length == 0)
+                    
+
+                    string designIdHex = BitConverter.ToString(orderItem.DesignId).Replace("-", "").ToLower();
+
+                    string designName = await getDesignName(designIdHex);
+                    if (designIdHex == null || designIdHex.Length == 0)
                     {
-                        return BadRequest($"Design '{orderItem.DesignName}' not found.");
+                        return BadRequest($"Design '{orderItem.DesignId}' not found.");
                     }
 
-                    // Retrieve the design name and pastry material ID
-                    string designName = await getDesignName(orderItem.DesignName);
-                    string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
                     string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
                     string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderItem.Size);
                     string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderItem.Size);
                     string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
+                    double TotalPrice = await CalculatesTotalPrice(orderItem.Size, orderItem.Quantity, pastryId);
+
+                    Debug.WriteLine("Total Price is: " + TotalPrice);
 
                     // Retrieve list of add_ons_id from pastymaterialaddons table
                     var mainVariantAddOnsId = await GetsMainVariantAddOns(pastryId, orderItem.Size);
@@ -132,7 +136,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     var order = new Order
                     {
                         suborderId = suborderId,
-                        price = orderItem.Price,
+                        price = TotalPrice,
                         quantity = orderItem.Quantity,
                         designName = designName,
                         size = orderItem.Size,
@@ -146,7 +150,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     };
 
                     // Insert the order with the determined pastryId
-                    await InsertsOrder(order, orderIdBinary, designId, orderItem.Flavor, orderItem.Size, pastryId, customerId, orderItem.Color, orderItem.Shape, orderItem.Description);
+                    await InsertsOrder(order, orderIdBinary, designIdHex, orderItem.Flavor, orderItem.Size, pastryId, customerId, orderItem.Color, orderItem.Shape, orderItem.Description);
 
                     // Add suborderId and add-ons to the response list
                     responses.Add(new SuborderResponse
@@ -166,6 +170,34 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        private async Task<double> CalculatesTotalPrice(string size, int quantity, string pastryId)
+        {
+
+            double SubTotalprice = await STotal2(pastryId);
+
+            Debug.WriteLine(SubTotalprice);
+
+            string mainId = await STotal1(pastryId, size);
+
+            double TotalPrice;
+
+            if (SubTotalprice == 0)
+            {
+                double MainTotalprice = await Total(pastryId);
+                Debug.WriteLine(MainTotalprice);
+
+                TotalPrice = MainTotalprice * quantity;
+            }
+            else
+            {
+                double MainTotalprice = await Total(mainId);
+                Debug.WriteLine(MainTotalprice);
+
+                TotalPrice = (SubTotalprice + MainTotalprice) * quantity;
+            }
+
+            return TotalPrice; // Return the calculated total price
+        }
 
         private async Task<List<int>> GetsMainVariantAddOns(string pastryMaterialId, string size)
         {
@@ -233,7 +265,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        private async Task InsertsOrder(Order order, string orderId, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
+        private async Task InsertsOrder(Order order, string orderId, string designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -243,7 +275,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"INSERT INTO suborders (
             suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
-            VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(@orderid), @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
+            VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(@orderid), @customerId, @CustomerName, NULL, NOW(), @status, UNHEX(@designId), @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -412,21 +444,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return BadRequest("Customer not found");
                 }
 
-                // Get the design's ID using the provided design name
-                byte[] designId = await GetDesignIdByDesignName(orderDto.DesignName);
-                if (designId == null || designId.Length == 0)
-                {
-                    return BadRequest("Design not found");
-                }
+                string designIdHex = BitConverter.ToString(orderDto.DesignId).Replace("-", "").ToLower();
 
-                string designName = await getDesignName(orderDto.DesignName);
-                string designIdHex = BitConverter.ToString(designId).Replace("-", "").ToLower();
+                string designName = await getDesignName(designIdHex);
+                if (designIdHex == null || designIdHex.Length == 0)
+                {
+                    return BadRequest($"Design '{orderDto.DesignId}' not found.");
+                }
 
                 // Get the pastry material ID using just the design ID
                 string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
                 string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderDto.Size);
                 string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderDto.Size);
                 string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
+                double TotalPrice = await CalculateTotalPrice(orderDto, pastryId);
+
+                Debug.WriteLine("Total Price is: "+TotalPrice);
 
                 // List to collect suborderId responses
                 var responses = new List<SuborderResponse>();
@@ -464,8 +498,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     orderId = Guid.NewGuid(),
                     suborderId = Guid.NewGuid(),
-                    price = orderDto.Price, // Use the calculated price from the response
                     quantity = orderDto.Quantity,
+                    price = TotalPrice, // Use the calculated price from the response
                     designName = designName,
                     size = orderDto.Size,
                     flavor = orderDto.Flavor,
@@ -480,7 +514,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string suborderIdBinary = ConvertGuidToBinary16(order.suborderId.ToString()).ToLower();
 
                 // Insert the order into the database using the determined pastryId
-                await InsertOrder(order, designId, orderDto.Flavor, orderDto.Size, pastryId, customerId, orderDto.Color, orderDto.Shape, orderDto.Description);
+                await InsertOrder(order, designIdHex, orderDto.Flavor, orderDto.Size, pastryId, customerId, orderDto.Color, orderDto.Shape, orderDto.Description);
 
                 responses.Add(new SuborderResponse
                 {
@@ -497,6 +531,193 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 _logger.LogError(ex, "An error occurred while creating the order");
                 return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
             }
+        }
+
+        private async Task<double> CalculateTotalPrice(OrderDTO orderDto, string pastryId)
+        {
+
+            double SubTotalprice = await STotal2(pastryId);
+
+            Debug.WriteLine(SubTotalprice);
+
+            string mainId = await STotal1(pastryId, orderDto.Size);
+
+            double TotalPrice;
+
+            if (SubTotalprice == 0)
+            {
+                double MainTotalprice = await Total(pastryId);
+                Debug.WriteLine(MainTotalprice);
+
+                TotalPrice = MainTotalprice * orderDto.Quantity;
+            }
+            else
+            {
+                double MainTotalprice = await Total(mainId);
+                Debug.WriteLine(MainTotalprice);
+
+                TotalPrice = (SubTotalprice + MainTotalprice) * orderDto.Quantity;
+            }
+
+            return TotalPrice; // Return the calculated total price
+        }
+
+
+        // Method to get the price of items by item_id
+        private async Task<List<double>> Price(int itemId)
+        {
+            var prices = new List<double>();
+
+            // Query to retrieve price for the given itemId
+            string query = "SELECT price FROM item WHERE id = @itemId";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@itemId", itemId);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            prices.Add(reader.GetDouble("price"));
+                        }
+                    }
+                }
+            }
+
+            return prices;
+        }
+
+        // Method to calculate the total by multiplying amount by price for each item
+        private async Task<double> Total(string pastryId)
+        {
+            double totalSum = 0.0;  // Initialize a variable to keep track of the total sum
+
+            // Query to retrieve item_id and amount where pastry_material_id = @pastryId
+            string query = "SELECT item_id, amount FROM ingredients WHERE pastry_material_id = @pastryId";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@pastryId", pastryId);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            int itemId = reader.GetInt32("item_id");
+                            double amount = reader.GetDouble("amount");
+
+                            // Get the prices for the given itemId by calling Price()
+                            var prices = await Price(itemId);
+
+                            // Multiply amount by each price and add the result to the total sum
+                            foreach (var price in prices)
+                            {
+                                totalSum += amount * price;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return totalSum;  // Return the total sum
+        }
+
+        // Method to get the pastry_material_sub_variant_id by pastryId and size
+        private async Task<string> STotal1(string pastryId, string size)
+        {
+            string psubId = string.Empty;
+
+            // Query to retrieve the pastry_material_sub_variant_id based on pastryId and size
+            string query = "SELECT pastry_material_id FROM pastrymaterialsubvariants WHERE pastry_material_sub_variant_id = @pastryId AND sub_variant_name = @size";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@pastryId", pastryId);
+                    command.Parameters.AddWithValue("@size", size);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            // Retrieve the sub-variant ID as a string
+                            psubId = reader.GetString("pastry_material_id");
+                        }
+                    }
+                }
+            }
+
+            return psubId;  // Return the sub-variant ID
+        }
+
+        // Method to get item_id and amount from pastrymaterialsubvariantingredients based on the psubId
+        private async Task<double> STotal2(string psubId)
+        {
+            double totalSum = 0.0;
+
+            // Query to retrieve item_id and amount for the given pastry_material_sub_variant_id
+            string query = "SELECT item_id, amount FROM pastrymaterialsubvariantingredients WHERE pastry_material_sub_variant_id = @psubId";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@psubId", psubId);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            int itemId = reader.GetInt32("item_id");
+                            double amount = reader.GetDouble("amount");
+
+                            // Get the price for the given itemId by calling STotal3()
+                            var prices = await STotal3(itemId);
+
+                            // Multiply amount by each price and add to the total sum
+                            foreach (var price in prices)
+                            {
+                                totalSum += amount * price;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return totalSum;  // Return the total sum
+        }
+
+        // Method to get the price for the given itemId
+        private async Task<List<double>> STotal3(int itemId)
+        {
+            var prices = new List<double>();
+
+            // Query to retrieve price for the given item_id
+            string query = "SELECT price FROM item WHERE Id = @itemId";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@itemId", itemId);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            prices.Add(reader.GetDouble("price"));
+                        }
+                    }
+                }
+            }
+
+            return prices;  // Return the list of prices
         }
 
         private async Task<string> GetPastryMaterialIdByDesignIds(string designIdHex)
@@ -534,7 +755,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task InsertOrder(Order order, byte[] designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
+        private async Task InsertOrder(Order order, string designId, string flavor, string size, string pastryId, byte[] customerId, string color, string shape, string Description)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -545,7 +766,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
             VALUES (
-            UNHEX(REPLACE(UUID(), '-', '')), NULL, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
+            UNHEX(REPLACE(UUID(), '-', '')), NULL, @customerId, @CustomerName, NULL, NOW(), @status, UNHEX(@designId), @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -6979,7 +7200,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             {
                 await connection.OpenAsync();
 
-                string designQuery = "SELECT display_name FROM designs WHERE display_name = @displayName";
+                string designQuery = "SELECT display_name FROM designs WHERE design_id = UNHEX(@displayName)";
                 using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@displayName", design);
