@@ -209,7 +209,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 string sql = @"
     SELECT pma.add_ons_id
-    FROM pastymaterialaddons pma
+    FROM pastrymaterialaddons pma
     JOIN pastrymaterials pm ON pm.pastry_material_id = pma.pastry_material_id
     WHERE pma.pastry_material_id = @pastryMaterialId
       AND pm.main_variant_name = @size";
