@@ -73,6 +73,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                         return BadRequest($"Design '{orderItem.DesignId}' not found.");
                     }
 
+                    string shape = await GetDesignShapes(designIdHex);
+
                     string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
                     string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId,orderItem.Size);
                     string subVariantId = await GetPastryMaterialSubVariantId(subersId,orderItem.Size);
@@ -128,13 +130,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                         isActive = false,
                         customerName = customerUsername,
                         color = orderItem.Color,
-                        shape = orderItem.Shape,
+                        shape = shape,
                         Description = orderItem.Description,
                         status = "to pay"
                     };
 
                     // Insert the order with the determined pastryId
-                    await InsertsOrder(order,orderIdBinary,designIdHex,orderItem.Flavor,orderItem.Size,pastryId,customerId,orderItem.Color,orderItem.Shape,orderItem.Description);
+                    await InsertsOrder(order,orderIdBinary,designIdHex,orderItem.Flavor,orderItem.Size,pastryId,customerId,orderItem.Color, shape, orderItem.Description);
 
                     // Add suborderId and add-ons to the response list
                     responses.Add(new SuborderResponse {
@@ -254,7 +256,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     command.Parameters.AddWithValue("@quantity",order.quantity);
                     command.Parameters.AddWithValue("@isActive",order.isActive);
                     command.Parameters.AddWithValue("@color",order.color);
-                    command.Parameters.AddWithValue("@shape",order.shape);
+                    command.Parameters.AddWithValue("@shape", shape);
                     command.Parameters.AddWithValue("@Description",order.Description);
                     command.Parameters.AddWithValue("@Flavor",flavor);
                     command.Parameters.AddWithValue("@Size",size);
@@ -398,6 +400,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     return BadRequest($"Design '{orderDto.DesignId}' not found.");
                 }
 
+                string shape = await GetDesignShapes(designIdHex);
+
                 // Get the pastry material ID using just the design ID
                 string subersId = await GetPastryMaterialIdByDesignIds(designIdHex);
                 string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId,orderDto.Size);
@@ -447,7 +451,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     isActive = false,
                     customerName = customerUsername, // Set customer name from authenticated user
                     color = orderDto.Color,
-                    shape = orderDto.Shape,
+                    shape = shape,
                     Description = orderDto.Description,
                     status = "cart"
                 };
@@ -455,7 +459,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 string suborderIdBinary = ConvertGuidToBinary16(order.suborderId.ToString()).ToLower();
 
                 // Insert the order into the database using the determined pastryId
-                await InsertOrder(order,designIdHex,orderDto.Flavor,orderDto.Size,pastryId,customerId,orderDto.Color,orderDto.Shape,orderDto.Description);
+                await InsertOrder(order,designIdHex,orderDto.Flavor,orderDto.Size,pastryId,customerId,orderDto.Color, shape, orderDto.Description);
 
                 responses.Add(new SuborderResponse {
                     suborderId = suborderIdBinary,
@@ -468,6 +472,29 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 // Log and return an error message if an exception occurs
                 _logger.LogError(ex,"An error occurred while creating the order");
                 return StatusCode(500,"An error occurred while processing the request"); // Return 500 Internal Server Error
+            }
+        }
+
+        private async Task<string> GetDesignShapes(string design)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string designQuery = "SELECT shape_name FROM designshapes WHERE design_id = UNHEX(@design_id)";
+                using (var designcommand = new MySqlCommand(designQuery, connection))
+                {
+                    designcommand.Parameters.AddWithValue("@design_id", design);
+                    object result = await designcommand.ExecuteScalarAsync();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        return (string)result;
+                    }
+                    else
+                    {
+                        return null; // Design not found
+                    }
+                }
             }
         }
 
@@ -678,7 +705,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     command.Parameters.AddWithValue("@quantity",order.quantity);
                     command.Parameters.AddWithValue("@isActive",order.isActive);
                     command.Parameters.AddWithValue("@color",order.color);
-                    command.Parameters.AddWithValue("@shape",order.shape);
+                    command.Parameters.AddWithValue("@shape",shape);
                     command.Parameters.AddWithValue("@Description",order.Description);
                     command.Parameters.AddWithValue("@Flavor",flavor);
                     command.Parameters.AddWithValue("@Size",size);
@@ -5739,6 +5766,157 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
          }
 
          */
+
+
+        [HttpPut("current-user/{suborderId}/manage-add-ons")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> ManageAddOnsByAddOnId(string suborderId, [FromBody] ManageAddOnQuantityWrapper manageWrapper)
+        {
+            // Convert suborderId to binary format
+            string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+
+            // Loop through each AddOn in the manage list
+            foreach (var manage in manageWrapper.manage)
+            {
+                // Log the process for each add-on
+                _logger.LogInformation($"Managing AddOnId: {manage.addonId} for SubOrderId: {suborderId}");
+
+                // Fetch the add-on price and name
+                double addonPrice = await GetAddonPriceAsync(manage.addonId);
+                string name = await AddonName(manage.addonId);
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+                    try
+                    {
+                        // Calculate total price
+                        double total = manage.quantity * addonPrice;
+
+                        // Insert or update the order add-ons for the current add-on
+                        await InsertOrUpdateOrderaddonWithSubOrderId(suborderIdBinary, manage.addonId, addonPrice, manage.quantity, name, total);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Transaction failed for AddOnId: {manage.addonId}, rolling back");
+                    }
+                }
+            }
+
+            return Ok("Add-ons quantities successfully managed.");
+        }
+
+
+        private async Task<double> GetAddonPriceAsync(int addOnId)
+        {
+            string sql = @"SELECT price FROM addons WHERE add_ons_id = @addOnId";
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@addOnId", addOnId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            return reader.GetDouble("price");
+                        }
+                        else
+                        {
+                            throw new Exception($"Price not found for AddOnId '{addOnId}'.");
+                        }
+                    }
+                }
+            }
+        }
+
+        private async Task<string> AddonName(int addOnId)
+        {
+            string addonName = string.Empty;
+
+            // Query to retrieve the pastry_material_sub_variant_id based on pastryId and size
+            string query = "SELECT name FROM addons WHERE add_ons_id = @addonId";
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+                using (var command = new MySqlCommand(query, connection))
+                {
+                    command.Parameters.AddWithValue("@addonId", addOnId);
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            addonName = reader.GetString("name");
+                        }
+                    }
+                }
+            }
+
+            return addonName;  // Return the sub-variant ID
+        }
+
+        private async Task InsertOrUpdateOrderaddonWithSubOrderId(string orderIdBinary, int addOnsId, double price, int quantity, string name, double total)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Check if the record already exists
+                string checkSql = @"SELECT COUNT(*) FROM orderaddons 
+                            WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnId";
+
+                using (var checkCommand = new MySqlCommand(checkSql, connection))
+                {
+                    checkCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    checkCommand.Parameters.AddWithValue("@addOnId", addOnsId);
+
+                    var count = Convert.ToInt32(await checkCommand.ExecuteScalarAsync());
+
+                    if (count > 0)
+                    {
+                        // Record exists, update it
+                        string updateSql = @"UPDATE orderaddons 
+                                     SET name = @name, price = @price, quantity = @quantity, total = @total 
+                                     WHERE order_id = UNHEX(@orderId) AND add_ons_id = @addOnId";
+
+                        using (var updateCommand = new MySqlCommand(updateSql, connection))
+                        {
+                            updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                            updateCommand.Parameters.AddWithValue("@addOnId", addOnsId);
+                            updateCommand.Parameters.AddWithValue("@quantity", quantity);
+                            updateCommand.Parameters.AddWithValue("@price", price);
+                            updateCommand.Parameters.AddWithValue("@name", name);
+                            updateCommand.Parameters.AddWithValue("@total", total);
+
+                            await updateCommand.ExecuteNonQueryAsync();
+                        }
+                    }
+                    else
+                    {
+                        // No existing record, insert new
+                        string insertSql = @"INSERT INTO orderaddons (order_id, add_ons_id, quantity, total, name, price)
+                                     VALUES (UNHEX(@orderId), @addOnId, @quantity, @total, @name, @price)";
+
+                        using (var insertCommand = new MySqlCommand(insertSql, connection))
+                        {
+                            insertCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                            insertCommand.Parameters.AddWithValue("@addOnId", addOnsId);
+                            insertCommand.Parameters.AddWithValue("@quantity", quantity);
+                            insertCommand.Parameters.AddWithValue("@price", price);
+                            insertCommand.Parameters.AddWithValue("@name", name);
+                            insertCommand.Parameters.AddWithValue("@total", total);
+
+                            await insertCommand.ExecuteNonQueryAsync();
+                        }
+                    }
+                }
+            }
+        }
+
 
         [HttpPatch("/culo-api/v1/current-user/manage-add-ons-by-material/{pastryMaterialId}/{suborderId}/{modifiedAddOnId}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
