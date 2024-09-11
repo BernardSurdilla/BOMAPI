@@ -149,7 +149,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return addOnDSOSList;
         }
 
-        [HttpPatch("{addOnsId}/update-add-on")] //test this soon
+        [HttpPatch("{addOnsId}")] //test this soon
         public async Task<IActionResult> UpdateAddOn(int addOnsId, [FromBody] Models.Adds.UpdateAddOnRequest updateRequest)
         {
             try
