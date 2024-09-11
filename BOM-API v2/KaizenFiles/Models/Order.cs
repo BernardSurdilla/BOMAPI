@@ -349,7 +349,6 @@ namespace CRUDFI.Models
         public string Flavor { get; set; }
         public string Size { get; set; }
         public string Color { get; set; }
-        public string Shape { get; set; }
     }
 
     public class CheckOutRequest
@@ -464,13 +463,20 @@ namespace CRUDFI.Models
         public DateTime? LastModifiedDate { get; set; }
         public bool IsActive { get; set; }
     }
-
-
     public class ManageAddOnAction
     {
-
-        public string ActionType { get; set; } // 'setquantity' or other actions
+        public string ActionType { get; set; } = "";
         public int Quantity { get; set; }
+    }
+    public class AddOn
+    {
+        public int addonId { get; set; }
+        public int quantity { get; set; }
+    }
+
+    public class ManageAddOnQuantityWrapper
+    {
+        public List<AddOn> manage { get; set; }
     }
     public class PastryMaterialAddOn
     {
