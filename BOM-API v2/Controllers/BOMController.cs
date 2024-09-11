@@ -29,14 +29,14 @@ namespace API_TEST.Controllers
         public TestEndpointsController(DatabaseContext context, IActionLogger logger, KaizenTables kaizenTables)
         {
             _context = context;
-            _actionLogger = logger;
             _kaizenTables = kaizenTables;
+            _actionLogger = logger;
         }
 
         [HttpGet("sss/{PMID}/{INGID}/{INGTYPE}")]
-        public async Task<bool> TestEndp(string PMID, string INGID, string INGTYPE)
+        public async Task<double> TestEndp(string PMID, string INGID, string INGTYPE)
         {
-            return await DataVerification.DoesIngredientExistsInPastryMaterial(PMID, INGID, INGTYPE, _context);
+            return await PriceCalculator.CalculatePastryMaterialPrice(PMID, _context, _kaizenTables);
         }
     }
 

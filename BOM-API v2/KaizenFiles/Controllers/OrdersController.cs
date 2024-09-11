@@ -24,9 +24,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
         private readonly string connectionstring;
         private readonly ILogger<OrdersController> _logger;
 
-        public OrdersController(IConfiguration configuration,ILogger<OrdersController> logger) {
+        private readonly DatabaseContext _context;
+        private readonly KaizenTables _kaizenTables;
+
+        public OrdersController(IConfiguration configuration,ILogger<OrdersController> logger, DatabaseContext context, KaizenTables kaizenTables) {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
+
+            _context = context;
+            _kaizenTables = kaizenTables;
+
+
         }
 
         [HttpPost("/culo-api/v1/current-user/buy-now")]
@@ -80,7 +88,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     string subVariantId = await GetPastryMaterialSubVariantId(subersId,orderItem.Size);
                     string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
 
-                    double TotalPrice = await CalculatesTotalPrice(orderItem.Size,orderItem.Quantity,pastryId);
+                    double TotalPrice = await PriceCalculator.CalculatePastryMaterialPrice(pastryId, _context, _kaizenTables);
 
                     Debug.WriteLine("Total Price is: " + TotalPrice);
 
@@ -408,7 +416,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 string subVariantId = await GetPastryMaterialSubVariantId(subersId,orderDto.Size);
                 string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
 
-                double TotalPrice = await CalculateTotalPrice(orderDto,pastryId);
+                double TotalPrice = await PriceCalculator.CalculatePastryMaterialPrice(pastryId, _context, _kaizenTables);
 
                 Debug.WriteLine("Total Price is: " + TotalPrice);
 
