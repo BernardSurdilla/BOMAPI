@@ -320,7 +320,7 @@ namespace CRUDFI.Models
     }
     public class AssignEmp
     {
-        public string name { get; set; }
+        public string employeeId { get; set; }
     }
 
     public class OrderAddon1
