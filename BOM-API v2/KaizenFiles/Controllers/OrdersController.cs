@@ -835,15 +835,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
             }
         }
 
-        [HttpPost("/culo-api/v1/current-user/confirm-cancel-order/{orderId}")]
+        [HttpPost("current-user/{orderId}/confirm")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> ConfirmOrCancelOrder(string orderId,[FromQuery] string action) {
-            // Validate action parameter
-            if(action != "confirm" && action != "cancel") {
-                return BadRequest("Invalid action parameter. It must be 'confirm' or 'cancel'.");
-            }
-
-            if(string.IsNullOrEmpty(orderId)) {
+        public async Task<IActionResult> ConfirmOrder(string orderId)
+        {
+            if (string.IsNullOrEmpty(orderId))
+            {
                 return BadRequest("OrderId cannot be null or empty.");
             }
 
@@ -853,34 +850,61 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
             // Check if the order exists
             var orderExists = await CheckOrderExistx(orderIdBinary);
 
-            if(!orderExists) {
+            if (!orderExists)
+            {
                 return NotFound("No orders found for the specified orderId.");
             }
 
-            // Perform the update based on the action
-            await UpdateOrderxxStatus(orderIdBinary,action);
+            // Perform the update for confirmation
+            await UpdateOrderxxStatus(orderIdBinary, "confirm");
 
-            byte[] suborderid = await UpdateOrderxxxxStatus(orderIdBinary);
+            byte[] suborderId = await UpdateOrderxxxxStatus(orderIdBinary);
 
-            Debug.Write(suborderid);
-            if(suborderid == null) {
+            if (suborderId == null)
+            {
                 return NotFound("No suborder ID found for the given order ID.");
             }
 
-            await UpdateOrderxxxStatus(suborderid,action);
+            await UpdateOrderxxxStatus(suborderId, "confirm");
 
-
-            // Return a success message based on the action
-            if(action == "confirm") {
-                return Ok("Order confirmed successfully.");
-            }
-            else if(action == "cancel") {
-                return Ok("Order canceled successfully.");
-            }
-            else {
-                return StatusCode(500,"An error occurred while updating the order status.");
-            }
+            return Ok("Order confirmed successfully.");
         }
+
+        [HttpPost("current-user/{orderId}/cancel")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> CancelOrder(string orderId)
+        {
+            if (string.IsNullOrEmpty(orderId))
+            {
+                return BadRequest("OrderId cannot be null or empty.");
+            }
+
+            // Convert orderId to binary format for querying
+            string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+            // Check if the order exists
+            var orderExists = await CheckOrderExistx(orderIdBinary);
+
+            if (!orderExists)
+            {
+                return NotFound("No orders found for the specified orderId.");
+            }
+
+            // Perform the update for cancellation
+            await UpdateOrderxxStatus(orderIdBinary, "cancel");
+
+            byte[] suborderId = await UpdateOrderxxxxStatus(orderIdBinary);
+
+            if (suborderId == null)
+            {
+                return NotFound("No suborder ID found for the given order ID.");
+            }
+
+            await UpdateOrderxxxStatus(suborderId, "cancel");
+
+            return Ok("Order canceled successfully.");
+        }
+
 
         private async Task UpdateOrderxxStatus(string orderIdBinary,string action) {
             using(var connection = new MySqlConnection(connectionstring)) {
@@ -1125,6 +1149,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             try {
                 // Convert the orderId from GUID string to binary(16) format without '0x' prefix
                 string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
+                string empdBinary = ConvertGuidToBinary16(assign.employeeId).ToLower();
 
                 // Check if the order with the given ID exists
                 bool orderExists = await CheckOrderExists(suborderIdBinary);
@@ -1133,13 +1158,14 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 }
 
                 // Check if the employee with the given username exists
-                byte[] employeeId = await GetEmployeeIdByUsername(assign.name);
-                if(employeeId == null || employeeId.Length == 0) {
+                string employeeName = await GetEmployeeNameById(empdBinary);
+
+                if(employeeName == null || employeeName.Length == 0) {
                     return NotFound($"Employee with username '{assign}' not found. Please try another name.");
                 }
 
                 // Update the order with the employee ID and employee name
-                await UpdateOrderEmployeeId(suborderIdBinary,employeeId,assign.name);
+                await UpdateOrderEmployeeId(suborderIdBinary, empdBinary, employeeName);
 
                 await UpdateOrderStatusToBaking(suborderIdBinary);
 
@@ -1149,6 +1175,35 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 return StatusCode(500,$"An error occurred while processing the request to assign employee to order with ID '{suborderId}'.");
             }
         }
+
+        private async Task<string> GetEmployeeNameById(string empId)
+        {
+            string EmpId = string.Empty;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();  // Open the connection only once
+
+                string sql = "SELECT DisplayName FROM users WHERE UserId = UNHEX(@id) AND Type = 2";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@id", empId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            // Retrieve the DisplayName as a string
+                            EmpId = reader.GetString("DisplayName");
+                        }
+                    }
+                }
+            }
+
+            return EmpId;  // Return the DisplayName
+        }
+
 
         [HttpDelete("suborders/{suborderId}/{addonId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
@@ -1478,7 +1533,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet]
+        [HttpGet("debug")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllOrders() {
             try {
@@ -3937,7 +3992,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-        [HttpGet("{suborderId}/add-ons")] //done (might remove this)
+        /*[HttpGet("{suborderId}/add-ons")] //done (might remove this)
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetAddOnsByOrderId(string suborderId) {
             try {
@@ -4014,7 +4069,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-
+        */
 
         private async Task<(string designIdHex, string size)> GetDesignIdAndSizeByOrderId(string orderIdBinary) {
             using(var connection = new MySqlConnection(connectionstring)) {
@@ -4502,7 +4557,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
         */
 
 
-
+        /*
         [HttpGet("/culo-api/v1/current-user/type")] //update this 
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetOrdersByType([FromQuery] string type) {
@@ -4588,7 +4643,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(StatusCodes.Status500InternalServerError,$"An error occurred while fetching orders by type: {ex.Message}");
             }
         }
-
+        */
         private async Task<string> GetLastupdater(string username) {
             using(var connection = new MySqlConnection(connectionstring)) {
                 await connection.OpenAsync();
@@ -4682,7 +4737,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
         }
 
 
-
+        /*
         [HttpGet("admin/by-customer-username/{customerUsername}")] //update this
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByCustomerUsername(string customerUsername) {
@@ -4738,7 +4793,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(StatusCodes.Status500InternalServerError,$"An error occurred while fetching orders for username '{customerUsername}': {ex.Message}");
             }
         }
-
+        */
 
         private async Task<byte[]> GetUserIdByCustomerUsername(string customerUsername) {
             using(var connection = new MySqlConnection(connectionstring)) {
@@ -4766,7 +4821,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-
+        /*
         [HttpGet("admin/by-type/{type}/{username}")] //update this
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Artist + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrdersByTypeAndUsername(string type,string username) {
@@ -4828,7 +4883,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(StatusCodes.Status500InternalServerError,$"An error occurred while fetching orders for username '{username}' and type '{type}': {ex.Message}");
             }
         }
-
+        */
 
         private bool IsValidOrderType(string type) {
             // Define valid order types
@@ -4988,7 +5043,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
         }
         */
 
-        // suggested URL: "{orderId}/update-price"
+        /*
         [HttpPatch("update-price")] //change this
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderAddon([FromQuery] string orderId,[FromQuery] string name,[FromQuery] decimal price) {
@@ -5062,7 +5117,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(500,"An error occurred while processing the request");
             }
         }
-
+        */
         [HttpPatch("{orderId}/approve")] // done
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderxStatus(string orderId,[FromQuery] string action) {
@@ -6273,7 +6328,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
         }
 
 
-        [HttpDelete("/culo-api/v1/current-user/orders/{orderId}/remove")] //debug this  
+        [HttpDelete("/culo-api/v1/current-user/orders/{orderId}/remove")] 
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> RemoveOrder(string orderId) {
             try {
@@ -6341,7 +6396,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-        [HttpDelete("/culo-api/v1/current-user/cart/{suborderId}")] //debug this  
+        [HttpDelete("/culo-api/v1/current-user/cart/{suborderId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> RemoveCart(string suborderId) {
             try {
@@ -6511,12 +6566,12 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
 
 
-        private async Task UpdateOrderEmployeeId(string orderIdBinary,byte[] employeeId,string employeeUsername) {
+        private async Task UpdateOrderEmployeeId(string orderIdBinary,string employeeId,string employeeUsername) {
             using(var connection = new MySqlConnection(connectionstring)) {
                 await connection.OpenAsync();
 
                 // Update the status in both suborders and orders tables
-                string sqlSuborders = "UPDATE suborders SET employee_id = @employeeId, employee_name = @employeeName, status = 'baking' WHERE suborder_id = UNHEX(@orderId)";
+                string sqlSuborders = "UPDATE suborders SET employee_id = UNHEX(@employeeId), employee_name = @employeeName, status = 'baking' WHERE suborder_id = UNHEX(@orderId)";
 
                 using(var command = new MySqlCommand(sqlSuborders,connection)) {
                     command.Parameters.AddWithValue("@employeeId",employeeId);
