@@ -1894,7 +1894,16 @@ namespace BillOfMaterialsAPI.Helpers
                 catch { throw; }
 
                 InventorySubtractorInfo currentIngredientSubtractionInfo = totalIngredientAmountConsumption[ingredientId];
-                double calculatedAmount = UnitConverter.ConvertByName(currentIngredientSubtractionInfo.Amount, currentIngredientSubtractionInfo.AmountQuantityType, currentIngredientSubtractionInfo.AmountUnit, currentItem.measurements) * currentItem.price;
+                double calculatedAmount = 0.0;
+                try
+                {
+                    calculatedAmount = UnitConverter.ConvertByName(currentIngredientSubtractionInfo.Amount, currentIngredientSubtractionInfo.AmountQuantityType, currentIngredientSubtractionInfo.AmountUnit, currentItem.measurements) * currentItem.price;
+                }
+                catch
+                {
+                    calculatedAmount = currentIngredientSubtractionInfo.Amount * currentItem.price;
+                }
+                
 
                 response += calculatedAmount;
             }
