@@ -145,6 +145,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
 
                     // Insert the order with the determined pastryId
                     await InsertsOrder(order,orderIdBinary,designIdHex,orderItem.Flavor,orderItem.Size,pastryId,customerId,orderItem.Color, shape, orderItem.Description);
+                    
+                    string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+
+                    string message = ((order.customerName ?? "Unknown") + " " + "''" + (order.designName ?? "Design") + "''" + " has been added to your to pay");
+
+                    await NotifyAsync(userId, message);
 
                     // Add suborderId and add-ons to the response list
                     responses.Add(new SuborderResponse {
@@ -327,7 +333,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 // Insert custom order into the database
                 await InsertCustomOrder(customOrder.quantity,orderIdBinary,customerId,customerUsername,customOrder.picture,customOrder.Description,customOrder.message,customOrder.size,customOrder.tier,customOrder.cover,customOrder.color,customOrder.shape,customOrder.flavor);
 
-
+                string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+                string message = ((order.customerName ?? "Unknown") + " " + "your order is added for approval");
+                await NotifyAsync(userId, message);
 
                 return Ok(); // Return 200 OK if the order is successfully created
             } catch(Exception ex) {
@@ -468,6 +476,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
 
                 // Insert the order into the database using the determined pastryId
                 await InsertOrder(order,designIdHex,orderDto.Flavor,orderDto.Size,pastryId,customerId,orderDto.Color, shape, orderDto.Description);
+
+                string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+
+                string message = ((order.customerName ?? "Unknown") + " " + "''" + (order.designName ?? "Design") + "''" + " has been added to your cart");
+
+                await NotifyAsync(userId, message);
 
                 responses.Add(new SuborderResponse {
                     suborderId = suborderIdBinary,
@@ -778,6 +792,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     await UpdateSuborderWithOrderId(suborderIdBinary,orderIdBinary);
                 }
 
+                string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+
+                string message = ((customerUsername ?? "Unknown") + " your cart has been added to your to pay");
+
+                await NotifyAsync(userId, message);
+
                 return Ok($"Order for {checkOutRequest.SuborderIds.Count} suborder(s) has been successfully created with order ID '{orderIdBinary}'.");
             } catch(Exception ex) {
                 _logger.LogError(ex,"An error occurred while processing the request.");
@@ -866,6 +886,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
             }
 
             await UpdateOrderxxxStatus(suborderId, "confirm");
+
 
             return Ok("Order confirmed successfully.");
         }
@@ -6691,23 +6712,28 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-        private async Task<byte[]> GetDesignIdByDesignName(string designName) {
-            using(var connection = new MySqlConnection(connectionstring)) {
+        private async Task NotifyAsync(string userId, string message)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
                 await connection.OpenAsync();
 
-                string designIdQuery = "SELECT design_id FROM designs WHERE display_name = @DisplayName";
-                using(var designIdCommand = new MySqlCommand(designIdQuery,connection)) {
-                    designIdCommand.Parameters.AddWithValue("@DisplayName",designName);
-                    object result = await designIdCommand.ExecuteScalarAsync();
-                    if(result != null && result != DBNull.Value) {
-                        return (byte[])result;
-                    }
-                    else {
-                        return null; // Design not found
-                    }
+                string sql = @"
+            INSERT INTO notification (notif_id, user_id, message, date_created) 
+            VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(@userId), @message, NOW())";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Add parameters for userId and message
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.Parameters.AddWithValue("@message", message);
+
+                    // Execute the query
+                    await command.ExecuteNonQueryAsync();
                 }
             }
         }
+
 
 
 
