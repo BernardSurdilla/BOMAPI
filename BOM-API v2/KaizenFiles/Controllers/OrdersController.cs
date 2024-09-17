@@ -887,6 +887,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
 
             await UpdateOrderxxxStatus(suborderId, "confirm");
 
+            // Retrieve all employee IDs with Type 3 or 4
+            List<string> users = await GetEmployeeAllId();
+
+            foreach (var user in users)
+            {
+                // Get the employee name by the userId
+                string employeeName = await GetEmployeeNameById(user);
+
+                // Convert the userId to the binary form expected in the database
+                string userIdBinary = ConvertGuidToBinary16(user).ToLower();
+
+                // Construct the notification message
+                string message = ((employeeName ?? "Unknown") + " new order that needed approval has been added");
+
+                // Send notification to the user
+                await NotifyAsync(userIdBinary, message);
+            }
 
             return Ok("Order confirmed successfully.");
         }
@@ -946,7 +963,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
             }
         }
 
-        private async Task UpdateOrderxxxStatus(byte[] orderIdBinary,string action)//decide whether to use or nahh
+        private async Task UpdateOrderxxxStatus(byte[] orderIdBinary,string action)
         {
             using(var connection = new MySqlConnection(connectionstring)) {
                 await connection.OpenAsync();
@@ -1189,6 +1206,12 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 await UpdateOrderEmployeeId(suborderIdBinary, empdBinary, employeeName);
 
                 await UpdateOrderStatusToBaking(suborderIdBinary);
+
+                string userId = empdBinary;
+
+                string message = ((employeeName ?? "Unknown") + " new order has been assigned to you");
+
+                await NotifyAsync(userId, message);
 
                 return Ok($"Employee with username '{assign}' has been successfully assigned to order with ID '{suborderId}'.");
             } catch(Exception ex) {
@@ -5213,6 +5236,27 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                 }
 
+                // Call the method to get customer ID and name
+                var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
+
+                if (!string.IsNullOrEmpty(customerId))
+                {
+                    // Convert the customerId to the binary format needed
+                    string userId = ConvertGuidToBinary16(customerId).ToLower();
+
+                    // Construct the message
+                    string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
+
+                    // Send the notification
+                    await NotifyAsync(userId, message);
+                }
+                else
+                {
+                    // Handle case where customer info is not found
+                    Debug.Write("Customer not found for the given order.");
+                }
+
+
                 return Ok("Order status updated successfully");
             } catch(Exception ex) {
                 // Log and return an error message if an exception occurs
@@ -5428,6 +5472,8 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 else {
                     return BadRequest("Invalid action. Please choose 'send' or 'done'.");
                 }
+
+
 
                 return Ok($"Order with ID '{suborderId}' has been successfully updated to '{action}'.");
             } catch(Exception ex) {
@@ -6712,6 +6758,34 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
+        private async Task<(string customerId, string customerName)> GetCustomerInfo(string order)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string designQuery = "SELECT customer_name, customer_id FROM orders WHERE order_id = UNHEX(@orderId)";
+                using (var designcommand = new MySqlCommand(designQuery, connection))
+                {
+                    designcommand.Parameters.AddWithValue("@orderId", order);
+                    using (var reader = await designcommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            string customerId = reader.GetString("customer_id");
+                            string customerName = reader.GetString("customer_name");
+                            return (customerId, customerName);  // Return both customer ID and name
+                        }
+                        else
+                        {
+                            return (null, null); // Design not found
+                        }
+                    }
+                }
+            }
+        }
+
+
         private async Task NotifyAsync(string userId, string message)
         {
             using (var connection = new MySqlConnection(connectionstring))
@@ -6734,8 +6808,31 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
+        private async Task<List<string>> GetEmployeeAllId()
+        {
+            var empIds = new List<string>();
 
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();  // Open the connection only once
 
+                string sql = "SELECT UserId FROM users WHERE Type IN (3,4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())  // Loop through all the results
+                        {
+                            // Retrieve the UserId and add it to the list
+                            empIds.Add(reader.GetString("UserId"));
+                        }
+                    }
+                }
+            }
+
+            return empIds;  // Return the list of UserIds
+        }
 
 
     }
