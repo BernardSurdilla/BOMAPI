@@ -11,7 +11,6 @@ namespace CRUDFI.Models
         public Guid suborderId { get; set; }
         public string pastryId { get; set; }
         public Guid? customerId { get; set; }
-
         public string customerName { get; set; } = string.Empty;
 
         public string? employeeName { get; set; } = string.Empty;

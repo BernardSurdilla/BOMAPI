@@ -5182,16 +5182,19 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
                 Debug.Write("orderId here!!! " + orderIdBinary);
 
-                using(var connection = new MySqlConnection(connectionstring)) {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
                     await connection.OpenAsync();
 
                     // Check if the order exists with the given OrderId
                     string sqlCheck = "SELECT COUNT(*) FROM orders WHERE order_id = UNHEX(@orderId)";
-                    using(var checkCommand = new MySqlCommand(sqlCheck,connection)) {
-                        checkCommand.Parameters.AddWithValue("@orderId",orderIdBinary);
+                    using (var checkCommand = new MySqlCommand(sqlCheck, connection))
+                    {
+                        checkCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
 
                         int orderCount = Convert.ToInt32(await checkCommand.ExecuteScalarAsync());
-                        if(orderCount == 0) {
+                        if (orderCount == 0)
+                        {
                             Debug.Write(orderIdBinary);
                             return NotFound("Order not found");
                         }
@@ -5199,7 +5202,8 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                     // Prepare the SQL update query based on the action
                     string sqlUpdate;
-                    switch(action.ToLower()) {
+                    switch (action.ToLower())
+                    {
                         case "half":
                             sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = 'half', last_updated_by = @lastUpdatedBy, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
                             break;
@@ -5213,31 +5217,41 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     }
 
                     // Execute the update command
-                    using(var updateCommand = new MySqlCommand(sqlUpdate,connection)) {
-                        updateCommand.Parameters.AddWithValue("@orderId",orderIdBinary);
-                        updateCommand.Parameters.AddWithValue("@lastUpdatedBy",lastUpdatedBy);
-                        updateCommand.Parameters.AddWithValue("@lastUpdatedAt",DateTime.UtcNow);
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                        updateCommand.Parameters.AddWithValue("@lastUpdatedBy", lastUpdatedBy);
+                        updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
 
                         int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
-                        if(rowsAffected == 0) {
+                        if (rowsAffected == 0)
+                        {
                             return NotFound("Order not found");
                         }
                     }
 
-                    byte[] suborderid = await UpdateStatus1(orderIdBinary);
+                    // Call UpdateStatus1 to get a list of suborder IDs
+                    List<byte[]> suborderIds = await UpdateStatus1(orderIdBinary);
 
-                    Debug.WriteLine(BitConverter.ToString(suborderid));
-
-                    if(suborderid == null) {
+                    // Check if suborderIds is null or empty
+                    if (suborderIds == null || suborderIds.Count == 0)
+                    {
                         return NotFound("No suborder ID found for the given order ID.");
                     }
 
-                    await UpdateStatus2(suborderid,action);
+                    // Iterate through each suborder ID and call UpdateStatus2
+                    foreach (var suborderid in suborderIds)
+                    {
+                        // Log the suborderId for debugging
+                        Debug.WriteLine(BitConverter.ToString(suborderid));
 
+                        // Call UpdateStatus2 for each suborder ID
+                        await UpdateStatus2(suborderid, action);
+                    }
                 }
 
-                // Call the method to get customer ID and name
-                var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
+                    // Call the method to get customer ID and name
+                    var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
 
                 if (!string.IsNullOrEmpty(customerId))
                 {
@@ -5291,35 +5305,41 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
 
-        private async Task<byte[]> UpdateStatus1(string orderIdBinary)//decide whether to use or nahh
+        async Task<List<byte[]>> UpdateStatus1(string orderIdBinary)
         {
-            using(var connection = new MySqlConnection(connectionstring)) {
+            List<byte[]> suborderIds = new List<byte[]>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
                 await connection.OpenAsync();
 
                 // Specify the columns you want to select
                 string sql = "SELECT suborder_id FROM suborders WHERE order_id = UNHEX(@orderId)";
 
-                using(var command = new MySqlCommand(sql,connection)) {
-                    command.Parameters.AddWithValue("@orderId",orderIdBinary);
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
 
                     // Use ExecuteReaderAsync to execute the SELECT query
-                    using(var reader = await command.ExecuteReaderAsync()) {
-                        if(await reader.ReadAsync()) {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
                             // Return the binary value of suborder_id directly
                             byte[] suborderIdBytes = (byte[])reader["suborder_id"];
 
                             // Debug.WriteLine to display the value of suborderIdBytes
                             Debug.WriteLine($"Suborder ID bytes for order ID '{orderIdBinary}': {BitConverter.ToString(suborderIdBytes)}");
 
-                            return suborderIdBytes;
-                        }
-                        else {
-                            // Return null or handle cases where no rows are found
-                            return null;
+                            // Add each suborder_id to the list
+                            suborderIds.Add(suborderIdBytes);
                         }
                     }
                 }
             }
+
+            // Return the list of suborder_id byte arrays
+            return suborderIds;
         }
 
 
@@ -5473,7 +5493,42 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     return BadRequest("Invalid action. Please choose 'send' or 'done'.");
                 }
 
+                // Call the method to get customer ID and name
+                var (customerId, customerName) = await GetCustomerInfoBySubOrderId(orderIdBinary);
 
+                if (!string.IsNullOrEmpty(customerId))
+                {
+                    // Convert the customerId to the binary format needed
+                    string userId = ConvertGuidToBinary16(customerId).ToLower();
+
+                    // Check the value of 'action' and send the corresponding notification
+                    if (action.Equals("send", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Construct the message for 'send' action
+                        string message = ((customerName ?? "Unknown") + " your order is ready for pick up");
+
+                        // Send the notification
+                        await NotifyAsync(userId, message);
+                    }
+                    else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Construct the message for 'done' action
+                        string message = ((customerName ?? "Unknown") + " order received");
+
+                        // Send the notification
+                        await NotifyAsync(userId, message);
+                    }
+                    else
+                    {
+                        // Handle other cases or log unexpected actions
+                        Debug.Write("Invalid action or no notification sent for this action.");
+                    }
+                }
+                else
+                {
+                    // Handle case where customer info is not found
+                    Debug.Write("Customer not found for the given order.");
+                }
 
                 return Ok($"Order with ID '{suborderId}' has been successfully updated to '{action}'.");
             } catch(Exception ex) {
@@ -5497,6 +5552,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 _logger.LogError(ex,$"An error occurred while processing order completion for '{orderIdBinary}'.");
                 throw; // Re-throw the exception to propagate it to the calling method
             }
+
         }
 
         private async Task<forSales> GetOrderDetailsAndInsertIntoSales(string orderIdBytes) {
@@ -6380,7 +6436,26 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                         int rowsAffected = await cmd.ExecuteNonQueryAsync();
 
-                        if(rowsAffected > 0) {
+                        var (customerId, customerName) = await GetCustomerInfoForCustomOrders(suborderIdBinary);
+
+                        if (!string.IsNullOrEmpty(customerId))
+                        {
+                            // Convert the customerId to the binary format needed
+                            string userId = ConvertGuidToBinary16(customerId).ToLower();
+
+                            // Construct the message
+                            string message = ((customerName ?? "Unknown") + " your order has been approved; view final details");
+
+                            // Send the notification
+                            await NotifyAsync(userId, message);
+                        }
+                        else
+                        {
+                            // Handle case where customer info is not found
+                            Debug.Write("Customer not found for the given order.");
+                        }
+
+                        if (rowsAffected > 0) {
                             return Ok("Custom order updated successfully.");
                         }
                         else {
@@ -6393,6 +6468,34 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(500,"Internal server error: " + ex.Message);
             }
         }
+
+        private async Task<(string customerId, string customerName)> GetCustomerInfoForCustomOrders(string order)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string designQuery = "SELECT customer_name, customer_id FROM customorders WHERE custom_id = UNHEX(@orderId)";
+                using (var designcommand = new MySqlCommand(designQuery, connection))
+                {
+                    designcommand.Parameters.AddWithValue("@orderId", order);
+                    using (var reader = await designcommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            string customerId = reader.GetString("customer_id");
+                            string customerName = reader.GetString("customer_name");
+                            return (customerId, customerName);  // Return both customer ID and name
+                        }
+                        else
+                        {
+                            return (null, null); // Design not found
+                        }
+                    }
+                }
+            }
+        }
+
 
 
         [HttpDelete("/culo-api/v1/current-user/orders/{orderId}/remove")] 
@@ -6765,6 +6868,33 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 await connection.OpenAsync();
 
                 string designQuery = "SELECT customer_name, customer_id FROM orders WHERE order_id = UNHEX(@orderId)";
+                using (var designcommand = new MySqlCommand(designQuery, connection))
+                {
+                    designcommand.Parameters.AddWithValue("@orderId", order);
+                    using (var reader = await designcommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            string customerId = reader.GetString("customer_id");
+                            string customerName = reader.GetString("customer_name");
+                            return (customerId, customerName);  // Return both customer ID and name
+                        }
+                        else
+                        {
+                            return (null, null); // Design not found
+                        }
+                    }
+                }
+            }
+        }
+
+        private async Task<(string customerId, string customerName)> GetCustomerInfoBySubOrderId(string order)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string designQuery = "SELECT customer_name, customer_id FROM orders WHERE suborder_id = UNHEX(@orderId)";
                 using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@orderId", order);
