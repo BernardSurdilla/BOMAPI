@@ -36,7 +36,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
-        [HttpGet]
+        [HttpGet("current-user")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetNotifications()
         {
             List<Notif> notifications = new List<Notif>();
@@ -94,6 +95,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                 }
 
+                int unreadNotificationCount = await CountUnreadNotificationsAsync(user);
+
+                Response.Headers.Append("X-Unread-Notification-Count", unreadNotificationCount.ToString());
+
+                if (notifications.Count == 0)
+                {
+                    return Ok(new List<Notif>());
+                }
+
                 return Ok(notifications);
             }
             catch (Exception ex)
@@ -101,6 +111,96 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 _logger.LogError($"Error retrieving notifications: {ex.Message}");
                 return StatusCode(500, "Internal server error");
             }
+        }
+
+        [HttpPost("current-user/{notifId}/mark-as-read")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> MarkNotificationAsRead(string notifId)
+        {
+            try
+            {
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized.");
+                }
+
+                string userId = await GetUserIdByAllUsername(username);
+
+                if (userId == null)
+                {
+                    return BadRequest("User not found.");
+                }
+
+                string user = ConvertGuidToBinary16(userId).ToLower();
+
+                string notif = ConvertGuidToBinary16(notifId).ToLower();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                    UPDATE notification
+                    SET is_read = 1
+                    WHERE notif_id = UHEX(@notifId) AND user_id = UNHEX(@userId)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@notifId", notif);
+                        command.Parameters.AddWithValue("@userId", user);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected > 0)
+                        {
+                            return Ok("Notification marked as read.");
+                        }
+                        else
+                        {
+                            return NotFound("Notification not found or already marked as read.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error marking notification as read: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        private async Task<int> CountUnreadNotificationsAsync(string userId)
+        {
+            int unreadCount = 0;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT COUNT(*) 
+            FROM notification 
+            WHERE user_id = UNHEX(@userId) AND is_read = 0";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Add the userId parameter to the query
+                    command.Parameters.AddWithValue("@userId", userId);
+
+                    // Execute the query and get the count of unread notifications
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        unreadCount = Convert.ToInt32(result);
+                    }
+                }
+            }
+
+            // Return the total unread notification count
+            return unreadCount;
         }
 
         private string ConvertGuidToBinary16(string guidString)
