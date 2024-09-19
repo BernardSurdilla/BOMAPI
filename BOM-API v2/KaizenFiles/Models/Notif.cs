@@ -7,7 +7,6 @@ namespace BOM_API_v2.KaizenFiles.Models
     public class Notif
     {
         public Guid? customId { get; set; }
-        public string designName { get; set; } = string.Empty;
         public Guid? userId { get; set; }
         public DateTime dateCreated { get; set; }
         public string Message { get; set; }
