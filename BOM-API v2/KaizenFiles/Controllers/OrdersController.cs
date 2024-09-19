@@ -53,9 +53,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 if(customerId == null || customerId.Length == 0) {
                     return BadRequest("Customer not found.");
                 }
+                string customer = await GetUserIdByAllUsernameString(customerUsername);
 
                 // Validate and parse pickup date and time
-                if(!DateTime.TryParseExact(buyNowRequest.PickupDate,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out DateTime parsedDate) ||
+                if (!DateTime.TryParseExact(buyNowRequest.PickupDate,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out DateTime parsedDate) ||
                     !DateTime.TryParseExact(buyNowRequest.PickupTime,"h:mm tt",CultureInfo.InvariantCulture,DateTimeStyles.None,out DateTime parsedTime)) {
                     return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
                 }
@@ -146,7 +147,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     // Insert the order with the determined pastryId
                     await InsertsOrder(order,orderIdBinary,designIdHex,orderItem.Flavor,orderItem.Size,pastryId,customerId,orderItem.Color, shape, orderItem.Description);
                     
-                    string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+                    string userId = ConvertGuidToBinary16(customer.ToString()).ToLower();
 
                     string message = ((order.customerName ?? "Unknown") + " " + "''" + (order.designName ?? "Design") + "''" + " has been added to your to pay");
 
@@ -300,7 +301,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     return BadRequest("Customer not found");
                 }
 
-                if(!DateTime.TryParseExact(customOrder.PickupDate,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out DateTime parsedDate) ||
+                string customer = await GetUserIdByAllUsernameString(customerUsername);
+
+                if (!DateTime.TryParseExact(customOrder.PickupDate,"yyyy-MM-dd",CultureInfo.InvariantCulture,DateTimeStyles.None,out DateTime parsedDate) ||
                     !DateTime.TryParseExact(customOrder.PickupTime,"h:mm tt",CultureInfo.InvariantCulture,DateTimeStyles.None,out DateTime parsedTime)) {
                     return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
                 }
@@ -333,7 +336,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 // Insert custom order into the database
                 await InsertCustomOrder(customOrder.quantity,orderIdBinary,customerId,customerUsername,customOrder.picture,customOrder.Description,customOrder.message,customOrder.size,customOrder.tier,customOrder.cover,customOrder.color,customOrder.shape,customOrder.flavor);
 
-                string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+                string userId = ConvertGuidToBinary16(customer.ToString()).ToLower();
                 string message = ((order.customerName ?? "Unknown") + " " + "your order is added for approval");
                 await NotifyAsync(userId, message);
 
@@ -342,6 +345,40 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 // Log and return an error message if an exception occurs
                 _logger.LogError(ex,"An error occurred while creating the custom order");
                 return StatusCode(500,"An error occurred while processing the request"); // Return 500 Internal Server Error
+            }
+        }
+
+        private async Task<string> GetUserIdByAllUsernameString(string username)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (1, 2, 3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@username", username);
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        // Cast the result to byte[] since UserId is stored as binary(16)
+                        byte[] userIdBytes = (byte[])result;
+
+                        // Convert the byte[] to a hex string (without dashes)
+                        string userIdHex = BitConverter.ToString(userIdBytes).Replace("-", "").ToLower();
+
+                        // Debug.WriteLine to display the value of userIdHex
+                        Debug.WriteLine($"UserId hex for username '{username}': {userIdHex}");
+
+                        return userIdHex;
+                    }
+                    else
+                    {
+                        return null; // User not found or type not matching
+                    }
+                }
             }
         }
 
@@ -408,6 +445,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 if(customerId == null || customerId.Length == 0) {
                     return BadRequest("Customer not found");
                 }
+
+                string customer = await GetUserIdByAllUsernameString(customerUsername);
 
                 string designIdHex = BitConverter.ToString(orderDto.DesignId).Replace("-","").ToLower();
 
@@ -477,7 +516,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 // Insert the order into the database using the determined pastryId
                 await InsertOrder(order,designIdHex,orderDto.Flavor,orderDto.Size,pastryId,customerId,orderDto.Color, shape, orderDto.Description);
 
-                string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+                string userId = ConvertGuidToBinary16(customer.ToString()).ToLower();
 
                 string message = ((order.customerName ?? "Unknown") + " " + "''" + (order.designName ?? "Design") + "''" + " has been added to your cart");
 
@@ -757,8 +796,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     return BadRequest("Customer not found.");
                 }
 
+                string customer = await GetUserIdByAllUsernameString(customerUsername);
+
                 // Validate type
-                if(!checkOutRequest.Type.Equals("normal",StringComparison.OrdinalIgnoreCase) &&
+                if (!checkOutRequest.Type.Equals("normal",StringComparison.OrdinalIgnoreCase) &&
                     !checkOutRequest.Type.Equals("rush",StringComparison.OrdinalIgnoreCase)) {
                     return BadRequest("Invalid type. Please choose 'normal' or 'rush'.");
                 }
@@ -792,7 +833,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     await UpdateSuborderWithOrderId(suborderIdBinary,orderIdBinary);
                 }
 
-                string userId = ConvertGuidToBinary16(customerId.ToString()).ToLower();
+                string userId = ConvertGuidToBinary16(customer.ToString()).ToLower();
 
                 string message = ((customerUsername ?? "Unknown") + " your cart has been added to your to pay");
 
@@ -893,13 +934,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
             foreach (var user in users)
             {
                 // Get the employee name by the userId
-                string employeeName = await GetEmployeeNameById(user);
+                string AdminName = await GetAdminNameById(user);
 
                 // Convert the userId to the binary form expected in the database
                 string userIdBinary = ConvertGuidToBinary16(user).ToLower();
 
                 // Construct the notification message
-                string message = ((employeeName ?? "Unknown") + " new order that needed approval has been added");
+                string message = ((AdminName ?? "Unknown") + " new order that needed approval has been added");
 
                 // Send notification to the user
                 await NotifyAsync(userIdBinary, message);
@@ -907,6 +948,37 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
 
             return Ok("Order confirmed successfully.");
         }
+
+        private async Task<string> GetAdminNameById(string empId)
+        {
+            string adminName = string.Empty;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();  // Open the connection once
+
+                // SQL query to fetch DisplayName for the specified empId
+                string sql = "SELECT DisplayName FROM users WHERE UserId = UNHEX(@id) AND Type IN (3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Ensure empId is a valid binary UUID string
+                    command.Parameters.AddWithValue("@id", empId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            // Retrieve and return the DisplayName if found
+                            adminName = reader.GetString("DisplayName");
+                        }
+                    }
+                }
+            }
+
+            return adminName;  // Return the DisplayName (or empty string if not found)
+        }
+
 
         [HttpPost("current-user/{orderId}/cancel")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
@@ -6923,8 +6995,8 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 await connection.OpenAsync();
 
                 string sql = @"
-            INSERT INTO notification (notif_id, user_id, message, date_created) 
-            VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(@userId), @message, NOW())";
+            INSERT INTO notification (notif_id, user_id, message, date_created, is_read) 
+            VALUES (UNHEX(REPLACE(UUID(), '-', '')), UNHEX(@userId), @message, NOW(), 0)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
