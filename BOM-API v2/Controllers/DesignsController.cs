@@ -194,6 +194,75 @@ namespace BOM_API_v2.Controllers
             return response;
 
         }
+        [HttpGet("search/by-name")]
+        public async Task<List<GetDesign>> SearchDesignByName(string name, int? page, int? record_per_page, string? sortBy, string? sortOrder)
+        {
+
+            IQueryable<Designs> dbQuery = _databaseContext.Designs.Where(x => x.is_active == true && EF.Functions.Like(x.display_name, $"%{name}%"));
+
+            List<Designs> current_design_records = new List<Designs>();
+            List<GetDesign> response = new List<GetDesign>();
+
+            switch (sortBy)
+            {
+                case "design_id":
+                    switch (sortOrder)
+                    {
+                        case "DESC":
+                            dbQuery = dbQuery.OrderByDescending(x => x.design_id);
+                            break;
+                        default:
+                            dbQuery = dbQuery.OrderBy(x => x.design_id);
+                            break;
+                    }
+                    break;
+                case "display_name":
+                    switch (sortOrder)
+                    {
+                        case "DESC":
+                            dbQuery = dbQuery.OrderByDescending(x => x.display_name);
+                            break;
+                        default:
+                            dbQuery = dbQuery.OrderBy(x => x.display_name);
+                            break;
+                    }
+                    break;
+                case "display_picture_url":
+                    switch (sortOrder)
+                    {
+                        case "DESC":
+                            dbQuery = dbQuery.OrderByDescending(x => x.display_picture_url);
+                            break;
+                        default:
+                            dbQuery = dbQuery.OrderBy(x => x.display_picture_url);
+                            break;
+                    }
+                    break;
+            }
+
+            //Paging algorithm
+            if (page == null) { current_design_records = await dbQuery.ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                current_design_records = await dbQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            foreach (Designs currentDesign in current_design_records)
+            {
+                GetDesign newResponseEntry = await DataParser.CreateGetDesignResponseFromDbRow(currentDesign, _databaseContext, _kaizenTables);
+
+                response.Add(newResponseEntry);
+            }
+
+            await _actionLogger.LogAction(User, "GET", "Search Design");
+            return response;
+
+        }
 
         [HttpGet("{design_id}/pastry-material")]
         [Authorize(Roles = UserRoles.Admin)]
