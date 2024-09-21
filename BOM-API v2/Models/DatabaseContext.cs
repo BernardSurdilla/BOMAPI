@@ -40,7 +40,7 @@ namespace BillOfMaterialsAPI.Models
         public DbSet<DesignTagsForCakes> DesignTagsForCakes { get; set; }
         public DbSet<DesignImage> DesignImage { get; set; }
         public DbSet<DesignShapes> DesignShapes { get; set; }
-    }   
+    }
 
     public class KaizenTables : DbContext
     {

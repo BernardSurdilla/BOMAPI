@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -120,6 +119,6 @@ namespace BillOfMaterialsAPI.Schemas
     public class PostDesignShape
     {
         [Required] public Guid design_id { get; set; }
-        [Required] public string shape_name { get; set;  }
+        [Required] public string shape_name { get; set; }
     }
 }

@@ -1,16 +1,13 @@
-﻿using BillOfMaterialsAPI.Models;
+﻿using BillOfMaterialsAPI.Helpers;
+using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Helpers;
-
+using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Diagnostics;
-using System.Text;
 using UnitsNet;
-using BOM_API_v2.Services;
 
 namespace API_TEST.Controllers
 {
@@ -630,7 +627,7 @@ namespace API_TEST.Controllers
             await _actionLogger.LogAction(User, "POST", "Subtract ingredients of " + pastry_material_id);
             return Ok(new { message = "Ingredients sucessfully deducted." });
         }
-        
+
         [HttpPost("orders/{order_id}/subtract-recipe-ingredients-on-inventory/")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string order_id)
@@ -739,6 +736,6 @@ namespace API_TEST.Controllers
 
             return Ok(new { message = "Ingredients sucessfully deducted." });
         }
-        
+
     }
 }

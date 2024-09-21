@@ -1,5 +1,4 @@
-﻿using Google.Protobuf;
-using JWTAuthentication.Authentication;
+﻿using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -10,14 +9,14 @@ namespace LiveChat
 {
     public class DirectMessagesController : ControllerBase
 
-    { 
+    {
         private readonly UserManager<APIUsers> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
 
         private readonly DirectMessagesDB _directMessagesDB;
-        public DirectMessagesController(DirectMessagesDB directMessagesDB, UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager) 
-        { 
-            _directMessagesDB = directMessagesDB; 
+        public DirectMessagesController(DirectMessagesDB directMessagesDB, UserManager<APIUsers> userManager, RoleManager<IdentityRole> roleManager)
+        {
+            _directMessagesDB = directMessagesDB;
             _userManager = userManager;
             _roleManager = roleManager;
         }
@@ -33,10 +32,10 @@ namespace LiveChat
             APIUsers? currentUser = await _userManager.FindByIdAsync(userId);
             if (currentUser == null) { return response; }
 
-            List<DirectMessages> allMessages = await _directMessagesDB.DirectMessages.Where(x => x.sender_account_id == currentUser.Id.ToString() || x.receiver_account_id == currentUser.Id.ToString()).ToListAsync(); 
+            List<DirectMessages> allMessages = await _directMessagesDB.DirectMessages.Where(x => x.sender_account_id == currentUser.Id.ToString() || x.receiver_account_id == currentUser.Id.ToString()).ToListAsync();
 
             //Select all unique ids
-            List<string?> uniqueIds = allMessages.SelectMany(x => new[] {x.sender_account_id, x.receiver_account_id}).Distinct().ToList();
+            List<string?> uniqueIds = allMessages.SelectMany(x => new[] { x.sender_account_id, x.receiver_account_id }).Distinct().ToList();
             uniqueIds.Remove(currentUser.Id.ToString());
             uniqueIds.RemoveAll(x => x == null);
 
@@ -75,7 +74,7 @@ namespace LiveChat
     }
     public class GetMessageResponseFormat
     {
-        public string? account_id {  get; set; }
+        public string? account_id { get; set; }
         public string? account_name { get; set; }
         public List<GetMessageFormat> messages { get; set; }
     }

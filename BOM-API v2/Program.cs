@@ -1,7 +1,10 @@
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Services;
+using BOM_API_v2.Bridge;
+using BOM_API_v2.Helpers;
 using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
+using LiveChat;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -9,12 +12,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
-using Microsoft.EntityFrameworkCore.InMemory;
-using BOM_API_v2.Bridge;
-using API_TEST.Controllers;
-using BOM_API_v2.Helpers;
-using BOM_API_v2.Controllers;
-using LiveChat;
 
 
 const string API_VERSION = "v1";

@@ -110,14 +110,14 @@ namespace BillOfMaterialsAPI.Schemas
     public class GetPastryMaterial
     {
         [Required] public string design_id { get; set; }
-        [Required] public string design_name { get; set;  }
+        [Required] public string design_name { get; set; }
         [Required][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
 
         public double cost_estimate { get; set; }
-        
+
         public string main_variant_name { get; set; }
         public bool ingredients_in_stock { get; set; }
         public List<GetPastryMaterialIngredients> ingredients { get; set; }

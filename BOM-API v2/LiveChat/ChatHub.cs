@@ -1,10 +1,6 @@
 ﻿using JWTAuthentication.Authentication;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using System.Security.Claims;
 
 namespace LiveChat
@@ -29,10 +25,10 @@ namespace LiveChat
 
             MessageFormat formattedMessage = CreateFormattedMessage(accountId, message, currentUser);
 
-            if (currentUser != null) 
+            if (currentUser != null)
             {
                 List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
-                
+
                 if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
                 //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
 
@@ -49,9 +45,9 @@ namespace LiveChat
             }
 
             ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
-            if (messageRecipientConnectionInfo == null) 
-            { 
-                messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.AccountId == accountId).FirstOrDefault(); 
+            if (messageRecipientConnectionInfo == null)
+            {
+                messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
             }
             if (messageRecipientConnectionInfo == null) { return; }
 
@@ -118,7 +114,7 @@ namespace LiveChat
             {
                 IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
 
-                if (recieverUserAccountRoles.Contains(UserRoles.Artist) 
+                if (recieverUserAccountRoles.Contains(UserRoles.Artist)
                     || recieverUserAccountRoles.Contains(UserRoles.Admin)
                     || recieverUserAccountRoles.Contains(UserRoles.Manager))
                 {
@@ -159,9 +155,9 @@ namespace LiveChat
             }
 
             ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
-            if (messageRecipientConnectionInfo == null) 
+            if (messageRecipientConnectionInfo == null)
             {
-                return; 
+                return;
             }
 
             ISingleClientProxy callerClientProxy = Clients.Caller;
@@ -175,17 +171,19 @@ namespace LiveChat
             ClaimsPrincipal? currentUser = Context.User;
 
             if (currentUser == null) { _connectionManager.AddConnection(Context.ConnectionId); }
-            else {
+            else
+            {
                 List<Claim> allRoles = currentUser.FindAll(ClaimTypes.Role).ToList();
                 List<string> allRolesParsed = new List<string>();
                 foreach (Claim claim in allRoles) { allRolesParsed.Add(claim.Value); }
 
                 _connectionManager.AddConnection(new ConnectionInfo(
-                Context.ConnectionId, 
+                Context.ConnectionId,
                 currentUser.FindFirstValue(ClaimTypes.NameIdentifier),
-                currentUser.FindFirstValue(ClaimTypes.Name), 
-                allRolesParsed )); }
-            
+                currentUser.FindFirstValue(ClaimTypes.Name),
+                allRolesParsed));
+            }
+
             return base.OnConnectedAsync();
         }
 
@@ -204,8 +202,8 @@ namespace LiveChat
                 sender_message_time_sent = DateTime.Now
             };
 
-            if (senderAccount == null) 
-            { 
+            if (senderAccount == null)
+            {
                 response.sender_name = "Anonymous";
                 response.sender_account_id = "N/A";
             }

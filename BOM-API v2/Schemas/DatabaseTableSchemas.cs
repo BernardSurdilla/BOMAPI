@@ -1,13 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using System.Runtime.InteropServices;
-using System;
-using MimeKit.Encodings;
 
 namespace BillOfMaterialsAPI.Schemas
 {
-    
+
     public static class IngredientType
     {
         public const string Material = "MAT";
@@ -173,7 +170,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         [Required] public double amount { get; set; }
         [Required][MaxLength(15)] public string amount_measurement { get; set; }
-        
+
         [Required][Column("is_active")] public bool is_active { get; set; }
         [Required] public DateTime date_added { get; set; }
         public DateTime last_modified_date { get; set; }
@@ -222,10 +219,10 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("design_tags_for_cake_id")]
     public class DesignTagsForCakes
     {
-        [Key]public Guid design_tags_for_cake_id { get; set; }
+        [Key] public Guid design_tags_for_cake_id { get; set; }
 
-        [ForeignKey("Designs")]public byte[] design_id { get; set; }
-        [ForeignKey("DesignTags")]public Guid design_tag_id { get; set; }
+        [ForeignKey("Designs")] public byte[] design_id { get; set; }
+        [ForeignKey("DesignTags")] public Guid design_tag_id { get; set; }
 
         [Column("is_active")] public bool is_active { get; set; }
 

@@ -1,13 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using MySql.Data.MySqlClient;
-using System;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using BOM_API_v2.KaizenFiles.Models;
-using Microsoft.Extensions.Logging;
+﻿using BOM_API_v2.KaizenFiles.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using MySql.Data.MySqlClient;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {

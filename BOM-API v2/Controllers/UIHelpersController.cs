@@ -2,17 +2,17 @@
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
 using JWTAuthentication.Authentication;
+using LiveChat;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using LiveChat;
 using Microsoft.IdentityModel.Tokens;
 
 namespace BOM_API_v2.Controllers
 {
     [ApiController]
     [Route("ui-helpers/")]
-    public class UIHelpersController: ControllerBase
+    public class UIHelpersController : ControllerBase
     {
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
@@ -38,7 +38,7 @@ namespace BOM_API_v2.Controllers
             Dictionary<string, int> response = PastryMaterialIngredientImportanceCode.ValidIngredientImportanceCodes();
 
             return response;
-            
+
         }
         [HttpGet("get-design-info/{designId}")]
         public async Task<GetDesignInfo> GetDesignInfo([FromRoute] string designId)
@@ -110,7 +110,7 @@ namespace BOM_API_v2.Controllers
                     newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
                     newMainVariantAddOnsEntry.amount = currentSubVariantAddOn.amount;
                     newMainVariantAddOnsEntry.price = referencedAddOns.price;
-                    
+
                     newResponseSubVariantEntry.add_ons.Add(newMainVariantAddOnsEntry);
                 }
 

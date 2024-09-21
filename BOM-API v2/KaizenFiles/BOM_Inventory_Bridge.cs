@@ -1,6 +1,5 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;

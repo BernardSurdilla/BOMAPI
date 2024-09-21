@@ -1,7 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-
-using MailKit.Net.Smtp;
-using MailKit;
+﻿using MailKit.Net.Smtp;
 using MimeKit;
 
 using System.ComponentModel.DataAnnotations;
@@ -56,7 +53,7 @@ namespace BOM_API_v2.Services
             {
                 return 1;
             }
-            
+
         }
 
         private string ConfirmationEmailFormat([Url] string confirmEmailLink)

@@ -1,15 +1,12 @@
-﻿using BillOfMaterialsAPI.Models;
+﻿using BillOfMaterialsAPI.Helpers;
+using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Helpers;
-
+using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Globalization;
-using System.Net.NetworkInformation;
-using BOM_API_v2.Services;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -114,9 +111,9 @@ namespace BillOfMaterialsAPI.Controllers
                 pastryMaterials = await pastryMaterialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            foreach (PastryMaterials i in pastryMaterials) 
+            foreach (PastryMaterials i in pastryMaterials)
             {
-                List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x =>  x.is_active == false && x.pastry_material_id == i.pastry_material_id).ToListAsync();
+                List<Ingredients> ingredientsForCurrentMaterial = await _context.Ingredients.Where(x => x.is_active == false && x.pastry_material_id == i.pastry_material_id).ToListAsync();
 
                 List<GetPastryMaterialIngredients> subIngredientList = new List<GetPastryMaterialIngredients>();
                 foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
@@ -141,7 +138,7 @@ namespace BillOfMaterialsAPI.Controllers
                             {
                                 List<SubGetMaterialIngredients> newEntryMaterialIngredients = new List<SubGetMaterialIngredients>();
 
-                                foreach(MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
+                                foreach (MaterialIngredients materialIngredients in currentMaterialReferencedIngredients)
                                 {
                                     SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
                                     newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
@@ -560,7 +557,7 @@ namespace BillOfMaterialsAPI.Controllers
 
                             break;
                     }
-                    
+
                 }
             }
             await _context.SaveChangesAsync();

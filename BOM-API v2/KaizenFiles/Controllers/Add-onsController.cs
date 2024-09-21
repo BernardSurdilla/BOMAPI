@@ -1,21 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using CRUDFI.Models;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
-using CRUDFI.Models;
-using System.Data.SqlTypes;
-using System.Diagnostics;
-using Microsoft.AspNetCore.Authorization;
-using JWTAuthentication.Authentication;
 using System.Data;
-using System.Globalization;
-using System.Security.Claims;
-using BOM_API_v2.Helpers;
-using System.Text.Json;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {

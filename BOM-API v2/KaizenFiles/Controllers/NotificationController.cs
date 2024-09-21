@@ -1,17 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using BillOfMaterialsAPI.Models;
+using BOM_API_v2.KaizenFiles.Models;
+using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
-using BOM_API_v2.KaizenFiles.Models;
-using System.Data.SqlTypes;
-using System.Diagnostics;
-using Microsoft.AspNetCore.Authorization;
-using JWTAuthentication.Authentication;
 using System.Data;
-using System.Globalization;
+using System.Diagnostics;
 using System.Security.Claims;
-using System.Text.Json;
-using BillOfMaterialsAPI.Models;
-using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -83,8 +78,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 var notif = new Notif
                                 {
-                                    customId = reader.IsDBNull(reader.GetOrdinal("notif_id"))? (Guid?)null: new Guid((byte[])reader["notif_id"]),
-                                    userId = reader.IsDBNull(reader.GetOrdinal("user_id"))? (Guid?)null: new Guid((byte[])reader["user_id"]),
+                                    customId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
+                                    userId = reader.IsDBNull(reader.GetOrdinal("user_id")) ? (Guid?)null : new Guid((byte[])reader["user_id"]),
                                     Message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
                                     dateCreated = reader.GetDateTime("date_created")
                                 };

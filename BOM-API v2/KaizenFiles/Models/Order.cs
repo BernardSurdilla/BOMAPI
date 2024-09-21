@@ -1,8 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc.ModelBinding;
-using System.Text.Json.Serialization;
-
-namespace CRUDFI.Models
+﻿namespace CRUDFI.Models
 {
     public class Order
     {
@@ -74,7 +70,7 @@ namespace CRUDFI.Models
         public string size { get; set; }
         public string flavor { get; set; }
         public string picture { get; set; }
-        public string message {  get; set; }
+        public string message { get; set; }
         public string type { get; set; }
         public string PickupDate { get; set; } = "yyyy-mm-dd";
         public string PickupTime { get; set; } = "hh:mm AM/PM";
@@ -312,7 +308,7 @@ namespace CRUDFI.Models
         public string Flavor { get; set; }
         public string Size { get; set; }
         public string CustomerName { get; set; }
-        public double SubOrderTotal {  get; set; }
+        public double SubOrderTotal { get; set; }
 
         // List to hold all add-ons for the order item
         public List<OrderAddon1> OrderAddons { get; set; } = new List<OrderAddon1>();
@@ -364,7 +360,7 @@ namespace CRUDFI.Models
     {
         public string suborderId { get; set; }
         public string pastryId { get; set; }
-        public List<string> addonId {  get; set; }
+        public List<string> addonId { get; set; }
     }
 
 
@@ -491,6 +487,6 @@ namespace CRUDFI.Models
     public class employee
     {
         public string name { get; set; }
-        public Guid userId {  get; set; }
+        public Guid userId { get; set; }
     }
 }

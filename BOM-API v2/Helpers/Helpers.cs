@@ -1,11 +1,7 @@
 ﻿using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using Castle.Components.DictionaryAdapter.Xml;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Diagnostics;
-using System.Linq.Expressions;
-using System.Runtime.CompilerServices;
 using System.Text.Json;
 using UnitsNet;
 
@@ -269,7 +265,7 @@ namespace BillOfMaterialsAPI.Helpers
         {
             Dictionary<string, List<string>> validUnitList = ValidMeasurementUnits();
 
-            foreach (string quantity in validUnitList.Keys) 
+            foreach (string quantity in validUnitList.Keys)
             {
                 List<string> units = validUnitList[quantity];
                 if (units.Contains(x)) { return true; }
@@ -301,7 +297,7 @@ namespace BillOfMaterialsAPI.Helpers
                 => x.is_active == true).FirstAsync(x => x.pastry_material_id == pastry_material_id);
 
                 return true;
-            } 
+            }
             catch { }
             return false; //throw new NotFoundInDatabaseException("No Pastry Material with the specified id found.");
         }
@@ -335,8 +331,8 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<bool> DesignExistsAsync(byte[] designId, DatabaseContext context)
         {
             Designs? selectedDesign;
-            try 
-            { 
+            try
+            {
                 selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id == designId).FirstAsync();
                 return true;
             }
@@ -355,7 +351,7 @@ namespace BillOfMaterialsAPI.Helpers
             catch (InvalidOperationException exO) { return false; }
         }
 
-        public static async Task<bool> IsIngredientItemValid(string item_id, string ingredient_type, string amount_measurement,  DatabaseContext context, KaizenTables kaizenTables)
+        public static async Task<bool> IsIngredientItemValid(string item_id, string ingredient_type, string amount_measurement, DatabaseContext context, KaizenTables kaizenTables)
         {
             switch (ingredient_type)
             {
@@ -395,7 +391,7 @@ namespace BillOfMaterialsAPI.Helpers
             if (response == true) return response;
 
             List<PastryMaterialSubVariants> subVariants = await context.PastryMaterialSubVariants.Where(x => x.is_active == true && x.pastry_material_id == pastry_material_id).ToListAsync();
-            foreach(PastryMaterialSubVariants variant in subVariants)
+            foreach (PastryMaterialSubVariants variant in subVariants)
             {
                 List<PastryMaterialSubVariantIngredients> subVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.is_active == true && x.pastry_material_sub_variant_id == variant.pastry_material_sub_variant_id).ToListAsync();
 
@@ -403,7 +399,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                 if (response == true) return response;
             }
-            
+
             return response;
         }
 
@@ -426,14 +422,14 @@ namespace BillOfMaterialsAPI.Helpers
 
             List<PastryMaterialIngredientImportance> ingredientImportanceList = await context.PastryMaterialIngredientImportance.Where(x => x.pastry_material_id == selectedPastryMaterial.pastry_material_id).ToListAsync();
             Dictionary<string, InventorySubtractorInfo> totalVariantIngredientConsumptionList = await DataParser.GetTotalIngredientAmountList(variant_id, context, kaizenTables);
-            
-            foreach(string currentIngredientId in totalVariantIngredientConsumptionList.Keys)
+
+            foreach (string currentIngredientId in totalVariantIngredientConsumptionList.Keys)
             {
                 PastryMaterialIngredientImportance? currentIngredientImportance = ingredientImportanceList.Where(x => x.item_id == currentIngredientId).FirstOrDefault();
 
                 //If record for ingredientImportance is not found; default to normal importance
                 //Else; use the value in the found value
-                
+
 
             }
 
@@ -762,8 +758,8 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<PastryMaterialAddOns> GetPastryMaterialAddOnAsync(string pastry_material_add_on_id, DatabaseContext context)
         {
             PastryMaterialAddOns? currentPastryMaterialAddOn = null;
-            try 
-            { 
+            try
+            {
                 currentPastryMaterialAddOn = await context.PastryMaterialAddOns.Where(x => x.is_active == true && x.pastry_material_add_on_id == pastry_material_add_on_id).FirstAsync();
                 return currentPastryMaterialAddOn;
             }
@@ -877,8 +873,8 @@ namespace BillOfMaterialsAPI.Helpers
         {
             Item? currentInventoryItem;
 
-            try 
-            { 
+            try
+            {
                 currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(id)).FirstAsync();
                 return currentInventoryItem;
             }
@@ -888,14 +884,14 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<AddOns> GetAddOnItemAsync(int add_ons_id, KaizenTables kaizenTables)
         {
             AddOns? selectedAddOn = null;
-            try 
-            { 
+            try
+            {
                 selectedAddOn = await kaizenTables.AddOns.Where(x => x.add_ons_id == add_ons_id).FirstAsync();
-                
+
                 return selectedAddOn;
             }
-            catch(Exception e) { throw new NotFoundInDatabaseException("Add on with the id " + Convert.ToString(add_ons_id) + " does not exist."); }
-            
+            catch (Exception e) { throw new NotFoundInDatabaseException("Add on with the id " + Convert.ToString(add_ons_id) + " does not exist."); }
+
         }
     }
     public class DataParser
@@ -1363,7 +1359,7 @@ namespace BillOfMaterialsAPI.Helpers
                                                 Item? currentSubMaterialReferencedInventoryItem = null;
                                                 try { currentSubMaterialReferencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(materialIngredients.item_id, kaizenTables); }
                                                 catch { continue; }
-                                                newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; 
+                                                newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name;
                                                 break;
                                             case IngredientType.Material:
                                                 Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.is_active == true).FirstAsync();
@@ -1636,7 +1632,7 @@ namespace BillOfMaterialsAPI.Helpers
                 string? amountUnitMeasurement = null;
 
                 bool isAmountMeasurementValid = false;
-                
+
                 foreach (string unitQuantity in validMeasurementUnits.Keys)
                 {
                     List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
@@ -1844,7 +1840,7 @@ namespace BillOfMaterialsAPI.Helpers
                                     try
                                     { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentMaterialIngredient.item_id, kaizenTables); }
                                     catch (FormatException e) { throw new FormatException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ", failed to parse its item id " + currentMaterialIngredient.item_id + " as an integer"); }
-                                    catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ",  its item id " + currentMaterialIngredient.item_id + " does not refer to any active inventory record" ); }
+                                    catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ",  its item id " + currentMaterialIngredient.item_id + " does not refer to any active inventory record"); }
 
                                     string currentItemMeasurement = currentMaterialIngredient.amount_measurement;
                                     double currentItemAmount = currentMaterialIngredient.amount;
@@ -1903,7 +1899,7 @@ namespace BillOfMaterialsAPI.Helpers
                 {
                     calculatedAmount = currentIngredientSubtractionInfo.Amount * currentItem.price;
                 }
-                
+
 
                 response += calculatedAmount;
             }

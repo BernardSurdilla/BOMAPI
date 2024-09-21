@@ -1,13 +1,12 @@
-﻿using BillOfMaterialsAPI.Models;
+﻿using BillOfMaterialsAPI.Helpers;
+using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Helpers;
-
+using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using BOM_API_v2.Services;
 
 namespace BOM_API_v2.Controllers
 {
@@ -108,7 +107,7 @@ namespace BOM_API_v2.Controllers
                 pastryMaterials = await pastryMaterialQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
             }
 
-            foreach(PastryMaterials currentPastryMaterial in pastryMaterials)
+            foreach (PastryMaterials currentPastryMaterial in pastryMaterials)
             {
                 GetPastryMaterial newRow;
                 try { newRow = await DataParser.CreatePastryMaterialResponseFromDBRow(currentPastryMaterial, _context, _kaizenTables); }
@@ -157,12 +156,12 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "All Pastry Material Ingredients");
             return response;
         }
-        
+
         //POST
         [HttpPost]
         public async Task<IActionResult> AddNewPastryMaterial(PostPastryMaterial newEntry)
         {
-            if (await DataVerification.DesignExistsAsync(newEntry.design_id, _context) == false) { return NotFound(new {message = "No design with the id " + newEntry.design_id + " found."}); }
+            if (await DataVerification.DesignExistsAsync(newEntry.design_id, _context) == false) { return NotFound(new { message = "No design with the id " + newEntry.design_id + " found." }); }
             foreach (PostIngredients entry in newEntry.ingredients)
             {
                 try { await DataVerification.IsIngredientItemValid(entry.item_id, entry.ingredient_type, entry.amount_measurement, _context, _kaizenTables); }
@@ -174,7 +173,7 @@ namespace BOM_API_v2.Controllers
                 {
                     AddOns? selectedAddOn = null;
                     try { selectedAddOn = await DataRetrieval.GetAddOnItemAsync(addOnEntry.add_ons_id, _kaizenTables); }
-                    catch(Exception e) { return NotFound(new { message = e.Message }); }
+                    catch (Exception e) { return NotFound(new { message = e.Message }); }
                 }
             }
             if (newEntry.ingredient_importance != null)
@@ -190,7 +189,7 @@ namespace BOM_API_v2.Controllers
 
                     isImportanceValid = inMainIngredients || inSubVariantIngredients;
 
-                    if (isImportanceValid == false) return BadRequest(new { message = "One of the ingredient importance entry uses an item that does not exist in both main and sub variant ingredients, id " + importanceEntry.item_id }); 
+                    if (isImportanceValid == false) return BadRequest(new { message = "One of the ingredient importance entry uses an item that does not exist in both main and sub variant ingredients, id " + importanceEntry.item_id });
                 }
             }
             if (newEntry.sub_variants != null)
@@ -209,7 +208,7 @@ namespace BOM_API_v2.Controllers
                         {
                             AddOns? selectedAddOn = null;
                             try { selectedAddOn = await DataRetrieval.GetAddOnItemAsync(entry_sub_variant_add_on.add_ons_id, _kaizenTables); }
-                            catch(Exception e) { return NotFound(new { message = e.Message }); }
+                            catch (Exception e) { return NotFound(new { message = e.Message }); }
                         }
                     }
                 }
@@ -254,7 +253,7 @@ namespace BOM_API_v2.Controllers
 
                     await DataInsertion.AddPastryMaterialSubVariantIngredient(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_ingredients, _context);
                     if (entry_sub_variant.sub_variant_add_ons != null) await DataInsertion.AddPastryMaterialSubVariantAddOn(lastPastryMaterialSubVariantId, entry_sub_variant.sub_variant_add_ons, _context);
-                    
+
                 }
             }
             await _context.SaveChangesAsync();
@@ -332,7 +331,7 @@ namespace BOM_API_v2.Controllers
             //Add on verification
             if (entry.sub_variant_add_ons != null)
             {
-                foreach(PostPastryMaterialSubVariantAddOns subVariantAddOn in entry.sub_variant_add_ons)
+                foreach (PostPastryMaterialSubVariantAddOns subVariantAddOn in entry.sub_variant_add_ons)
                 {
                     AddOns? selectedAddOn = null;
                     try { selectedAddOn = await DataRetrieval.GetAddOnItemAsync(subVariantAddOn.add_ons_id, _kaizenTables); }
@@ -470,7 +469,7 @@ namespace BOM_API_v2.Controllers
             PastryMaterialIngredientImportance? importanceForSelectedIngredient = await _context.PastryMaterialIngredientImportance.Where(x => x.is_active == true && x.pastry_material_id == pastry_material_id && x.item_id == entry.item_id && x.pastry_material_ingredient_importance_id.Equals(currentIngredientImportance.pastry_material_ingredient_importance_id) == false).FirstOrDefaultAsync();
 
             if (importanceForSelectedIngredient != null) return BadRequest(new { message = "Importance entry for the item with the id " + entry.item_id + " and ingredient type " + entry.ingredient_type + " already exists, please modify that instead" });
-            
+
             DateTime currentTime = DateTime.Now;
 
             _context.PastryMaterialIngredientImportance.Update(currentIngredientImportance);
@@ -506,7 +505,7 @@ namespace BOM_API_v2.Controllers
             currentPastryMaterialAddOn.last_modified_date = DateTime.Now;
 
             await _context.SaveChangesAsync();
-            
+
             return Ok(new { message = "Add on " + pastry_material_add_on_id + " updated " });
         }
         [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}")]

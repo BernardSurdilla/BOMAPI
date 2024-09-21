@@ -64,7 +64,7 @@ namespace LiveChat
         }
         public List<ConnectionInfo> GetAllConnections()
         {
-            return ConnectionInfos; 
+            return ConnectionInfos;
         }
         public List<ConnectionInfo> GetAllCustomerConnections()
         {

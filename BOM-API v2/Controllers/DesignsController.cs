@@ -1,13 +1,12 @@
-﻿using BillOfMaterialsAPI.Models;
+﻿using BillOfMaterialsAPI.Helpers;
+using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BillOfMaterialsAPI.Helpers;
-
+using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using BOM_API_v2.Services;
 
 namespace BOM_API_v2.Controllers
 {
@@ -79,7 +78,7 @@ namespace BOM_API_v2.Controllers
             }
 
 
-            foreach (Designs currentDesign in  current_design_records)
+            foreach (Designs currentDesign in current_design_records)
             {
                 GetDesign newResponseEntry = await DataParser.CreateGetDesignResponseFromDbRow(currentDesign, _databaseContext, _kaizenTables);
 
@@ -90,7 +89,7 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("{design_id}")]
-        public async Task<GetDesign> GetSpecificDesign([FromRoute]string design_id)
+        public async Task<GetDesign> GetSpecificDesign([FromRoute] string design_id)
         {
             Designs? selectedDesign;
             string decodedId = design_id;
@@ -138,7 +137,7 @@ namespace BOM_API_v2.Controllers
             return response;
         }
         [HttpGet("with-tags/{*tags}")]
-        public async Task<List<GetDesign>> GetDesignsWithTag([FromRoute]string tags )
+        public async Task<List<GetDesign>> GetDesignsWithTag([FromRoute] string tags)
         {
             List<GetDesign> response = new List<GetDesign>();
             string decodedIds = tags;
@@ -147,7 +146,7 @@ namespace BOM_API_v2.Controllers
             {
                 decodedIds = Uri.UnescapeDataString(decodedIds);
             }
-            catch(Exception e) { return(response); }
+            catch (Exception e) { return (response); }
 
             string[] design_ids = decodedIds.Split("/");
 
@@ -186,7 +185,7 @@ namespace BOM_API_v2.Controllers
                 byte[] encodedId = Convert.FromBase64String(currentCakeId);
                 try { selectedDesign = await _databaseContext.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(encodedId)).FirstAsync(); }
                 catch (Exception e) { continue; }
-                    
+
                 response.Add(await DataParser.CreateGetDesignResponseFromDbRow(selectedDesign, _databaseContext, _kaizenTables));
             }
 
@@ -300,7 +299,7 @@ namespace BOM_API_v2.Controllers
         {
             List<GetDesignWithoutPastryMaterial> response = new List<GetDesignWithoutPastryMaterial>();
 
-            List<Designs> dbResp = await _databaseContext.Designs.Where(x => x.is_active == true && _databaseContext.PastryMaterials.Where(x=> x.is_active == true).Select(x => x.design_id).Contains(x.design_id) == false).Select(x => new Designs { design_id = x.design_id, display_name = x.display_name}).ToListAsync();
+            List<Designs> dbResp = await _databaseContext.Designs.Where(x => x.is_active == true && _databaseContext.PastryMaterials.Where(x => x.is_active == true).Select(x => x.design_id).Contains(x.design_id) == false).Select(x => new Designs { design_id = x.design_id, display_name = x.display_name }).ToListAsync();
             foreach (Designs design in dbResp)
             {
                 GetDesignWithoutPastryMaterial newResponseRow = new GetDesignWithoutPastryMaterial();
@@ -308,7 +307,7 @@ namespace BOM_API_v2.Controllers
                 newResponseRow.design_id = design.design_id;
                 response.Add(newResponseRow);
             }
-                
+
             return response;
         }
 
@@ -397,24 +396,24 @@ namespace BOM_API_v2.Controllers
                 newDesignImage.picture_data = input.display_picture_data;
                 newDesignImage.is_active = true;
             }
-            
+
             _databaseContext.Designs.Add(newEntry);
             _databaseContext.SaveChanges();
 
-            if (newTagRelationships.IsNullOrEmpty() == false) 
-            { 
-                await _databaseContext.DesignTagsForCakes.AddRangeAsync(newTagRelationships); 
-                await _databaseContext.SaveChangesAsync(); 
+            if (newTagRelationships.IsNullOrEmpty() == false)
+            {
+                await _databaseContext.DesignTagsForCakes.AddRangeAsync(newTagRelationships);
+                await _databaseContext.SaveChangesAsync();
             }
             if (newDesignShapes.IsNullOrEmpty() == false)
             {
                 await _databaseContext.DesignShapes.AddRangeAsync(newDesignShapes);
                 await _databaseContext.SaveChangesAsync();
             }
-            if (newDesignImage != null) 
-            { 
-                await _databaseContext.DesignImage.AddAsync(newDesignImage); 
-                await _databaseContext.SaveChangesAsync(); 
+            if (newDesignImage != null)
+            {
+                await _databaseContext.DesignImage.AddAsync(newDesignImage);
+                await _databaseContext.SaveChangesAsync();
             }
 
             await _actionLogger.LogAction(User, "POST", "Add new design " + newEntryId.ToString());
@@ -453,7 +452,7 @@ namespace BOM_API_v2.Controllers
 
             return Ok(new { message = "New shape (" + shape_name + ") associated with design " + design_id });
         }
-        
+
         [HttpPut("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> AddDesignTags(PostDesignTags input, [FromRoute] string design_id)
@@ -510,7 +509,7 @@ namespace BOM_API_v2.Controllers
 
         [HttpPatch("{design_id}/")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute]string design_id)
+        public async Task<IActionResult> UpdateDesign(PostDesign input, [FromRoute] string design_id)
         {
             string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
@@ -520,7 +519,7 @@ namespace BOM_API_v2.Controllers
                 decodedId = Uri.UnescapeDataString(design_id);
                 byteArrEncodedId = Convert.FromBase64String(decodedId);
             }
-            catch { return BadRequest(new {message="Invalid format in the design_id value in route"}); }
+            catch { return BadRequest(new { message = "Invalid format in the design_id value in route" }); }
 
             Designs? foundEntry = null;
             try { foundEntry = await _databaseContext.Designs.Where(x => x.is_active == true && x.design_id == byteArrEncodedId).FirstAsync(); }
@@ -599,7 +598,7 @@ namespace BOM_API_v2.Controllers
         }
         [HttpPatch("{design_id}/shapes/{design_shape_id}")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> UpdateDesignShapeName(string design_id, Guid design_shape_id, [FromBody]string design_shape_name)
+        public async Task<IActionResult> UpdateDesignShapeName(string design_id, Guid design_shape_id, [FromBody] string design_shape_name)
         {
             Designs? selectedDesign;
             string decodedId = design_id;
@@ -616,7 +615,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
 
             DesignShapes? selectedShape = await _databaseContext.DesignShapes.Where(x => x.is_active == true && x.design_id.SequenceEqual(selectedDesign.design_id) && x.design_shape_id == design_shape_id).FirstOrDefaultAsync();
-            if (selectedShape == null) { return NotFound(new {message = "Shape with the id " + design_shape_id + " does not exist or deleted"}); }
+            if (selectedShape == null) { return NotFound(new { message = "Shape with the id " + design_shape_id + " does not exist or deleted" }); }
 
             _databaseContext.DesignShapes.Update(selectedShape);
             selectedShape.shape_name = design_shape_name;
@@ -649,14 +648,14 @@ namespace BOM_API_v2.Controllers
             _databaseContext.Designs.Update(foundEntry);
             foundEntry.is_active = false;
             await _databaseContext.SaveChangesAsync();
-            
+
 
             await _actionLogger.LogAction(User, "DELETE", "Delete design " + decodedId);
             return Ok(new { message = "Design " + decodedId + " deleted" });
         }
         [HttpDelete("{design_id}/tags")]
         [Authorize(Roles = UserRoles.Admin)]
-        public async Task<IActionResult> RemoveDesignTag([FromRoute]string design_id, [FromBody] List<Guid> tag_ids)
+        public async Task<IActionResult> RemoveDesignTag([FromRoute] string design_id, [FromBody] List<Guid> tag_ids)
         {
             string decodedId = design_id;
             byte[]? byteArrEncodedId = null;
