@@ -41,6 +41,24 @@
 
         public string flavor { get; set; }
     }
+    public class ManualOrder
+    {
+        public string DesignName { get; set; }
+        public decimal Price { get; set; }
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public string tier { get; set; } = string.Empty;
+        public int quantity { get; set; }
+        public string cover { get; set; } = "";
+        public string Description { get; set; }
+        public string size { get; set; }
+        public string flavor { get; set; }
+        public string picture { get; set; }
+        public string message { get; set; }
+        public string type { get; set; }
+        public string PickupDate { get; set; } = "yyyy-mm-dd";
+        public string PickupTime { get; set; } = "hh:mm AM/PM";
+    }
     public class Custom
     {
         public string color { get; set; } = string.Empty;
@@ -126,7 +144,6 @@
         public string color { get; set; } = string.Empty;
         public string shape { get; set; } = string.Empty;
         public string tier { get; set; } = string.Empty;
-        public int quantity { get; set; }
         public string cover { get; set; } = "";
         public string Description { get; set; }
         public string size { get; set; }
@@ -150,6 +167,7 @@
     }
     public class AdminInitial
     {
+        public Guid? customId { get; set; }
         public Guid? Id { get; set; }
         public byte[]? DesignId { get; set; }
         public Guid CustomerId { get; set; }
