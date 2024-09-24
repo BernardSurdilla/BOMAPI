@@ -106,6 +106,13 @@
         public string payment { get; set; } = "";
     }
 
+    // Class to hold the day and total quantity
+    public class DayQuantity
+    {
+        public string Day { get; set; } // Day of the month formatted as "01", "02", etc.
+        public int TotalQuantity { get; set; } // Total quantity for that day
+    }
+
     public class CustomPartial
     {
         public Guid customId { get; set; }

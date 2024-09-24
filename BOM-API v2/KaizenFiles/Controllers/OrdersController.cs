@@ -4853,7 +4853,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
 
 
-        [HttpGet("total-orders")] //done
+        [HttpGet("total-active-orders")] //done
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetTotalQuantities()
         {
@@ -5787,6 +5787,163 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             }
         }
         */
+
+        [HttpGet("total-order-quantity")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> GetTotalQuantity([FromQuery] string category, [FromQuery] string month = null)
+        {
+            // Set default category to "day" if no value is provided
+            if (string.IsNullOrEmpty(category))
+            {
+                int totalToday = await GetTotalQuantityForToday();
+                return Ok(new { Today = totalToday });
+            }
+
+            switch (category.ToLower())
+            {
+                case "day":
+                    // Get total quantity for today
+                    int totalToday = await GetTotalQuantityForToday();
+                    return Ok(new { Today = totalToday });
+                case "week":
+                    var weekQuantities = await GetTotalQuantityForWeek();
+                    return Ok(weekQuantities);
+                case "month":
+                    if (string.IsNullOrEmpty(month))
+                    {
+                        return BadRequest("Please provide a month in numeric format (e.g., '01' for January).");
+                    }
+                    var dailyQuantities = await GetTotalQuantityForMonth(month);
+                    return Ok(dailyQuantities); // Return the list directly
+                case "year":
+                    var yearlyQuantities = await GetTotalQuantityForYear();
+                    return Ok(yearlyQuantities);
+                default:
+                    return BadRequest("Invalid category. Please use 'day', 'week', 'month', or 'year'.");
+            }
+        }
+
+
+
+        // Private method to get total quantity for today
+        private async Task<int> GetTotalQuantityForToday()
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT SUM(quantity) FROM suborders WHERE DATE(created_at) = CURDATE()";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    object result = await command.ExecuteScalarAsync();
+                    return result != DBNull.Value ? Convert.ToInt32(result) : 0; // Return 0 if result is DBNull
+                }
+            }
+        }
+
+        // Private method to get total quantity for each day of the past week
+        private async Task<Dictionary<string, int>> GetTotalQuantityForWeek()
+        {
+            var quantities = new Dictionary<string, int>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT DAYNAME(created_at) AS DayName, SUM(quantity) AS TotalQuantity
+            FROM suborders 
+            WHERE created_at >= NOW() - INTERVAL 7 DAY
+            GROUP BY DAYNAME(created_at) 
+            ORDER BY FIELD(DAYNAME(created_at), 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            quantities[reader.GetString("DayName")] = reader.GetInt32("TotalQuantity");
+                        }
+                    }
+                }
+            }
+
+            return quantities;
+        }
+
+        // Private method to get total quantity for each day of a specific month
+        private async Task<List<DayQuantity>> GetTotalQuantityForMonth(string month)
+        {
+            var dailyQuantities = new List<DayQuantity>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT DAY(created_at) AS Day, SUM(quantity) AS TotalQuantity
+            FROM suborders 
+            WHERE MONTH(created_at) = @month AND YEAR(created_at) = YEAR(NOW())
+            GROUP BY DAY(created_at)
+            ORDER BY DAY(created_at)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@month", month);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            dailyQuantities.Add(new DayQuantity
+                            {
+                                Day = reader.GetInt32("Day").ToString("D2"), // Format as "01", "02", etc.
+                                TotalQuantity = reader.GetInt32("TotalQuantity")
+                            });
+                        }
+                    }
+                }
+            }
+
+            return dailyQuantities;
+        }
+
+
+        // Private method to get total quantity for each month of the current year
+        private async Task<Dictionary<string, int>> GetTotalQuantityForYear()
+        {
+            var quantities = new Dictionary<string, int>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT MONTHNAME(created_at) AS MonthName, SUM(quantity) AS TotalQuantity
+            FROM suborders 
+            WHERE YEAR(created_at) = YEAR(NOW())
+            GROUP BY MONTH(created_at)
+            ORDER BY MONTH(created_at)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            quantities[reader.GetString("MonthName")] = reader.GetInt32("TotalQuantity");
+                        }
+                    }
+                }
+            }
+
+            return quantities;
+        }
+
+
         [HttpPatch("{orderId}/approve")] // done
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderxStatus(string orderId, [FromQuery] string action)
