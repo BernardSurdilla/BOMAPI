@@ -93,5 +93,8 @@
         public DateTime lastUpdatedAt { get; set; }
 
         public bool isActive { get; set; }
+
+        public int GoodThreshold { get; set; }
+        public int CriticalThreshold { get; set; }
     }
 }

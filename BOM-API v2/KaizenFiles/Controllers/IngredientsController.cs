@@ -238,7 +238,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpGet("active")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult GetActiveIngredients()
+        public async Task<IActionResult> GetActiveIngredients()
         {
             try
             {
@@ -248,20 +248,30 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return NotFound("No active ingredients found");
 
                 // Map Ingri entities to IngriDTP DTOs
-                var ingredientsDto = activeIngredients.Select(ingredient => new IngriDTP
+                var ingredientsDto = new List<IngriDTP>();
+
+                foreach (var ingredient in activeIngredients)
                 {
-                    Id = ingredient.Id,
-                    name = ingredient.name,
-                    quantity = ingredient.quantity,
-                    measurements = ingredient.measurements,
-                    price = ingredient.price,
-                    status = ingredient.status,
-                    type = ingredient.type,
-                    CreatedAt = ingredient.CreatedAt,
-                    isActive = ingredient.isActive,
-                    lastUpdatedBy = ingredient.lastUpdatedBy,
-                    lastUpdatedAt = ingredient.lastUpdatedAt
-                }).ToList();
+                    // Fetch thresholds for each item
+                    var thresholds = await GetThresholdsForItemAsync(ingredient.Id);
+
+                    ingredientsDto.Add(new IngriDTP
+                    {
+                        Id = ingredient.Id,
+                        name = ingredient.name,
+                        quantity = ingredient.quantity,
+                        measurements = ingredient.measurements,
+                        price = ingredient.price,
+                        status = ingredient.status,
+                        type = ingredient.type,
+                        CreatedAt = ingredient.CreatedAt,
+                        isActive = ingredient.isActive,
+                        lastUpdatedBy = ingredient.lastUpdatedBy,
+                        lastUpdatedAt = ingredient.lastUpdatedAt,
+                        GoodThreshold = thresholds.goodThreshold, // Assuming you add this field in your DTO
+                        CriticalThreshold = thresholds.criticalThreshold // Assuming you add this field in your DTO
+                    });
+                }
 
                 return Ok(ingredientsDto);
             }
@@ -271,6 +281,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
 
         private List<Ingri> GetActiveIngredientsFromDatabase()
         {
@@ -312,6 +323,40 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             return activeIngredients;
         }
+
+        private async Task<(int goodThreshold, int criticalThreshold)> GetThresholdsForItemAsync(int itemId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT good_threshold, critical_threshold 
+            FROM thresholdconfig 
+            WHERE item_id = @itemId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@itemId", itemId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            int goodThreshold = reader.GetInt32(reader.GetOrdinal("good_threshold"));
+                            int criticalThreshold = reader.GetInt32(reader.GetOrdinal("critical_threshold"));
+
+                            return (goodThreshold, criticalThreshold);
+                        }
+                        else
+                        {
+                            throw new Exception($"Thresholds not found for itemId {itemId}");
+                        }
+                    }
+                }
+            }
+        }
+
 
 
         [HttpGet("{id}")]
