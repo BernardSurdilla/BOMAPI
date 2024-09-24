@@ -63,7 +63,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     // Modify the SQL query to filter notifications by user_id
                     string sql = @"
-                SELECT notif_id, user_id, message, date_created 
+                SELECT notif_id, user_id, message, date_created, is_read
                 FROM notification
                 WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
 
@@ -78,10 +78,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 var notif = new Notif
                                 {
-                                    customId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
+                                    notifId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
                                     userId = reader.IsDBNull(reader.GetOrdinal("user_id")) ? (Guid?)null : new Guid((byte[])reader["user_id"]),
                                     Message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
-                                    dateCreated = reader.GetDateTime("date_created")
+                                    dateCreated = reader.GetDateTime("date_created"),
+                                    is_read = reader.GetBoolean(reader.GetOrdinal("is_read"))
                                 };
 
                                 notifications.Add(notif);
@@ -138,23 +139,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     string sql = @"
                     UPDATE notification
-                    SET is_read = 1
-                    WHERE notif_id = UHEX(@notifId) AND user_id = UNHEX(@userId)";
+                    SET is_read = @read
+                    WHERE notif_id = UNHEX(@notifId)";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@notifId", notif);
-                        command.Parameters.AddWithValue("@userId", user);
+                        command.Parameters.AddWithValue("@read", true);
 
                         int rowsAffected = await command.ExecuteNonQueryAsync();
 
                         if (rowsAffected > 0)
                         {
-                            return Ok("Notification marked as read.");
+                            return Ok("Notification marked as read."+ notif);
                         }
                         else
                         {
-                            return NotFound("Notification not found or already marked as read.");
+                            return NotFound("Notification not found or already marked as read." + notif);
                         }
                     }
                 }

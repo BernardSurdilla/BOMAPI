@@ -2,7 +2,7 @@
 {
     public class Notif
     {
-        public Guid? customId { get; set; }
+        public Guid? notifId { get; set; }
         public Guid? userId { get; set; }
         public DateTime dateCreated { get; set; }
         public string Message { get; set; }
