@@ -1900,10 +1900,27 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("custom-orders")]
+        [HttpGet("current-user/custom-orders")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllCustomInitialOrdersByCustomerIds([FromQuery] string? search = null)
         {
+            var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            if (string.IsNullOrEmpty(customerUsername))
+            {
+                return Unauthorized("User is not authorized");
+            }
+
+            // Get the customer's ID using the extracted username
+            string Id = await GetAdminIdByUsername(customerUsername);
+
+            string customerId = Id.ToLower();
+
+            if (customerId == null || customerId.Length == 0)
+            {
+                return BadRequest("Customer not found");
+            }
+
             try
             {
                 List<CustomPartial> orders;
@@ -1914,13 +1931,13 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                     if (search.Equals("to review", StringComparison.OrdinalIgnoreCase))
                     {
                         // Fetch by status if valid search value is provided
-                        orders = await FetchByStatusCustomInitialOrdersAsync(search);
+                        orders = await FetchByStatusCustomInitialOrdersAsync(customerId,search);
 
                     }
                     else if (await IsEmployeeNameExistsAsync(search))
                     {
                         // Fetch by employee name if it exists in the database
-                        orders = await FetchCustomOrdersByEmployeeInitialOrdersAsync(search);
+                        orders = await FetchCustomOrdersByEmployeeInitialOrdersAsync(customerId,search);
 
                     }
                     else
@@ -1932,7 +1949,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 else
                 {
                     // Fetch all if no search value is provided
-                    orders = await FetchInitialCustomOrdersAsync();
+                    orders = await FetchInitialCustomOrdersAsync(customerId);
                 }
 
                 // If no orders are found, return an empty list
@@ -1947,7 +1964,67 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        private async Task<List<CustomPartial>> FetchByStatusCustomInitialOrdersAsync(string status)
+        private async Task<string> GetAdminIdByUsername(string username)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@username", username);
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        // Cast the result to byte[] since UserId is stored as binary(16)
+                        byte[] userIdBytes = (byte[])result;
+
+                        // Convert the byte[] to a hex string (without dashes)
+                        string userIdHex = BitConverter.ToString(userIdBytes).Replace("-", "").ToLower();
+
+                        // Debug.WriteLine to display the value of userIdHex
+                        Debug.WriteLine($"UserId hex for username '{username}': {userIdHex}");
+
+                        return userIdHex;
+                    }
+                    else
+                    {
+                        return null; // User not found or type not matching
+                    }
+                }
+            }
+        }
+
+        private async Task<string> GetCustomerIdString(string order)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string designQuery = "SELECT UserId FROM users WHERE Username = @username AND Type IN (3, 4)";
+                using (var designcommand = new MySqlCommand(designQuery, connection))
+                {
+                    designcommand.Parameters.AddWithValue("@username", order);
+                    using (var reader = await designcommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            string customerId = reader.GetString("UserId");
+                            return customerId;
+                        }
+                        else
+                        {
+                            return null; // Design not found
+                        }
+                    }
+                }
+            }
+        }
+
+        private async Task<List<CustomPartial>> FetchByStatusCustomInitialOrdersAsync(string id, string status)
         {
             List<CustomPartial> orders = new List<CustomPartial>();
 
@@ -1960,12 +2037,13 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
             design_id, design_name, quantity, customer_name
         FROM customorders 
-        WHERE status = @status";
+        WHERE status = @status AND customer_id = @id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     // Add the status parameter to the SQL command
                     command.Parameters.AddWithValue("@status", status);
+                    command.Parameters.AddWithValue("@id", id);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
@@ -2012,7 +2090,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             return orders; // Return the list of toPayInitial records
         }
 
-        private async Task<List<CustomPartial>> FetchCustomOrdersByEmployeeInitialOrdersAsync(string name)
+        private async Task<List<CustomPartial>> FetchCustomOrdersByEmployeeInitialOrdersAsync(string id, string name)
         {
             List<CustomPartial> orders = new List<CustomPartial>();
 
@@ -2025,12 +2103,13 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
             design_id, design_name, quantity, customer_name
         FROM customorders 
-        WHERE employee_name = @name AND status != 'to review'";
+        WHERE employee_name = @name AND customer_id = @id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     // Add the status parameter to the SQL command
                     command.Parameters.AddWithValue("@name", name);
+                    command.Parameters.AddWithValue("@id", id);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
@@ -2075,7 +2154,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             return orders;
         }
 
-        private async Task<List<CustomPartial>> FetchInitialCustomOrdersAsync()
+        private async Task<List<CustomPartial>> FetchInitialCustomOrdersAsync(string id)
         {
             List<CustomPartial> orders = new List<CustomPartial>();
 
@@ -2086,10 +2165,12 @@ WHERE order_id = UNHEX(@orderIdBinary);";
                 string sql = @"SELECT custom_id, order_id, customer_id, created_at, status, tier, shape, size, price, color, cover, picture_url, description, message, flavor, 
             design_id, design_name, quantity, customer_name, employee_id, employee_name
         FROM customorders
-WHERE status != 'to review'";
+WHERE customer_id = @id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
+                    command.Parameters.AddWithValue("@id", id);
+
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -7553,7 +7634,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             {
                 await connection.OpenAsync();
 
-                string sql = "DELETE FROM suborders WHERE suborder_id = UNHEX(@orderId)";
+                string sql = "DELETE FROM suborders WHERE suborder_id = UNHEX(@orderId) AND status = 'cart'";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -7632,7 +7713,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                 string sql = @"
         DELETE FROM suborders 
-        WHERE order_id IS NULL AND customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+        WHERE status = 'cart' AND customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
