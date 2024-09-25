@@ -5,8 +5,8 @@
         public Guid? notifId { get; set; }
         public Guid? userId { get; set; }
         public DateTime dateCreated { get; set; }
-        public string Message { get; set; }
-        public bool is_read { get; set; }
+        public string message { get; set; }
+        public bool isRead { get; set; }
     }
 }
 
