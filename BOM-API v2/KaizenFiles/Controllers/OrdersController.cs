@@ -1012,7 +1012,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("current-user/{orderId}/confirm")]
+        [HttpPost("/culo-api/v1/current-user/{orderId}/confirm")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> ConfirmOrder(string orderId)
         {
@@ -1096,7 +1096,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPost("current-user/{orderId}/cancel")]
+        [HttpPost("/culo-api/v1/current-user/{orderId}/cancel")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> CancelOrder(string orderId)
         {
@@ -1900,7 +1900,7 @@ WHERE order_id = UNHEX(@orderIdBinary);";
             }
         }
 
-        [HttpGet("current-user/custom-orders")]
+        [HttpGet("/culo-api/v1/current-user/custom-orders")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllCustomInitialOrdersByCustomerIds([FromQuery] string? search = null)
         {
@@ -4233,7 +4233,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             return null;
         }
 
-        [HttpGet("current-user/artist/to-do")]
+        [HttpGet("/culo-api/v1/current-user/artist/to-do")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetOrderxByCustomerId()
         {
@@ -6872,22 +6872,22 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
          */
 
 
-        [HttpPut("current-user/{suborderId}/manage-add-ons")]
+        [HttpPut("/culo-api/v1/current-user/{suborderId}/manage-add-ons")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> ManageAddOnsByAddOnId(string suborderId, [FromBody] ManageAddOnQuantityWrapper manageWrapper)
+        public async Task<IActionResult> ManageAddOnsByAddOnId(string suborderId, [FromBody] List<AddOn> manageAddOns)
         {
             // Convert suborderId to binary format
             string suborderIdBinary = ConvertGuidToBinary16(suborderId).ToLower();
 
             // Loop through each AddOn in the manage list
-            foreach (var manage in manageWrapper.manage)
+            foreach (var manage in manageAddOns)
             {
                 // Log the process for each add-on
-                _logger.LogInformation($"Managing AddOnId: {manage.addonId} for SubOrderId: {suborderId}");
+                _logger.LogInformation($"Managing AddOnId: {manage.Id} for SubOrderId: {suborderId}");
 
                 // Fetch the add-on price and name
-                double addonPrice = await GetAddonPriceAsync(manage.addonId);
-                string name = await AddonName(manage.addonId);
+                double addonPrice = await GetAddonPriceAsync(manage.Id);
+                string name = await AddonName(manage.Id);
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -6898,11 +6898,11 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                         double total = manage.quantity * addonPrice;
 
                         // Insert or update the order add-ons for the current add-on
-                        await InsertOrUpdateOrderaddonWithSubOrderId(suborderIdBinary, manage.addonId, addonPrice, manage.quantity, name, total);
+                        await InsertOrUpdateOrderaddonWithSubOrderId(suborderIdBinary, manage.Id, addonPrice, manage.quantity, name, total);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Transaction failed for AddOnId: {manage.addonId}, rolling back");
+                        _logger.LogError(ex, $"Transaction failed for AddOnId: {manage.Id}, rolling back");
                     }
                 }
             }

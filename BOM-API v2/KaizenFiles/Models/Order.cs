@@ -490,7 +490,7 @@
     }
     public class AddOn
     {
-        public int addonId { get; set; }
+        public int Id { get; set; }
         public int quantity { get; set; }
     }
 
