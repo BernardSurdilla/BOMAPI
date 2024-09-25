@@ -31,7 +31,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
-        [HttpGet("current-user/notifications")]
+
+        [HttpGet("/culo-api/v1/current-user/notifications")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetNotifications()
         {
@@ -62,9 +63,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     // Modify the SQL query to filter notifications by user_id
                     string sql = @"
-            SELECT notif_id, message, date_created, is_read
-            FROM notification
-            WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
+
+                SELECT notif_id, message, date_created, is_read
+                FROM notification
+                WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -78,7 +80,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 var notif = new Notif
                                 {
                                     notifId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
-                                    Message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
+
+
+                                    message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
                                     dateCreated = reader.GetDateTime("date_created"),
                                     isRead = reader.GetBoolean(reader.GetOrdinal("is_read"))
                                 };
@@ -110,7 +114,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPost("current-user/{notifId}/mark-as-read")]
+
+        [HttpPost("/culo-api/v1/current-user/notifications/{notifId}/mark-as-read")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> MarkNotificationAsRead(string notifId)
         {
@@ -248,7 +253,5 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
-
-
     }
 }
