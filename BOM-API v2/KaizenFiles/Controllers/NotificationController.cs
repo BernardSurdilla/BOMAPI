@@ -115,7 +115,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        [HttpPost("/culo-api/v1/current-user/notifications/{notifId}/mark-as-read")]
+        [HttpPost("current-user/notifications/{notifId}/mark-as-read")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> MarkNotificationAsRead(string notifId)
         {
