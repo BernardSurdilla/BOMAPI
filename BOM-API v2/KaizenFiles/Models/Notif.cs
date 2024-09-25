@@ -4,7 +4,7 @@
     {
         public Guid? notifId { get; set; }
         public DateTime dateCreated { get; set; }
-        public string Message { get; set; }
+        public string message { get; set; }
         public bool isRead { get; set; }
     }
     public class Notification
