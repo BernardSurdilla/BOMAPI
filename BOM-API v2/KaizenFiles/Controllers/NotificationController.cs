@@ -10,7 +10,7 @@ using System.Security.Claims;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
-    [Route("notification")]
+    [Route("notifications")]
     [ApiController]
     [Authorize]
     public class NotificationController : ControllerBase
@@ -31,7 +31,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
-        [HttpGet("current-user")]
+        [HttpGet("current-user/notifications")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetNotifications()
         {
@@ -49,7 +49,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 // Retrieve userId from the username
                 string userId = await GetUserIdByAllUsername(username);
-
                 string user = ConvertGuidToBinary16(userId).ToLower();
 
                 if (userId == null || userId.Length == 0)
@@ -63,9 +62,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     // Modify the SQL query to filter notifications by user_id
                     string sql = @"
-                SELECT notif_id, user_id, message, date_created, is_read
-                FROM notification
-                WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
+            SELECT notif_id, message, date_created, is_read
+            FROM notification
+            WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -79,10 +78,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 var notif = new Notif
                                 {
                                     notifId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
-                                    userId = reader.IsDBNull(reader.GetOrdinal("user_id")) ? (Guid?)null : new Guid((byte[])reader["user_id"]),
                                     Message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
                                     dateCreated = reader.GetDateTime("date_created"),
-                                    is_read = reader.GetBoolean(reader.GetOrdinal("is_read"))
+                                    isRead = reader.GetBoolean(reader.GetOrdinal("is_read"))
                                 };
 
                                 notifications.Add(notif);
@@ -91,16 +89,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                 }
 
+                // Get the unread notification count
                 int unreadNotificationCount = await CountUnreadNotificationsAsync(user);
 
-                Response.Headers.Append("X-Unread-Notification-Count", unreadNotificationCount.ToString());
-
-                if (notifications.Count == 0)
+                // Create a Notification object to return
+                var response = new Notification
                 {
-                    return Ok(new List<Notif>());
-                }
+                    unread = unreadNotificationCount,
+                    notifs = notifications
+                };
 
-                return Ok(notifications);
+                // Return the response with the unread count and notifications
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -108,6 +108,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "Internal server error");
             }
         }
+
 
         [HttpPost("current-user/{notifId}/mark-as-read")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
