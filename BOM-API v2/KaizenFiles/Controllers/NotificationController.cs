@@ -31,6 +31,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
+
         [HttpGet("/culo-api/v1/current-user/notifications")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetNotifications()
@@ -49,7 +50,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 // Retrieve userId from the username
                 string userId = await GetUserIdByAllUsername(username);
-
                 string user = ConvertGuidToBinary16(userId).ToLower();
 
                 if (userId == null || userId.Length == 0)
@@ -63,6 +63,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     // Modify the SQL query to filter notifications by user_id
                     string sql = @"
+
                 SELECT notif_id, message, date_created, is_read
                 FROM notification
                 WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
@@ -79,6 +80,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 var notif = new Notif
                                 {
                                     notifId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
+
+
                                     message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
                                     dateCreated = reader.GetDateTime("date_created"),
                                     isRead = reader.GetBoolean(reader.GetOrdinal("is_read"))
@@ -90,16 +93,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                 }
 
+                // Get the unread notification count
                 int unreadNotificationCount = await CountUnreadNotificationsAsync(user);
 
-                Response.Headers.Append("X-Unread-Notification-Count", unreadNotificationCount.ToString());
-
-                if (notifications.Count == 0)
+                // Create a Notification object to return
+                var response = new Notification
                 {
-                    return Ok(new List<Notif>());
-                }
+                    unread = unreadNotificationCount,
+                    notifs = notifications
+                };
 
-                return Ok(notifications);
+                // Return the response with the unread count and notifications
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -107,6 +112,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "Internal server error");
             }
         }
+
+
 
         [HttpPost("/culo-api/v1/current-user/notifications/{notifId}/mark-as-read")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]

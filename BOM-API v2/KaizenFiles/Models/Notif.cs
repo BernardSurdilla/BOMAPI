@@ -3,10 +3,14 @@
     public class Notif
     {
         public Guid? notifId { get; set; }
-        public Guid? userId { get; set; }
         public DateTime dateCreated { get; set; }
-        public string message { get; set; }
+        public string Message { get; set; }
         public bool isRead { get; set; }
+    }
+    public class Notification
+    {
+        public int unread { get; set; }
+        public List<Notif> notifs { get; set; } = new List<Notif>();
     }
 }
 
