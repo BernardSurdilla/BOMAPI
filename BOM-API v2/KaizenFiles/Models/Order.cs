@@ -163,6 +163,7 @@
         public string payment { get; set; } = "";
         public DateTime? PickupDateTime { get; set; }
     }
+
     public class UpdateOrderDetailsRequest
     {
         public string Description { get; set; }
