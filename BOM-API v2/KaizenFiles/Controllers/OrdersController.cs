@@ -3,17 +3,28 @@ using BillOfMaterialsAPI.Models;
 using CRUDFI.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using System.Security.Claims;
 
 
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
+    public static class DateTimeExtensions
+    {
+        public static DateTime StartOfWeek(this DateTime dt, DayOfWeek startOfWeek)
+        {
+            int diff = (7 + (dt.DayOfWeek - startOfWeek)) % 7;
+            return dt.AddDays(-1 * diff).Date;
+        }
+    }
+
     [Route("orders")]
     [ApiController]
     [Authorize]
@@ -24,6 +35,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
+
 
         public OrdersController(IConfiguration configuration, ILogger<OrdersController> logger, DatabaseContext context, KaizenTables kaizenTables)
         {
@@ -5869,63 +5881,97 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
         }
         */
 
-        [HttpGet("total-order-quantity")]
+        [HttpGet("total-order-quantity/day")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public async Task<IActionResult> GetTotalQuantity([FromQuery] string category, [FromQuery] string month = null)
+        public async Task<IActionResult> GetTotalQuantityForDay([FromQuery] int year, [FromQuery] int month, [FromQuery] int day)
         {
-            // Set default category to "day" if no value is provided
-            if (string.IsNullOrEmpty(category))
+            try
             {
-                int totalToday = await GetTotalQuantityForToday();
-                return Ok(new { Today = totalToday });
-            }
+                // Create a DateTime object from the provided query parameters
+                DateTime specificDay = new DateTime(year, month, day);
 
-            switch (category.ToLower())
+                // Call the method to get total quantity for the specific day
+                int total = await GetTotalQuantityForSpecificDay(specificDay);
+
+                // If total is 0, return an empty string or array
+                if (total == 0)
+                {
+                    return Ok(new { Day = specificDay.ToString("dddd"), TotalOrders = 0 });
+                }
+
+                // Return the result as day name and total order quantity
+                return Ok(new
+                {
+                    Day = specificDay.ToString("dddd"), // Get the full name of the day (e.g., Monday)
+                    TotalOrders = total
+                });
+            }
+            catch (Exception ex)
             {
-                case "day":
-                    // Get total quantity for today
-                    int totalToday = await GetTotalQuantityForToday();
-                    return Ok(new { Today = totalToday });
-                case "week":
-                    var weekQuantities = await GetTotalQuantityForWeek();
-                    return Ok(weekQuantities);
-                case "month":
-                    if (string.IsNullOrEmpty(month))
-                    {
-                        return BadRequest("Please provide a month in numeric format (e.g., '01' for January).");
-                    }
-                    var dailyQuantities = await GetTotalQuantityForMonth(month);
-                    return Ok(dailyQuantities); // Return the list directly
-                case "year":
-                    var yearlyQuantities = await GetTotalQuantityForYear();
-                    return Ok(yearlyQuantities);
-                default:
-                    return BadRequest("Invalid category. Please use 'day', 'week', 'month', or 'year'.");
+                _logger.LogError(ex, "Error retrieving total quantity for the day.");
+                return StatusCode(500, "Internal server error.");
             }
         }
 
-
-
-        // Private method to get total quantity for today
-        private async Task<int> GetTotalQuantityForToday()
+        // Private method for fetching quantity on a specific day
+        private async Task<int> GetTotalQuantityForSpecificDay(DateTime specificDay)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
                 string sql = @"
-            SELECT SUM(quantity) FROM suborders WHERE DATE(created_at) = CURDATE()";
+            SELECT SUM(quantity) 
+            FROM suborders 
+            WHERE DAY(created_at) = @day AND MONTH(created_at) = @month AND YEAR(created_at) = @year";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
+                    // Use the DateTime properties for the day, month, and year
+                    command.Parameters.AddWithValue("@day", specificDay.Day);
+                    command.Parameters.AddWithValue("@month", specificDay.Month);
+                    command.Parameters.AddWithValue("@year", specificDay.Year);
+
                     object result = await command.ExecuteScalarAsync();
                     return result != DBNull.Value ? Convert.ToInt32(result) : 0; // Return 0 if result is DBNull
                 }
             }
         }
 
-        // Private method to get total quantity for each day of the past week
-        private async Task<Dictionary<string, int>> GetTotalQuantityForWeek()
+        [HttpGet("total-order-quantity/week")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> GetTotalQuantityForWeek([FromQuery] int year, [FromQuery] int month, [FromQuery] int day)
+        {
+            try
+            {
+                // Create a DateTime object from the provided query parameters for the start of the week
+                DateTime startOfWeek = new DateTime(year, month, day).StartOfWeek(DayOfWeek.Monday);
+
+                // Fetch total quantity for the specific week
+                var weekQuantities = await GetTotalQuantityForSpecificWeek(startOfWeek);
+
+                // If no data found, return an empty array
+                if (weekQuantities.Count == 0)
+                {
+                    return Ok(new List<object>()); // Return an empty array
+                }
+
+                // Return result in the desired format
+                return Ok(weekQuantities.Select(q => new
+                {
+                    Day = q.Key,
+                    TotalOrders = q.Value
+                }));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving total quantity for the week.");
+                return StatusCode(500, "Internal server error.");
+            }
+        }
+
+        // Private method for fetching quantity for a specific week
+        private async Task<Dictionary<string, int>> GetTotalQuantityForSpecificWeek(DateTime startOfWeek)
         {
             var quantities = new Dictionary<string, int>();
 
@@ -5936,16 +5982,21 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 string sql = @"
             SELECT DAYNAME(created_at) AS DayName, SUM(quantity) AS TotalQuantity
             FROM suborders 
-            WHERE created_at >= NOW() - INTERVAL 7 DAY
-            GROUP BY DAYNAME(created_at) 
+            WHERE created_at >= @startOfWeek AND created_at < @endOfWeek
+            GROUP BY DAYNAME(created_at)
             ORDER BY FIELD(DAYNAME(created_at), 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
+                    // Set the start of the week and end of the week for the SQL query
+                    command.Parameters.AddWithValue("@startOfWeek", startOfWeek);
+                    command.Parameters.AddWithValue("@endOfWeek", startOfWeek.AddDays(7));
+
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
+                            // Add day names and corresponding total quantities to the dictionary
                             quantities[reader.GetString("DayName")] = reader.GetInt32("TotalQuantity");
                         }
                     }
@@ -5955,10 +6006,40 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             return quantities;
         }
 
-        // Private method to get total quantity for each day of a specific month
-        private async Task<List<DayQuantity>> GetTotalQuantityForMonth(string month)
+
+        [HttpGet("total-order-quantity/month")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> GetTotalQuantityForMonth([FromQuery] int year, [FromQuery] int month)
         {
-            var dailyQuantities = new List<DayQuantity>();
+            try
+            {
+                // Fetch total quantity for the specific month
+                var dailyQuantities = await GetTotalQuantityForSpecificMonth(year, month);
+
+                // If no data found, return an empty array
+                if (dailyQuantities.Count == 0)
+                {
+                    return Ok(new List<object>()); // Return an empty array
+                }
+
+                // Return result in the desired format
+                return Ok(dailyQuantities.Select(q => new
+                {
+                    Day = q.Key, // Day number
+                    TotalOrders = q.Value // Total orders for that day
+                }));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving total quantity for the month.");
+                return StatusCode(500, "Internal server error.");
+            }
+        }
+
+        // Private method to get total quantity for a specific month
+        private async Task<Dictionary<int, int>> GetTotalQuantityForSpecificMonth(int year, int month)
+        {
+            var dailyQuantities = new Dictionary<int, int>();
 
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -5967,23 +6048,22 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 string sql = @"
             SELECT DAY(created_at) AS Day, SUM(quantity) AS TotalQuantity
             FROM suborders 
-            WHERE MONTH(created_at) = @month AND YEAR(created_at) = YEAR(NOW())
+            WHERE MONTH(created_at) = @month AND YEAR(created_at) = @year
             GROUP BY DAY(created_at)
             ORDER BY DAY(created_at)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
+                    // Set the month and year parameters for the SQL query
                     command.Parameters.AddWithValue("@month", month);
+                    command.Parameters.AddWithValue("@year", year);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            dailyQuantities.Add(new DayQuantity
-                            {
-                                Day = reader.GetInt32("Day").ToString("D2"), // Format as "01", "02", etc.
-                                TotalQuantity = reader.GetInt32("TotalQuantity")
-                            });
+                            // Add day and total quantities to the dictionary
+                            dailyQuantities[reader.GetInt32("Day")] = reader.GetInt32("TotalQuantity");
                         }
                     }
                 }
@@ -5992,9 +6072,37 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             return dailyQuantities;
         }
 
+        [HttpGet("total-order-quantity/year")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> GetTotalQuantityForYear([FromQuery] int year)
+        {
+            try
+            {
+                // Fetch total quantity for the specific year
+                var yearlyQuantities = await GetTotalQuantityForSpecificYear(year);
 
-        // Private method to get total quantity for each month of the current year
-        private async Task<Dictionary<string, int>> GetTotalQuantityForYear()
+                // If no data found, return an empty array
+                if (yearlyQuantities.Count == 0)
+                {
+                    return Ok(new List<object>()); // Return an empty array
+                }
+
+                // Return result in the desired format
+                return Ok(yearlyQuantities.Select(q => new
+                {
+                    Month = q.Key, // Month name
+                    TotalOrders = q.Value // Total orders for that month
+                }));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving total quantity for the year.");
+                return StatusCode(500, "Internal server error.");
+            }
+        }
+
+        // Private method to get total quantity for a specific year
+        private async Task<Dictionary<string, int>> GetTotalQuantityForSpecificYear(int year)
         {
             var quantities = new Dictionary<string, int>();
 
@@ -6005,16 +6113,20 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 string sql = @"
             SELECT MONTHNAME(created_at) AS MonthName, SUM(quantity) AS TotalQuantity
             FROM suborders 
-            WHERE YEAR(created_at) = YEAR(NOW())
+            WHERE YEAR(created_at) = @year
             GROUP BY MONTH(created_at)
             ORDER BY MONTH(created_at)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
+                    // Set the year parameter for the SQL query
+                    command.Parameters.AddWithValue("@year", year);
+
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
+                            // Add month name and total quantities to the dictionary
                             quantities[reader.GetString("MonthName")] = reader.GetInt32("TotalQuantity");
                         }
                     }
