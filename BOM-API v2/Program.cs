@@ -136,6 +136,7 @@ builder.Services.AddSingleton<ILiveChatConnectionManager, LiveChatConnectionMana
 
 
 var app = builder.Build();
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -143,6 +144,8 @@ if (app.Environment.IsDevelopment())
     .UseSwaggerUI()
     .UseCors("DebugPolicy");
 }
+
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
