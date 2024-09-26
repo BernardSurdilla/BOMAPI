@@ -119,17 +119,17 @@ namespace BillOfMaterialsAPI.Controllers
                 foreach (Ingredients ifcm in ingredientsForCurrentMaterial)
                 {
                     GetPastryMaterialIngredients newSubIngredientListEntry = new GetPastryMaterialIngredients();
-                    newSubIngredientListEntry.pastry_material_id = ifcm.pastry_material_id;
-                    newSubIngredientListEntry.ingredient_id = ifcm.ingredient_id;
-                    newSubIngredientListEntry.ingredient_type = ifcm.ingredient_type;
-                    newSubIngredientListEntry.amount_measurement = ifcm.amount_measurement;
+                    newSubIngredientListEntry.pastryMaterialId = ifcm.pastry_material_id;
+                    newSubIngredientListEntry.ingredientId = ifcm.ingredient_id;
+                    newSubIngredientListEntry.ingredientType = ifcm.ingredient_type;
+                    newSubIngredientListEntry.amountMeasurement = ifcm.amount_measurement;
                     newSubIngredientListEntry.amount = ifcm.amount;
-                    newSubIngredientListEntry.item_id = ifcm.item_id;
+                    newSubIngredientListEntry.itemId = ifcm.item_id;
 
                     switch (ifcm.ingredient_type)
                     {
                         case IngredientType.InventoryItem:
-                            newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                            newSubIngredientListEntry.materialIngredients = new List<SubGetMaterialIngredients>();
                             break;
                         case IngredientType.Material:
                             List<MaterialIngredients> currentMaterialReferencedIngredients = await _context.MaterialIngredients.Where(x => x.material_id == ifcm.item_id).ToListAsync();
@@ -143,11 +143,11 @@ namespace BillOfMaterialsAPI.Controllers
                                     SubGetMaterialIngredients newEntryMaterialIngredientsEntry = new SubGetMaterialIngredients(materialIngredients);
                                     newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
                                 }
-                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                newSubIngredientListEntry.materialIngredients = newEntryMaterialIngredients;
                             }
                             else
                             {
-                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                newSubIngredientListEntry.materialIngredients = new List<SubGetMaterialIngredients>();
                             }
                             break;
                     }
@@ -194,20 +194,20 @@ namespace BillOfMaterialsAPI.Controllers
                         {
                             materialIngEntry.Add(new SubGetMaterialIngredients(mi));
                         }
-                        newEntry.material_ingredients = materialIngEntry;
+                        newEntry.materialIngredients = materialIngEntry;
                         break;
                     default:
                         break;
                 }
 
-                newEntry.ingredient_id = i.ingredient_id;
-                newEntry.pastry_material_id = i.pastry_material_id;
-                newEntry.ingredient_type = i.ingredient_type;
-                newEntry.item_id = i.item_id;
+                newEntry.ingredientId = i.ingredient_id;
+                newEntry.pastryMaterialId = i.pastry_material_id;
+                newEntry.ingredientType = i.ingredient_type;
+                newEntry.itemId = i.item_id;
                 newEntry.amount = i.amount;
-                newEntry.amount_measurement = i.amount_measurement;
-                newEntry.date_added = i.date_added;
-                newEntry.last_modified_date = i.last_modified_date;
+                newEntry.amountMeasurement = i.amount_measurement;
+                newEntry.dateAdded = i.date_added;
+                newEntry.lastModifiedDate = i.last_modified_date;
 
                 response.Add(newEntry);
 
@@ -498,8 +498,8 @@ namespace BillOfMaterialsAPI.Controllers
             foreach (DesignTags currentDesignTag in current_design_records)
             {
                 GetDesignTag newResponseEntry = new GetDesignTag();
-                newResponseEntry.design_tag_id = currentDesignTag.design_tag_id;
-                newResponseEntry.design_tag_name = currentDesignTag.design_tag_name;
+                newResponseEntry.designTagId = currentDesignTag.design_tag_id;
+                newResponseEntry.designTagName = currentDesignTag.design_tag_name;
                 response.Add(newResponseEntry);
             }
 

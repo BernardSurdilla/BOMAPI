@@ -303,8 +303,8 @@ namespace BOM_API_v2.Controllers
             foreach (Designs design in dbResp)
             {
                 GetDesignWithoutPastryMaterial newResponseRow = new GetDesignWithoutPastryMaterial();
-                newResponseRow.display_name = design.display_name;
-                newResponseRow.design_id = design.design_id;
+                newResponseRow.displayName = design.display_name;
+                newResponseRow.designId = design.design_id;
                 response.Add(newResponseRow);
             }
 
@@ -343,19 +343,19 @@ namespace BOM_API_v2.Controllers
 
             Designs newEntry = new Designs();
             newEntry.design_id = newEntryId;
-            newEntry.display_name = input.display_name;
-            newEntry.display_picture_url = input.display_picture_url;
-            newEntry.cake_description = input.cake_description;
+            newEntry.display_name = input.displayName;
+            newEntry.display_picture_url = input.displayPictureUrl;
+            newEntry.cake_description = input.cakeDescription;
 
             newEntry.is_active = true;
 
             //Remove dupes
-            input.design_tag_ids = input.design_tag_ids.Distinct().ToList();
+            input.designTagIds = input.designTagIds.Distinct().ToList();
 
             List<DesignTagsForCakes> newTagRelationships = new List<DesignTagsForCakes>();
-            if (input.design_tag_ids != null)
+            if (input.designTagIds != null)
             {
-                foreach (Guid tagId in input.design_tag_ids)
+                foreach (Guid tagId in input.designTagIds)
                 {
                     DesignTags? selectedDesignTag = await _databaseContext.DesignTags.FindAsync(tagId);
                     if (selectedDesignTag == null) { continue; }
@@ -373,9 +373,9 @@ namespace BOM_API_v2.Controllers
             }
 
             List<DesignShapes> newDesignShapes = new List<DesignShapes>();
-            if (input.design_shape_names != null)
+            if (input.designShapeNames != null)
             {
-                foreach (string shapeName in input.design_shape_names)
+                foreach (string shapeName in input.designShapeNames)
                 {
                     newDesignShapes.Add(new DesignShapes
                     {
@@ -388,12 +388,12 @@ namespace BOM_API_v2.Controllers
             }
 
             DesignImage? newDesignImage = null;
-            if (input.display_picture_data != null)
+            if (input.displayPictureData != null)
             {
                 newDesignImage = new DesignImage();
                 newDesignImage.design_id = newEntry.design_id;
                 newDesignImage.design_picture_id = new Guid();
-                newDesignImage.picture_data = input.display_picture_data;
+                newDesignImage.picture_data = input.displayPictureData;
                 newDesignImage.is_active = true;
             }
 
@@ -472,9 +472,9 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return NotFound(new { message = "Design id not found" }); }
 
             if (input == null) { return BadRequest(new { message = "Input is null" }); }
-            if (input.design_tag_ids.IsNullOrEmpty()) { return BadRequest(new { message = "No tag ids in the input body" }); }
+            if (input.designTagIds.IsNullOrEmpty()) { return BadRequest(new { message = "No tag ids in the input body" }); }
 
-            foreach (Guid tagId in input.design_tag_ids)
+            foreach (Guid tagId in input.designTagIds)
             {
                 DesignTags referencedTag;
                 try { referencedTag = await _databaseContext.DesignTags.Where(x => x.is_active == true && x.design_tag_id == tagId).FirstAsync(); }
@@ -527,13 +527,13 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
 
             _databaseContext.Designs.Update(foundEntry);
-            foundEntry.display_name = input.display_name;
-            foundEntry.cake_description = input.cake_description;
-            foundEntry.display_picture_url = input.display_picture_url;
+            foundEntry.display_name = input.displayName;
+            foundEntry.cake_description = input.cakeDescription;
+            foundEntry.display_picture_url = input.displayPictureUrl;
 
             List<DesignTagsForCakes> allDesignTagsForCakes = await _databaseContext.DesignTagsForCakes.Where(x => x.is_active == true && x.design_id == foundEntry.design_id).ToListAsync();
 
-            List<Guid> normalizedInputTagIdList = input.design_tag_ids != null ? input.design_tag_ids.Distinct().ToList() : new List<Guid>();
+            List<Guid> normalizedInputTagIdList = input.designTagIds != null ? input.designTagIds.Distinct().ToList() : new List<Guid>();
 
             foreach (Guid currentTagId in normalizedInputTagIdList)
             {
@@ -554,7 +554,7 @@ namespace BOM_API_v2.Controllers
                 }
             }
             List<DesignShapes> allShapesForDesign = await _databaseContext.DesignShapes.Where(x => x.is_active == true && x.design_id == foundEntry.design_id).ToListAsync();
-            List<string> normalizedShapeNames = input.design_shape_names != null ? input.design_shape_names.Distinct().ToList() : new List<string>();
+            List<string> normalizedShapeNames = input.designShapeNames != null ? input.designShapeNames.Distinct().ToList() : new List<string>();
             foreach (string shapeName in normalizedShapeNames)
             {
                 DesignShapes? duplicateCheck = allShapesForDesign.Where(x => x.shape_name == shapeName).FirstOrDefault();
@@ -571,7 +571,7 @@ namespace BOM_API_v2.Controllers
             }
 
 
-            if (input.display_picture_data != null)
+            if (input.displayPictureData != null)
             {
                 DesignImage? designImage = null;
                 try { designImage = await _databaseContext.DesignImage.Where(x => x.is_active == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
@@ -581,13 +581,13 @@ namespace BOM_API_v2.Controllers
                     designImage = new DesignImage();
                     designImage.design_id = byteArrEncodedId;
                     designImage.design_picture_id = new Guid();
-                    designImage.picture_data = input.display_picture_data;
+                    designImage.picture_data = input.displayPictureData;
                     designImage.is_active = true;
                     await _databaseContext.DesignImage.AddAsync(designImage);
                 }
                 else
                 {
-                    designImage.picture_data = input.display_picture_data;
+                    designImage.picture_data = input.displayPictureData;
                     _databaseContext.DesignImage.Update(designImage);
                 }
             }

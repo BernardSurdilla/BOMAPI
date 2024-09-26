@@ -90,14 +90,14 @@ namespace JWTAuthentication.Authentication
         [EmailAddress] public string email { get; set; }
         public string username { get; set; }
         public List<string> roles { get; set; }
-        public string phone_number { get; set; }
-        public bool is_email_confirmed { get; set; }
-        public DateTime join_date { get; set; }
+        public string phoneNumber { get; set; }
+        public bool isEmailConfirmed { get; set; }
+        public DateTime joinDate { get; set; }
     }
     public class PatchUser
     {
         public string username { get; set; }
-        public string phone_number { get; set; }
+        public string phoneNumber { get; set; }
     }
 }
 
@@ -338,9 +338,9 @@ namespace JWTAuthentication.Controllers
                 newResponseEntry.user_id = user.Id;
                 newResponseEntry.username = user.UserName;
                 newResponseEntry.email = user.Email;
-                newResponseEntry.phone_number = user.PhoneNumber;
-                newResponseEntry.is_email_confirmed = currentUser.EmailConfirmed;
-                newResponseEntry.join_date = user.JoinDate;
+                newResponseEntry.phoneNumber = user.PhoneNumber;
+                newResponseEntry.isEmailConfirmed = currentUser.EmailConfirmed;
+                newResponseEntry.joinDate = user.JoinDate;
 
                 newResponseEntry.roles = (List<string>)await userManager.GetRolesAsync(user);
 
@@ -361,9 +361,9 @@ namespace JWTAuthentication.Controllers
             response.user_id = currentUser.Id;
             response.email = currentUser.Email;
             response.username = currentUser.UserName;
-            response.phone_number = currentUser.PhoneNumber;
-            response.is_email_confirmed = currentUser.EmailConfirmed;
-            response.join_date = currentUser.JoinDate;
+            response.phoneNumber = currentUser.PhoneNumber;
+            response.isEmailConfirmed = currentUser.EmailConfirmed;
+            response.joinDate = currentUser.JoinDate;
 
             response.roles = (List<string>)await userManager.GetRolesAsync(currentUser);
 
@@ -492,7 +492,7 @@ namespace JWTAuthentication.Controllers
             var currentUser = await userManager.GetUserAsync(User);
             if (currentUser == null) { return NotFound(new { message = "User not found" }); }
 
-            currentUser.PhoneNumber = input.phone_number;
+            currentUser.PhoneNumber = input.phoneNumber;
             currentUser.UserName = input.username;
 
             if (await _inventoryBOMBridge.UpdateUser(currentUser, input) == 1)

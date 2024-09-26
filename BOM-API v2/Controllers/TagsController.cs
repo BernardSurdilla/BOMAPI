@@ -69,8 +69,8 @@ namespace BOM_API_v2.Controllers
             foreach (DesignTags currentDesignTag in current_design_records)
             {
                 GetDesignTag newResponseEntry = new GetDesignTag();
-                newResponseEntry.design_tag_id = currentDesignTag.design_tag_id;
-                newResponseEntry.design_tag_name = currentDesignTag.design_tag_name;
+                newResponseEntry.designTagId = currentDesignTag.design_tag_id;
+                newResponseEntry.designTagName = currentDesignTag.design_tag_name;
                 response.Add(newResponseEntry);
             }
 
@@ -85,7 +85,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return new GetTag(); }
 
             GetTag response = new GetTag();
-            response.design_tag_name = selectedTag.design_tag_name;
+            response.designTagName = selectedTag.design_tag_name;
 
             await _actionLogger.LogAction(User, "GET", "Design tag " + selectedTag.design_tag_id);
             return response;
@@ -99,7 +99,7 @@ namespace BOM_API_v2.Controllers
 
             DesignTags newTags = new DesignTags();
             newTags.design_tag_id = new Guid();
-            newTags.design_tag_name = input.design_tag_name;
+            newTags.design_tag_name = input.designTagName;
             newTags.is_active = true;
 
             await _databaseContext.DesignTags.AddAsync(newTags);
@@ -119,7 +119,7 @@ namespace BOM_API_v2.Controllers
             catch (Exception e) { return BadRequest(new { message = "An unspecified error occured when retrieving the data" }); }
 
             _databaseContext.DesignTags.Update(selectedDesignTag);
-            selectedDesignTag.design_tag_name = input.design_tag_name;
+            selectedDesignTag.design_tag_name = input.designTagName;
             await _databaseContext.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH", "Update design tag " + selectedDesignTag.design_tag_id);

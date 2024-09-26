@@ -441,7 +441,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string sql = @"INSERT INTO customorders ( quantity, order_id ,custom_id, customer_id, customer_name, picture_url, description, message, size, 
-        tier, cover, color, shape, flavor, design_name, design_id, price, created_at, status)
+        `, cover, color, shape, flavor, design_name, design_id, price, created_at, status)
     VALUES ( @quantity, UNHEX(@orderid), UNHEX(REPLACE(UUID(), '-', '')), @CustomerId, @CustomerName, @PictureUrl, @Description, @Message, @Size, 
         @Tier, @Cover, @Color, @Shape, @Flavor, NULL, UNHEX(REPLACE(UUID(), '-', '')), NULL, NOW(), 'to review')";
 

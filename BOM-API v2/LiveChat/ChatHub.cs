@@ -132,7 +132,6 @@ namespace LiveChat
 
             await SendMessageToSenderAndRecepientClients(callerClientProxy, recepientClientProxy, formattedMessage);
         }
-
         [HubMethodName("admin-send-message")]
         public async Task AdminSendMessage(string message, string accountId)
         {
@@ -197,23 +196,23 @@ namespace LiveChat
         {
             MessageFormat response = new MessageFormat
             {
-                sender_connection_id = connectionId,
-                sender_message = message,
-                sender_message_time_sent = DateTime.Now
+                senderConnectionId = connectionId,
+                senderMessage = message,
+                senderMessageTimeSent = DateTime.Now
             };
 
             if (senderAccount == null)
             {
-                response.sender_name = "Anonymous";
-                response.sender_account_id = "N/A";
+                response.senderName = "Anonymous";
+                response.senderAccountId = "N/A";
             }
             else
             {
                 Claim? nameClaim = senderAccount.FindFirst(ClaimTypes.Name);
                 Claim? idClaim = senderAccount.FindFirst(ClaimTypes.NameIdentifier);
 
-                response.sender_name = nameClaim == null ? "N/A" : nameClaim.Value;
-                response.sender_account_id = idClaim == null ? "N/A" : idClaim.Value;
+                response.senderName = nameClaim == null ? "N/A" : nameClaim.Value;
+                response.senderAccountId = idClaim == null ? "N/A" : idClaim.Value;
 
             }
 
@@ -233,8 +232,8 @@ namespace LiveChat
                 direct_message_id = Guid.NewGuid(),
                 sender_account_id = sender.Id,
                 receiver_account_id = recepient.Id,
-                date_sent = message.sender_message_time_sent,
-                message = message.sender_message,
+                date_sent = message.senderMessageTimeSent,
+                message = message.senderMessage,
             };
 
             await _directMessagesDB.AddAsync(newDbEntry);
@@ -246,10 +245,10 @@ namespace LiveChat
 
     public class MessageFormat
     {
-        public string sender_connection_id { get; set; }
-        public string? sender_account_id { get; set; }
-        public string sender_name { get; set; }
-        public string sender_message { get; set; }
-        public DateTime sender_message_time_sent { get; set; }
+        public string senderConnectionId { get; set; }
+        public string? senderAccountId { get; set; }
+        public string senderName { get; set; }
+        public string senderMessage { get; set; }
+        public DateTime senderMessageTimeSent { get; set; }
     }
 }

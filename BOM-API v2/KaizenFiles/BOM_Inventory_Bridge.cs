@@ -79,7 +79,7 @@ namespace BOM_API_v2.Bridge
 
             selectedInventoryAccount.display_name = updateInfo.username;
             selectedInventoryAccount.user_name = updateInfo.username;
-            selectedInventoryAccount.contact = updateInfo.phone_number;
+            selectedInventoryAccount.contact = updateInfo.phoneNumber;
 
             await _inventoryAccounts.Users.AddAsync(selectedInventoryAccount);
             await _inventoryAccounts.SaveChangesAsync();

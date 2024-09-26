@@ -64,54 +64,54 @@ namespace BOM_API_v2.Controllers
 
             GetPastryMaterial parsedData = await DataParser.CreatePastryMaterialResponseFromDBRow(selectedDesignPastryMaterial, _context, _kaizenTables);
 
-            response.pastry_material_id = parsedData.pastry_material_id;
+            response.pastryMaterialId = parsedData.pastryMaterialId;
 
             response.variants = new List<SubGetVariants>();
-            SubGetVariants mainVariant = new SubGetVariants { variant_id = parsedData.pastry_material_id, variant_name = parsedData.main_variant_name, cost_estimate = parsedData.cost_estimate, in_stock = parsedData.ingredients_in_stock, add_ons = new List<SubGetAddOn>() };
+            SubGetVariants mainVariant = new SubGetVariants { variantId = parsedData.pastryMaterialId, variantName = parsedData.mainVariantName, costEstimate = parsedData.costEstimate, inStock = parsedData.ingredientsInStock, addOns = new List<SubGetAddOn>() };
 
-            foreach (GetPastryMaterialAddOns currentPastryMaterialAddOn in parsedData.add_ons)
+            foreach (GetPastryMaterialAddOns currentPastryMaterialAddOn in parsedData.addOns)
             {
                 AddOns? referencedAddOns = null;
-                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.add_ons_id == currentPastryMaterialAddOn.add_ons_id).FirstAsync(); }
+                try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.add_ons_id == currentPastryMaterialAddOn.addOnsId).FirstAsync(); }
                 catch { continue; }
                 if (referencedAddOns == null) { continue; }
 
                 SubGetAddOn newMainVariantAddOnsEntry = new SubGetAddOn();
-                newMainVariantAddOnsEntry.pastry_material_add_on_id = currentPastryMaterialAddOn.pastry_material_add_on_id;
-                newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
-                newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
+                newMainVariantAddOnsEntry.pastryMaterialAddOnId = currentPastryMaterialAddOn.pastryMaterialAddOnId;
+                newMainVariantAddOnsEntry.addOnId = referencedAddOns.add_ons_id;
+                newMainVariantAddOnsEntry.addOnName = referencedAddOns.name;
                 newMainVariantAddOnsEntry.amount = currentPastryMaterialAddOn.amount;
                 newMainVariantAddOnsEntry.price = referencedAddOns.price;
 
-                mainVariant.add_ons.Add(newMainVariantAddOnsEntry);
+                mainVariant.addOns.Add(newMainVariantAddOnsEntry);
             }
 
             response.variants.Add(mainVariant);
 
-            foreach (GetPastryMaterialSubVariant currentSubVariant in parsedData.sub_variants)
+            foreach (GetPastryMaterialSubVariant currentSubVariant in parsedData.subVariants)
             {
                 SubGetVariants newResponseSubVariantEntry = new SubGetVariants();
-                newResponseSubVariantEntry.variant_id = currentSubVariant.pastry_material_sub_variant_id;
-                newResponseSubVariantEntry.variant_name = currentSubVariant.sub_variant_name;
-                newResponseSubVariantEntry.cost_estimate = currentSubVariant.cost_estimate;
-                newResponseSubVariantEntry.in_stock = currentSubVariant.ingredients_in_stock;
-                newResponseSubVariantEntry.add_ons = new List<SubGetAddOn>();
+                newResponseSubVariantEntry.variantId = currentSubVariant.pastryMaterialSubVariantId;
+                newResponseSubVariantEntry.variantName = currentSubVariant.subVariantName;
+                newResponseSubVariantEntry.costEstimate = currentSubVariant.costEstimate;
+                newResponseSubVariantEntry.inStock = currentSubVariant.ingredientsInStock;
+                newResponseSubVariantEntry.addOns = new List<SubGetAddOn>();
 
-                foreach (GetPastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariant.sub_variant_add_ons)
+                foreach (GetPastryMaterialSubVariantAddOns currentSubVariantAddOn in currentSubVariant.subVariantAddOns)
                 {
                     AddOns? referencedAddOns = null;
-                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.add_ons_id == currentSubVariantAddOn.add_ons_id).FirstAsync(); }
+                    try { referencedAddOns = await _kaizenTables.AddOns.Where(x => x.add_ons_id == currentSubVariantAddOn.addOnsId).FirstAsync(); }
                     catch { continue; }
                     if (referencedAddOns == null) { continue; }
 
                     SubGetAddOn newMainVariantAddOnsEntry = new SubGetAddOn();
-                    newMainVariantAddOnsEntry.pastry_material_add_on_id = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
-                    newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
-                    newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
+                    newMainVariantAddOnsEntry.pastryMaterialAddOnId = currentSubVariantAddOn.pastryMaterialSubVariantAddOnId;
+                    newMainVariantAddOnsEntry.addOnId = referencedAddOns.add_ons_id;
+                    newMainVariantAddOnsEntry.addOnName = referencedAddOns.name;
                     newMainVariantAddOnsEntry.amount = currentSubVariantAddOn.amount;
                     newMainVariantAddOnsEntry.price = referencedAddOns.price;
 
-                    newResponseSubVariantEntry.add_ons.Add(newMainVariantAddOnsEntry);
+                    newResponseSubVariantEntry.addOns.Add(newMainVariantAddOnsEntry);
                 }
 
                 response.variants.Add(newResponseSubVariantEntry);

@@ -579,11 +579,11 @@ namespace BillOfMaterialsAPI.Helpers
 
             newIngredientsEntry.pastry_material_id = pastry_material_id;
 
-            newIngredientsEntry.item_id = data.item_id;
-            newIngredientsEntry.ingredient_type = data.ingredient_type;
+            newIngredientsEntry.item_id = data.itemId;
+            newIngredientsEntry.ingredient_type = data.ingredientType;
 
             newIngredientsEntry.amount = data.amount;
-            newIngredientsEntry.amount_measurement = data.amount_measurement;
+            newIngredientsEntry.amount_measurement = data.amountMeasurement;
             newIngredientsEntry.is_active = true;
             newIngredientsEntry.date_added = currentTime;
             newIngredientsEntry.last_modified_date = currentTime;
@@ -605,9 +605,9 @@ namespace BillOfMaterialsAPI.Helpers
             newIngredientImportanceEntry.pastry_material_ingredient_importance_id = response;
             newIngredientImportanceEntry.pastry_material_id = pastry_material_id;
 
-            newIngredientImportanceEntry.item_id = data.item_id;
+            newIngredientImportanceEntry.item_id = data.itemId;
             newIngredientImportanceEntry.importance = data.importance;
-            newIngredientImportanceEntry.ingredient_type = data.ingredient_type;
+            newIngredientImportanceEntry.ingredient_type = data.ingredientType;
 
             newIngredientImportanceEntry.date_added = currentTime;
             newIngredientImportanceEntry.last_modified_date = currentTime;
@@ -627,7 +627,7 @@ namespace BillOfMaterialsAPI.Helpers
             newAddOnEntry.pastry_material_add_on_id = pastry_material_add_on_id;
 
             newAddOnEntry.pastry_material_id = pastry_material_id;
-            newAddOnEntry.add_ons_id = data.add_ons_id;
+            newAddOnEntry.add_ons_id = data.addOnsId;
             newAddOnEntry.amount = data.amount;
 
             newAddOnEntry.is_active = true;
@@ -650,10 +650,10 @@ namespace BillOfMaterialsAPI.Helpers
 
             newSubVariantIngredient.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
 
-            newSubVariantIngredient.item_id = data.item_id;
-            newSubVariantIngredient.ingredient_type = data.ingredient_type;
+            newSubVariantIngredient.item_id = data.itemId;
+            newSubVariantIngredient.ingredient_type = data.ingredientType;
             newSubVariantIngredient.amount = data.amount;
-            newSubVariantIngredient.amount_measurement = data.amount_measurement;
+            newSubVariantIngredient.amount_measurement = data.amountMeasurement;
 
             newSubVariantIngredient.date_added = currentTime;
             newSubVariantIngredient.last_modified_date = currentTime;
@@ -675,7 +675,7 @@ namespace BillOfMaterialsAPI.Helpers
             newSubVariantAddOn.pastry_material_sub_variant_add_on_id = pastry_material_sub_variant_add_on_id;
             newSubVariantAddOn.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
 
-            newSubVariantAddOn.add_ons_id = data.add_ons_id;
+            newSubVariantAddOn.add_ons_id = data.addOnsId;
             newSubVariantAddOn.amount = data.amount;
 
             newSubVariantAddOn.date_added = currentTime;
@@ -899,15 +899,15 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<GetPastryMaterial> CreatePastryMaterialResponseFromDBRow(PastryMaterials data, DatabaseContext context, KaizenTables kaizenTables)
         {
             GetPastryMaterial response = new GetPastryMaterial();
-            response.design_id = Convert.ToBase64String(data.design_id);
-            try { Designs? selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.design_name = selectedDesign.display_name; }
-            catch (Exception e) { response.design_name = "N/A"; }
+            response.designId = Convert.ToBase64String(data.design_id);
+            try { Designs? selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.designName = selectedDesign.display_name; }
+            catch (Exception e) { response.designName = "N/A"; }
 
-            response.pastry_material_id = data.pastry_material_id;
-            response.date_added = data.date_added;
-            response.last_modified_date = data.last_modified_date;
-            response.main_variant_name = data.main_variant_name;
-            response.ingredients_in_stock = true;
+            response.pastryMaterialId = data.pastry_material_id;
+            response.dateAdded = data.date_added;
+            response.lastModifiedDate = data.last_modified_date;
+            response.mainVariantName = data.main_variant_name;
+            response.ingredientsInStock = true;
 
             List<GetPastryMaterialIngredients> responsePastryMaterialList = new List<GetPastryMaterialIngredients>();
             List<GetPastryMaterialIngredientImportance> responsePastryMaterialImportanceList = new List<GetPastryMaterialIngredientImportance>();
@@ -950,15 +950,15 @@ namespace BillOfMaterialsAPI.Helpers
                     throw new InvalidOperationException("The pastry material ingredient " + currentIngredient.ingredient_id + " has an invalid measurement unit"); //This should return something to identify the error
                 }
 
-                newSubIngredientListEntry.ingredient_id = currentIngredient.ingredient_id;
-                newSubIngredientListEntry.pastry_material_id = currentIngredient.pastry_material_id;
-                newSubIngredientListEntry.ingredient_type = currentIngredient.ingredient_type;
+                newSubIngredientListEntry.ingredientId = currentIngredient.ingredient_id;
+                newSubIngredientListEntry.pastryMaterialId = currentIngredient.pastry_material_id;
+                newSubIngredientListEntry.ingredientType = currentIngredient.ingredient_type;
 
                 newSubIngredientListEntry.amount = currentIngredient.amount;
-                newSubIngredientListEntry.amount_measurement = currentIngredient.amount_measurement;
+                newSubIngredientListEntry.amountMeasurement = currentIngredient.amount_measurement;
 
-                newSubIngredientListEntry.date_added = currentIngredient.date_added;
-                newSubIngredientListEntry.last_modified_date = currentIngredient.last_modified_date;
+                newSubIngredientListEntry.dateAdded = currentIngredient.date_added;
+                newSubIngredientListEntry.lastModifiedDate = currentIngredient.last_modified_date;
 
                 switch (currentIngredient.ingredient_type)
                 {
@@ -968,8 +968,8 @@ namespace BillOfMaterialsAPI.Helpers
                             try { currentInventoryItemI = await DataRetrieval.GetInventoryItemAsync(currentIngredient.item_id, kaizenTables); }
                             catch { continue; }
 
-                            newSubIngredientListEntry.item_name = currentInventoryItemI.item_name;
-                            newSubIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
+                            newSubIngredientListEntry.itemName = currentInventoryItemI.item_name;
+                            newSubIngredientListEntry.itemId = Convert.ToString(currentInventoryItemI.id);
 
                             string currentIngredientStringId = Convert.ToString(currentInventoryItemI.id);
 
@@ -998,7 +998,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                             if (baseVariantIngredientAmountDict[currentIngredientStringId] > currentInventoryItemI.quantity)
                             {
-                                response.ingredients_in_stock = false;
+                                response.ingredientsInStock = false;
                             }
                             calculatedCost += calculatedAmountI;
                             break;
@@ -1008,8 +1008,8 @@ namespace BillOfMaterialsAPI.Helpers
                             Materials? currentReferencedMaterial = await context.Materials.Where(x => x.material_id == currentIngredient.item_id && x.is_active == true).FirstAsync();
                             if (currentReferencedMaterial == null) { continue; }
 
-                            newSubIngredientListEntry.item_name = currentReferencedMaterial.material_name;
-                            newSubIngredientListEntry.item_id = currentReferencedMaterial.material_id;
+                            newSubIngredientListEntry.itemName = currentReferencedMaterial.material_name;
+                            newSubIngredientListEntry.itemId = currentReferencedMaterial.material_id;
 
                             List<MaterialIngredients> currentMaterialReferencedIngredients = await context.MaterialIngredients.Where(x => x.material_id == currentIngredient.item_id).ToListAsync();
 
@@ -1029,30 +1029,30 @@ namespace BillOfMaterialsAPI.Helpers
                                             catch { continue; }
 
                                             if (currentSubMaterialReferencedInventoryItem == null) { continue; }
-                                            else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name; }
+                                            else { newEntryMaterialIngredientsEntry.itemName = currentSubMaterialReferencedInventoryItem.item_name; }
                                             break;
                                         case IngredientType.Material:
                                             Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.is_active == true).FirstAsync();
                                             if (currentSubMaterialReferencedMaterial == null) { continue; }
-                                            else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedMaterial.material_name; }
+                                            else { newEntryMaterialIngredientsEntry.itemName = currentSubMaterialReferencedMaterial.material_name; }
                                             break;
                                     }
-                                    newEntryMaterialIngredientsEntry.material_id = materialIngredients.material_id;
-                                    newEntryMaterialIngredientsEntry.material_ingredient_id = materialIngredients.material_ingredient_id;
-                                    newEntryMaterialIngredientsEntry.item_id = materialIngredients.item_id;
-                                    newEntryMaterialIngredientsEntry.ingredient_type = materialIngredients.ingredient_type;
+                                    newEntryMaterialIngredientsEntry.materialId = materialIngredients.material_id;
+                                    newEntryMaterialIngredientsEntry.materialIngredientId = materialIngredients.material_ingredient_id;
+                                    newEntryMaterialIngredientsEntry.itemId = materialIngredients.item_id;
+                                    newEntryMaterialIngredientsEntry.ingredientType = materialIngredients.ingredient_type;
                                     newEntryMaterialIngredientsEntry.amount = materialIngredients.amount;
-                                    newEntryMaterialIngredientsEntry.amount_measurement = materialIngredients.amount_measurement;
-                                    newEntryMaterialIngredientsEntry.date_added = materialIngredients.date_added;
-                                    newEntryMaterialIngredientsEntry.last_modified_date = materialIngredients.last_modified_date;
+                                    newEntryMaterialIngredientsEntry.amountMeasurement = materialIngredients.amount_measurement;
+                                    newEntryMaterialIngredientsEntry.dateAdded = materialIngredients.date_added;
+                                    newEntryMaterialIngredientsEntry.lastModifiedDate = materialIngredients.last_modified_date;
 
                                     newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
                                 }
-                                newSubIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                newSubIngredientListEntry.materialIngredients = newEntryMaterialIngredients;
                             }
                             else
                             {
-                                newSubIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                newSubIngredientListEntry.materialIngredients = new List<SubGetMaterialIngredients>();
                             }
                             //Price calculation code
                             //Get all ingredient for currently referenced material
@@ -1087,7 +1087,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                 if (baseVariantIngredientAmountDict[currentIngredientStringId] > currentReferencedIngredientM.quantity)
                                 {
-                                    response.ingredients_in_stock = false;
+                                    response.ingredientsInStock = false;
                                 }
 
                                 ingredientCost = (currentRefItemPrice * convertedAmount) * currentSubIngredientCostMultiplier;
@@ -1179,7 +1179,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                             if (baseVariantIngredientAmountDict[currentIngredientStringId] > refItemForSubMatIng.quantity)
                                             {
-                                                response.ingredients_in_stock = false;
+                                                response.ingredientsInStock = false;
                                             }
 
                                             currentSubMaterialIngredientPrice = (refItemPrice * subMatIngRowAmount) * costMultiplier;
@@ -1203,15 +1203,15 @@ namespace BillOfMaterialsAPI.Helpers
             foreach (PastryMaterialIngredientImportance currentIngredientImportance in currentPastryMaterialIngredientImportance)
             {
                 GetPastryMaterialIngredientImportance newResponseImportanceListEntry = new GetPastryMaterialIngredientImportance();
-                newResponseImportanceListEntry.pastry_material_id = currentIngredientImportance.pastry_material_id;
-                newResponseImportanceListEntry.pastry_material_ingredient_importance_id = currentIngredientImportance.pastry_material_ingredient_importance_id;
+                newResponseImportanceListEntry.pastryMaterialId = currentIngredientImportance.pastry_material_id;
+                newResponseImportanceListEntry.pastryMaterialIngredientImportanceId = currentIngredientImportance.pastry_material_ingredient_importance_id;
 
-                newResponseImportanceListEntry.item_id = currentIngredientImportance.item_id;
-                newResponseImportanceListEntry.ingredient_type = currentIngredientImportance.ingredient_type;
+                newResponseImportanceListEntry.itemId = currentIngredientImportance.item_id;
+                newResponseImportanceListEntry.ingredientType = currentIngredientImportance.ingredient_type;
                 newResponseImportanceListEntry.importance = currentIngredientImportance.importance;
 
-                newResponseImportanceListEntry.date_added = currentIngredientImportance.date_added;
-                newResponseImportanceListEntry.last_modified_date = currentIngredientImportance.last_modified_date;
+                newResponseImportanceListEntry.dateAdded = currentIngredientImportance.date_added;
+                newResponseImportanceListEntry.lastModifiedDate = currentIngredientImportance.last_modified_date;
 
                 responsePastryMaterialImportanceList.Add(newResponseImportanceListEntry);
             }
@@ -1223,15 +1223,15 @@ namespace BillOfMaterialsAPI.Helpers
                 if (referencedAddOns == null) { continue; }
 
                 GetPastryMaterialAddOns newResponseAddOnRow = new GetPastryMaterialAddOns();
-                newResponseAddOnRow.pastry_material_add_on_id = currentAddOn.pastry_material_add_on_id;
-                newResponseAddOnRow.pastry_material_id = currentAddOn.pastry_material_id;
+                newResponseAddOnRow.pastryMaterialAddOnId = currentAddOn.pastry_material_add_on_id;
+                newResponseAddOnRow.pastryMaterialId = currentAddOn.pastry_material_id;
 
-                newResponseAddOnRow.add_ons_id = currentAddOn.add_ons_id;
-                newResponseAddOnRow.add_ons_name = referencedAddOns.name;
+                newResponseAddOnRow.addOnsId = currentAddOn.add_ons_id;
+                newResponseAddOnRow.addOnsName = referencedAddOns.name;
                 newResponseAddOnRow.amount = currentAddOn.amount;
 
-                newResponseAddOnRow.date_added = currentAddOn.date_added;
-                newResponseAddOnRow.last_modified_date = currentAddOn.last_modified_date;
+                newResponseAddOnRow.dateAdded = currentAddOn.date_added;
+                newResponseAddOnRow.lastModifiedDate = currentAddOn.last_modified_date;
                 responsePastryMaterialAddOns.Add(newResponseAddOnRow);
             }
 
@@ -1239,12 +1239,12 @@ namespace BillOfMaterialsAPI.Helpers
             foreach (PastryMaterialSubVariants currentSubVariant in currentPastryMaterialSubVariants)
             {
                 GetPastryMaterialSubVariant newSubVariantListRow = new GetPastryMaterialSubVariant();
-                newSubVariantListRow.pastry_material_id = currentSubVariant.pastry_material_id;
-                newSubVariantListRow.pastry_material_sub_variant_id = currentSubVariant.pastry_material_sub_variant_id;
-                newSubVariantListRow.sub_variant_name = currentSubVariant.sub_variant_name;
-                newSubVariantListRow.date_added = currentSubVariant.date_added;
-                newSubVariantListRow.last_modified_date = currentSubVariant.last_modified_date;
-                newSubVariantListRow.ingredients_in_stock = response.ingredients_in_stock == true ? true : false;
+                newSubVariantListRow.pastryMaterialId = currentSubVariant.pastry_material_id;
+                newSubVariantListRow.pastryMaterialSubVariantId = currentSubVariant.pastry_material_sub_variant_id;
+                newSubVariantListRow.subVariantName = currentSubVariant.sub_variant_name;
+                newSubVariantListRow.dateAdded = currentSubVariant.date_added;
+                newSubVariantListRow.lastModifiedDate = currentSubVariant.last_modified_date;
+                newSubVariantListRow.ingredientsInStock = response.ingredientsInStock == true ? true : false;
                 double estimatedCostSubVariant = calculatedCost;
 
                 List<PastryMaterialSubVariantIngredients> currentSubVariantIngredients = await context.PastryMaterialSubVariantIngredients.Where(x => x.is_active == true && x.pastry_material_sub_variant_id == currentSubVariant.pastry_material_sub_variant_id).ToListAsync();
@@ -1259,14 +1259,14 @@ namespace BillOfMaterialsAPI.Helpers
                 foreach (PastryMaterialSubVariantIngredients currentSubVariantIngredient in currentSubVariantIngredients)
                 {
                     SubGetPastryMaterialSubVariantIngredients newSubVariantIngredientListEntry = new SubGetPastryMaterialSubVariantIngredients();
-                    newSubVariantIngredientListEntry.pastry_material_sub_variant_id = currentSubVariantIngredient.pastry_material_sub_variant_id;
-                    newSubVariantIngredientListEntry.pastry_material_sub_variant_ingredient_id = currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id;
+                    newSubVariantIngredientListEntry.pastryMaterialSubVariantId = currentSubVariantIngredient.pastry_material_sub_variant_id;
+                    newSubVariantIngredientListEntry.pastryMaterialSubVariantIngredientId = currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id;
 
-                    newSubVariantIngredientListEntry.date_added = currentSubVariantIngredient.date_added;
-                    newSubVariantIngredientListEntry.last_modified_date = currentSubVariantIngredient.last_modified_date;
+                    newSubVariantIngredientListEntry.dateAdded = currentSubVariantIngredient.date_added;
+                    newSubVariantIngredientListEntry.lastModifiedDate = currentSubVariantIngredient.last_modified_date;
 
-                    newSubVariantIngredientListEntry.ingredient_type = currentSubVariantIngredient.ingredient_type;
-                    newSubVariantIngredientListEntry.amount_measurement = currentSubVariantIngredient.amount_measurement;
+                    newSubVariantIngredientListEntry.ingredientType = currentSubVariantIngredient.ingredient_type;
+                    newSubVariantIngredientListEntry.amountMeasurement = currentSubVariantIngredient.amount_measurement;
                     newSubVariantIngredientListEntry.amount = currentSubVariantIngredient.amount;
                     //Check if the measurement unit in the ingredient record is valid
                     //If not found, skip current ingredient
@@ -1301,8 +1301,8 @@ namespace BillOfMaterialsAPI.Helpers
                                 try { currentInventoryItemI = await DataRetrieval.GetInventoryItemAsync(currentSubVariantIngredient.item_id, kaizenTables); }
                                 catch { continue; }
 
-                                newSubVariantIngredientListEntry.item_name = currentInventoryItemI.item_name;
-                                newSubVariantIngredientListEntry.item_id = Convert.ToString(currentInventoryItemI.id);
+                                newSubVariantIngredientListEntry.itemName = currentInventoryItemI.item_name;
+                                newSubVariantIngredientListEntry.itemId = Convert.ToString(currentInventoryItemI.id);
                                 string currentIngredientStringId = Convert.ToString(currentInventoryItemI.id);
                                 double convertedAmountI = 0.0;
                                 double calculatedAmountI = 0.0;
@@ -1329,7 +1329,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                 if (subVariantIngredientConsumptionDict[currentIngredientStringId] > currentInventoryItemI.quantity)
                                 {
-                                    newSubVariantListRow.ingredients_in_stock = false;
+                                    newSubVariantListRow.ingredientsInStock = false;
                                 }
 
                                 estimatedCostSubVariant += calculatedAmountI;
@@ -1340,8 +1340,8 @@ namespace BillOfMaterialsAPI.Helpers
                                 Materials? currentReferencedMaterial = await context.Materials.Where(x => x.material_id == currentSubVariantIngredient.item_id && x.is_active == true).FirstAsync();
                                 if (currentReferencedMaterial == null) { continue; }
 
-                                newSubVariantIngredientListEntry.item_name = currentReferencedMaterial.material_name;
-                                newSubVariantIngredientListEntry.item_id = currentReferencedMaterial.material_id;
+                                newSubVariantIngredientListEntry.itemName = currentReferencedMaterial.material_name;
+                                newSubVariantIngredientListEntry.itemId = currentReferencedMaterial.material_id;
 
                                 List<MaterialIngredients> currentMaterialReferencedIngredients = await context.MaterialIngredients.Where(x => x.material_id == currentSubVariantIngredient.item_id).ToListAsync();
 
@@ -1359,30 +1359,30 @@ namespace BillOfMaterialsAPI.Helpers
                                                 Item? currentSubMaterialReferencedInventoryItem = null;
                                                 try { currentSubMaterialReferencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(materialIngredients.item_id, kaizenTables); }
                                                 catch { continue; }
-                                                newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedInventoryItem.item_name;
+                                                newEntryMaterialIngredientsEntry.itemName = currentSubMaterialReferencedInventoryItem.item_name;
                                                 break;
                                             case IngredientType.Material:
                                                 Materials? currentSubMaterialReferencedMaterial = await context.Materials.Where(x => x.material_id == materialIngredients.item_id && x.is_active == true).FirstAsync();
                                                 if (currentSubMaterialReferencedMaterial == null) { continue; }
-                                                else { newEntryMaterialIngredientsEntry.item_name = currentSubMaterialReferencedMaterial.material_name; }
+                                                else { newEntryMaterialIngredientsEntry.itemName = currentSubMaterialReferencedMaterial.material_name; }
                                                 break;
                                         }
-                                        newEntryMaterialIngredientsEntry.material_id = materialIngredients.material_id;
-                                        newEntryMaterialIngredientsEntry.material_ingredient_id = materialIngredients.material_ingredient_id;
-                                        newEntryMaterialIngredientsEntry.item_id = materialIngredients.item_id;
-                                        newEntryMaterialIngredientsEntry.ingredient_type = materialIngredients.ingredient_type;
+                                        newEntryMaterialIngredientsEntry.materialId = materialIngredients.material_id;
+                                        newEntryMaterialIngredientsEntry.materialIngredientId = materialIngredients.material_ingredient_id;
+                                        newEntryMaterialIngredientsEntry.itemId = materialIngredients.item_id;
+                                        newEntryMaterialIngredientsEntry.ingredientType = materialIngredients.ingredient_type;
                                         newEntryMaterialIngredientsEntry.amount = materialIngredients.amount;
-                                        newEntryMaterialIngredientsEntry.amount_measurement = materialIngredients.amount_measurement;
-                                        newEntryMaterialIngredientsEntry.date_added = materialIngredients.date_added;
-                                        newEntryMaterialIngredientsEntry.last_modified_date = materialIngredients.last_modified_date;
+                                        newEntryMaterialIngredientsEntry.amountMeasurement = materialIngredients.amount_measurement;
+                                        newEntryMaterialIngredientsEntry.dateAdded = materialIngredients.date_added;
+                                        newEntryMaterialIngredientsEntry.lastModifiedDate = materialIngredients.last_modified_date;
 
                                         newEntryMaterialIngredients.Add(newEntryMaterialIngredientsEntry);
                                     }
-                                    newSubVariantIngredientListEntry.material_ingredients = newEntryMaterialIngredients;
+                                    newSubVariantIngredientListEntry.materialIngredients = newEntryMaterialIngredients;
                                 }
                                 else
                                 {
-                                    newSubVariantIngredientListEntry.material_ingredients = new List<SubGetMaterialIngredients>();
+                                    newSubVariantIngredientListEntry.materialIngredients = new List<SubGetMaterialIngredients>();
                                 }
                                 //Price calculation code
                                 //Get all ingredient for currently referenced material
@@ -1416,7 +1416,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                     if (subVariantIngredientConsumptionDict[currentIngredientStringId] > currentReferencedIngredientM.quantity)
                                     {
-                                        newSubVariantListRow.ingredients_in_stock = false;
+                                        newSubVariantListRow.ingredientsInStock = false;
                                     }
 
                                     ingredientCost = (currentRefItemPrice * convertedAmount) * currentSubIngredientCostMultiplier;
@@ -1509,7 +1509,7 @@ namespace BillOfMaterialsAPI.Helpers
 
                                                 if (subVariantIngredientConsumptionDict[currentIngredientStringId] > refItemForSubMatIng.quantity)
                                                 {
-                                                    newSubVariantListRow.ingredients_in_stock = false;
+                                                    newSubVariantListRow.ingredientsInStock = false;
                                                 }
 
                                                 currentSubMaterialIngredientPrice = (refItemPrice * subMatIngRowAmount) * costMultiplier;
@@ -1539,30 +1539,30 @@ namespace BillOfMaterialsAPI.Helpers
 
 
                     GetPastryMaterialSubVariantAddOns newResponseSubVariantAddOnRow = new GetPastryMaterialSubVariantAddOns();
-                    newResponseSubVariantAddOnRow.pastry_material_sub_variant_add_on_id = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
-                    newResponseSubVariantAddOnRow.pastry_material_sub_variant_id = currentSubVariantAddOn.pastry_material_sub_variant_id;
+                    newResponseSubVariantAddOnRow.pastryMaterialSubVariantAddOnId = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
+                    newResponseSubVariantAddOnRow.pastryMaterialSubVariantId = currentSubVariantAddOn.pastry_material_sub_variant_id;
 
-                    newResponseSubVariantAddOnRow.add_ons_id = currentSubVariantAddOn.add_ons_id;
-                    newResponseSubVariantAddOnRow.add_ons_name = referencedAddOns.name;
+                    newResponseSubVariantAddOnRow.addOnsId = currentSubVariantAddOn.add_ons_id;
+                    newResponseSubVariantAddOnRow.addOnsName = referencedAddOns.name;
                     newResponseSubVariantAddOnRow.amount = currentSubVariantAddOn.amount;
 
-                    newResponseSubVariantAddOnRow.date_added = currentSubVariantAddOn.date_added;
-                    newResponseSubVariantAddOnRow.last_modified_date = currentSubVariantAddOn.last_modified_date;
+                    newResponseSubVariantAddOnRow.dateAdded = currentSubVariantAddOn.date_added;
+                    newResponseSubVariantAddOnRow.lastModifiedDate = currentSubVariantAddOn.last_modified_date;
                     currentSubVariantAddOnList.Add(newResponseSubVariantAddOnRow);
                 }
 
-                newSubVariantListRow.cost_estimate = estimatedCostSubVariant;
-                newSubVariantListRow.sub_variant_ingredients = currentSubVariantIngredientList;
-                newSubVariantListRow.sub_variant_add_ons = currentSubVariantAddOnList;
+                newSubVariantListRow.costEstimate = estimatedCostSubVariant;
+                newSubVariantListRow.subVariantIngredients = currentSubVariantIngredientList;
+                newSubVariantListRow.subVariantAddOns = currentSubVariantAddOnList;
 
                 responsePastryMaterialSubVariants.Add(newSubVariantListRow);
             }
 
             response.ingredients = responsePastryMaterialList;
-            response.ingredient_importance = responsePastryMaterialImportanceList;
-            response.add_ons = responsePastryMaterialAddOns;
-            response.sub_variants = responsePastryMaterialSubVariants;
-            response.cost_estimate = calculatedCost;
+            response.ingredientImportance = responsePastryMaterialImportanceList;
+            response.addOns = responsePastryMaterialAddOns;
+            response.subVariants = responsePastryMaterialSubVariants;
+            response.costEstimate = calculatedCost;
 
             return response;
         }
@@ -1570,12 +1570,12 @@ namespace BillOfMaterialsAPI.Helpers
         {
             GetDesign response = new GetDesign();
 
-            response.design_id = data.design_id;
-            response.display_name = data.display_name;
-            response.design_picture_url = data.display_picture_url;
-            response.cake_description = data.cake_description;
-            response.design_tags = new List<GetDesignTag>();
-            response.design_shapes = new List<GetDesignShape>();
+            response.designId = data.design_id;
+            response.displayName = data.display_name;
+            response.designPictureUrl = data.display_picture_url;
+            response.cakeDescription = data.cake_description;
+            response.designTags = new List<GetDesignTag>();
+            response.designShapes = new List<GetDesignShape>();
 
             List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.is_active == true && x.design_id == data.design_id && x.DesignTags.is_active == true).ToListAsync();
             List<DesignShapes> cakeShapes = await context.DesignShapes.Where(x => x.is_active == true && x.design_id == data.design_id).ToListAsync();
@@ -1588,20 +1588,20 @@ namespace BillOfMaterialsAPI.Helpers
             {
                 if (currentTag.DesignTags != null)
                 {
-                    response.design_tags.Add(new GetDesignTag { design_tag_id = currentTag.DesignTags.design_tag_id, design_tag_name = currentTag.DesignTags.design_tag_name });
+                    response.designTags.Add(new GetDesignTag { designTagId = currentTag.DesignTags.design_tag_id, designTagName = currentTag.DesignTags.design_tag_name });
                 }
             }
             foreach (DesignShapes currentShape in cakeShapes)
             {
-                response.design_shapes.Add(new GetDesignShape
+                response.designShapes.Add(new GetDesignShape
                 {
-                    design_shape_id = currentShape.design_shape_id,
-                    shape_name = currentShape.shape_name
+                    designShapeId = currentShape.design_shape_id,
+                    shapeName = currentShape.shape_name
                 });
             }
 
-            if (image != null) { response.display_picture_data = image.picture_data; }
-            else { response.display_picture_data = null; };
+            if (image != null) { response.displayPictureData = image.picture_data; }
+            else { response.displayPictureData = null; };
             return response;
         }
 

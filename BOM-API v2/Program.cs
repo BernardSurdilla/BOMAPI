@@ -12,6 +12,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
+using System.Text.Json;
 
 
 const string API_VERSION = "v1";
@@ -33,7 +34,12 @@ builder.Services.AddCors(options =>
         .AllowAnyMethod();
     });
 });
-builder.Services.AddControllers(options => options.Conventions.Add(new GlobalControllerRoutePrefixConvention(new GlobalControllerRoutePrefix(GLOBAL_ROUTE_PREFIX))));
+builder.Services.AddControllers(options => options.Conventions.Add(new GlobalControllerRoutePrefixConvention(new GlobalControllerRoutePrefix(GLOBAL_ROUTE_PREFIX))))
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    });
+;
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

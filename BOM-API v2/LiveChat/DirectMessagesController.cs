@@ -47,8 +47,8 @@ namespace LiveChat
                 List<DirectMessages> messagesForCurrentUser = allMessages.Where(x => x.sender_account_id == id || x.receiver_account_id == id).OrderBy(x => x.date_sent).ToList();
                 GetMessageResponseFormat newResponseEntry = new GetMessageResponseFormat
                 {
-                    account_id = currentIdUser.Id,
-                    account_name = currentIdUser.UserName,
+                    accountId = currentIdUser.Id,
+                    accountName = currentIdUser.UserName,
                     messages = new List<GetMessageFormat>()
                 };
 
@@ -56,12 +56,12 @@ namespace LiveChat
                 {
                     newResponseEntry.messages.Add(new GetMessageFormat
                     {
-                        sender_account_id = currentMessage.sender_account_id,
-                        sender_account_name = currentMessage.sender_account_id == currentUser.Id ? currentUser.UserName : currentIdUser.UserName,
-                        receiver_account_id = currentMessage.receiver_account_id,
-                        reciever_account_name = currentMessage.receiver_account_id == currentUser.Id ? currentUser.UserName : currentIdUser.UserName,
+                        senderAccountId = currentMessage.sender_account_id,
+                        senderAccountName = currentMessage.sender_account_id == currentUser.Id ? currentUser.UserName : currentIdUser.UserName,
+                        receiverAccountId = currentMessage.receiver_account_id,
+                        recieverAccountName = currentMessage.receiver_account_id == currentUser.Id ? currentUser.UserName : currentIdUser.UserName,
                         message = currentMessage.message,
-                        time_sent = currentMessage.date_sent,
+                        timeSent = currentMessage.date_sent,
                     });
                 }
 
@@ -74,17 +74,17 @@ namespace LiveChat
     }
     public class GetMessageResponseFormat
     {
-        public string? account_id { get; set; }
-        public string? account_name { get; set; }
+        public string? accountId { get; set; }
+        public string? accountName { get; set; }
         public List<GetMessageFormat> messages { get; set; }
     }
     public class GetMessageFormat
     {
-        public string? sender_account_id { get; set; }
-        public string? sender_account_name { get; set; }
-        public string? receiver_account_id { get; set; }
-        public string? reciever_account_name { get; set; }
+        public string? senderAccountId { get; set; }
+        public string? senderAccountName { get; set; }
+        public string? receiverAccountId { get; set; }
+        public string? recieverAccountName { get; set; }
         public string message { get; set; }
-        public DateTime time_sent { get; set; }
+        public DateTime timeSent { get; set; }
     }
 }

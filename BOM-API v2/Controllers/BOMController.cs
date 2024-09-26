@@ -108,29 +108,29 @@ namespace API_TEST.Controllers
                             currentItemName = searchResultM.material_name; break;
                     }
 
-                    GetUsedItemsByOccurence? currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
+                    GetUsedItemsByOccurence? currentRecord = response.Find(x => x.itemId == ingItemEnum.Current.item_id);
 
                     if (currentRecord == null)
                     {
                         GetUsedItemsByOccurence newEntry = new GetUsedItemsByOccurence()
                         {
-                            item_id = ingItemEnum.Current.item_id,
-                            item_name = currentItemName,
-                            item_type = ingItemEnum.Current.ingredient_type,
-                            as_material_ingredient = new List<string>(),
-                            as_cake_ingredient = new List<string>(),
-                            num_of_uses_cake_ingredient = 0,
-                            num_of_uses_material_ingredient = 0,
-                            ratio_of_uses_cake_ingredient = 0.0,
-                            ratio_of_uses_material_ingredient = 0.0
+                            itemId = ingItemEnum.Current.item_id,
+                            itemName = currentItemName,
+                            itemType = ingItemEnum.Current.ingredient_type,
+                            asMaterialIngredient = new List<string>(),
+                            asCakeIngredient = new List<string>(),
+                            numOfUsesCakeIngredient = 0,
+                            numOfUsesMaterialIngredient = 0,
+                            ratioOfUsesCakeIngredient = 0.0,
+                            ratioOfUsesMaterialIngredient = 0.0
                         };
 
                         response.Add(newEntry);
-                        currentRecord = response.Find(x => x.item_id == ingItemEnum.Current.item_id);
+                        currentRecord = response.Find(x => x.itemId == ingItemEnum.Current.item_id);
                     }
                     totalNumberOfPastryIngredients += 1;
-                    currentRecord.num_of_uses_cake_ingredient += 1;
-                    currentRecord.as_cake_ingredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " " + currentParentPastryMaterialReferencedDesign.display_name);
+                    currentRecord.numOfUsesCakeIngredient += 1;
+                    currentRecord.asCakeIngredient.Add(ingItemEnum.Current.PastryMaterials.pastry_material_id + ": " + " " + currentParentPastryMaterialReferencedDesign.display_name);
                 }
             }
             //Count the material ingredients
@@ -160,38 +160,38 @@ namespace API_TEST.Controllers
                             currentItemName = searchResult.material_name; break;
                     }
 
-                    GetUsedItemsByOccurence? currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
+                    GetUsedItemsByOccurence? currentRecord = response.Find(x => x.itemId == matIngItemEnum.Current.item_id);
                     if (currentRecord == null)
                     {
                         GetUsedItemsByOccurence newEntry = new GetUsedItemsByOccurence()
                         {
-                            item_id = matIngItemEnum.Current.item_id,
-                            item_name = currentItemName,
-                            item_type = matIngItemEnum.Current.ingredient_type,
-                            as_material_ingredient = new List<string>(),
-                            as_cake_ingredient = new List<string>(),
-                            num_of_uses_cake_ingredient = 0,
-                            num_of_uses_material_ingredient = 0,
-                            ratio_of_uses_cake_ingredient = 0.0,
-                            ratio_of_uses_material_ingredient = 0.0
+                            itemId = matIngItemEnum.Current.item_id,
+                            itemName = currentItemName,
+                            itemType = matIngItemEnum.Current.ingredient_type,
+                            asMaterialIngredient = new List<string>(),
+                            asCakeIngredient = new List<string>(),
+                            numOfUsesCakeIngredient = 0,
+                            numOfUsesMaterialIngredient = 0,
+                            ratioOfUsesCakeIngredient = 0.0,
+                            ratioOfUsesMaterialIngredient = 0.0
                         };
 
                         response.Add(newEntry);
-                        currentRecord = response.Find(x => x.item_id == matIngItemEnum.Current.item_id);
+                        currentRecord = response.Find(x => x.itemId == matIngItemEnum.Current.item_id);
                     }
                     totalNumberOfMaterialIngredients += 1;
-                    currentRecord.num_of_uses_material_ingredient += 1;
-                    currentRecord.as_material_ingredient.Add(matIngItemEnum.Current.Materials.material_id + ": " + matIngItemEnum.Current.Materials.material_name);
+                    currentRecord.numOfUsesMaterialIngredient += 1;
+                    currentRecord.asMaterialIngredient.Add(matIngItemEnum.Current.Materials.material_id + ": " + matIngItemEnum.Current.Materials.material_name);
                 }
             }
             //Ratio calculation
             foreach (GetUsedItemsByOccurence currentResponseRow in response)
             {
-                double curRowNumOfUsesCakeIng = currentResponseRow.num_of_uses_cake_ingredient;
-                double curRowNumOfUsesMatIng = currentResponseRow.num_of_uses_material_ingredient;
+                double curRowNumOfUsesCakeIng = currentResponseRow.numOfUsesCakeIngredient;
+                double curRowNumOfUsesMatIng = currentResponseRow.numOfUsesMaterialIngredient;
 
-                currentResponseRow.ratio_of_uses_cake_ingredient = curRowNumOfUsesCakeIng <= 0 ? 0 : curRowNumOfUsesCakeIng / totalNumberOfPastryIngredients;
-                currentResponseRow.ratio_of_uses_material_ingredient = curRowNumOfUsesMatIng <= 0 ? 0 : curRowNumOfUsesMatIng / totalNumberOfMaterialIngredients;
+                currentResponseRow.ratioOfUsesCakeIngredient = curRowNumOfUsesCakeIng <= 0 ? 0 : curRowNumOfUsesCakeIng / totalNumberOfPastryIngredients;
+                currentResponseRow.ratioOfUsesMaterialIngredient = curRowNumOfUsesMatIng <= 0 ? 0 : curRowNumOfUsesMatIng / totalNumberOfMaterialIngredients;
             }
             //Sorting Algorithm
             if (sortBy != null)
@@ -205,10 +205,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.item_id.CompareTo(x.item_id));
+                                response.Sort((x, y) => y.itemId.CompareTo(x.itemId));
                                 break;
                             default:
-                                response.Sort((x, y) => x.item_id.CompareTo(y.item_id));
+                                response.Sort((x, y) => x.itemId.CompareTo(y.itemId));
                                 break;
                         }
                         break;
@@ -216,10 +216,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.item_name.CompareTo(x.item_name));
+                                response.Sort((x, y) => y.itemName.CompareTo(x.itemName));
                                 break;
                             default:
-                                response.Sort((x, y) => x.item_name.CompareTo(y.item_name));
+                                response.Sort((x, y) => x.itemName.CompareTo(y.itemName));
                                 break;
                         }
                         break;
@@ -227,10 +227,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.item_type.CompareTo(x.item_type));
+                                response.Sort((x, y) => y.itemType.CompareTo(x.itemType));
                                 break;
                             default:
-                                response.Sort((x, y) => x.item_type.CompareTo(y.item_type));
+                                response.Sort((x, y) => x.itemType.CompareTo(y.itemType));
                                 break;
                         }
                         break;
@@ -238,10 +238,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.num_of_uses_cake_ingredient.CompareTo(x.num_of_uses_cake_ingredient));
+                                response.Sort((x, y) => y.numOfUsesCakeIngredient.CompareTo(x.numOfUsesCakeIngredient));
                                 break;
                             default:
-                                response.Sort((x, y) => x.num_of_uses_cake_ingredient.CompareTo(y.num_of_uses_cake_ingredient));
+                                response.Sort((x, y) => x.numOfUsesCakeIngredient.CompareTo(y.numOfUsesCakeIngredient));
                                 break;
                         }
                         break;
@@ -249,10 +249,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.num_of_uses_material_ingredient.CompareTo(x.num_of_uses_material_ingredient));
+                                response.Sort((x, y) => y.numOfUsesMaterialIngredient.CompareTo(x.numOfUsesMaterialIngredient));
                                 break;
                             default:
-                                response.Sort((x, y) => x.num_of_uses_material_ingredient.CompareTo(y.num_of_uses_material_ingredient));
+                                response.Sort((x, y) => x.numOfUsesMaterialIngredient.CompareTo(y.numOfUsesMaterialIngredient));
                                 break;
                         }
                         break;
@@ -260,10 +260,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.ratio_of_uses_material_ingredient.CompareTo(x.ratio_of_uses_material_ingredient));
+                                response.Sort((x, y) => y.ratioOfUsesMaterialIngredient.CompareTo(x.ratioOfUsesMaterialIngredient));
                                 break;
                             default:
-                                response.Sort((x, y) => x.ratio_of_uses_material_ingredient.CompareTo(y.ratio_of_uses_material_ingredient));
+                                response.Sort((x, y) => x.ratioOfUsesMaterialIngredient.CompareTo(y.ratioOfUsesMaterialIngredient));
                                 break;
                         }
                         break;
@@ -271,10 +271,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.ratio_of_uses_cake_ingredient.CompareTo(x.ratio_of_uses_cake_ingredient));
+                                response.Sort((x, y) => y.ratioOfUsesCakeIngredient.CompareTo(x.ratioOfUsesCakeIngredient));
                                 break;
                             default:
-                                response.Sort((x, y) => x.ratio_of_uses_cake_ingredient.CompareTo(y.ratio_of_uses_cake_ingredient));
+                                response.Sort((x, y) => x.ratioOfUsesCakeIngredient.CompareTo(y.ratioOfUsesCakeIngredient));
                                 break;
                         }
                         break;
@@ -318,12 +318,12 @@ namespace API_TEST.Controllers
 
                 int totalNumberOfIngredientsInInterval = 0;
 
-                newResponseEntry.date_start = new DateTime(currentDateYear, currentDateMonth, 1);
-                newResponseEntry.date_end = new DateTime(currentDateYear, currentDateMonth, DateTime.DaysInMonth(currentDateYear, currentDateMonth));
+                newResponseEntry.dateStart = new DateTime(currentDateYear, currentDateMonth, 1);
+                newResponseEntry.dateEnd = new DateTime(currentDateYear, currentDateMonth, DateTime.DaysInMonth(currentDateYear, currentDateMonth));
 
-                newResponseEntry.item_list = new List<ItemOccurence>();
+                newResponseEntry.itemList = new List<ItemOccurence>();
 
-                List<Orders> ordersForCurrentDate = ordersList.Where(x => x.created_at >= newResponseEntry.date_start && x.created_at <= newResponseEntry.date_end).ToList();
+                List<Orders> ordersForCurrentDate = ordersList.Where(x => x.created_at >= newResponseEntry.dateStart && x.created_at <= newResponseEntry.dateEnd).ToList();
 
                 //Add all items in the list of occurence for the current month
                 foreach (Orders currentOrder in ordersForCurrentDate)
@@ -353,18 +353,18 @@ namespace API_TEST.Controllers
                                     catch { continue; }
                                     if (currentInventoryItem == null) { continue; }
 
-                                    ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == i.item_id);
+                                    ItemOccurence? currentOccurenceEntry = newResponseEntry.itemList.Find(x => x.itemId == i.item_id);
                                     if (currentOccurenceEntry == null)
                                     {
-                                        newResponseEntry.item_list.Add(new ItemOccurence()
+                                        newResponseEntry.itemList.Add(new ItemOccurence()
                                         {
-                                            item_id = i.item_id,
-                                            item_name = currentInventoryItem.item_name, //Add code here to find the item name in inventory
-                                            item_type = i.ingredient_type,
-                                            occurrence_count = 1
+                                            itemId = i.item_id,
+                                            itemName = currentInventoryItem.item_name, //Add code here to find the item name in inventory
+                                            itemType = i.ingredient_type,
+                                            occurrenceCount = 1
                                         });
                                     }
-                                    else { currentOccurenceEntry.occurrence_count += 1; }
+                                    else { currentOccurenceEntry.occurrenceCount += 1; }
 
                                     totalNumberOfIngredientsInInterval += 1;
                                     break;
@@ -404,19 +404,19 @@ namespace API_TEST.Controllers
 
                                         if (currentInventoryItem == null) continue;
 
-                                        ItemOccurence? currentOccurenceEntry = newResponseEntry.item_list.Find(x => x.item_id == currentMaterialIngredient.item_id);
+                                        ItemOccurence? currentOccurenceEntry = newResponseEntry.itemList.Find(x => x.itemId == currentMaterialIngredient.item_id);
 
                                         if (currentOccurenceEntry == null)
                                         {
-                                            newResponseEntry.item_list.Add(new ItemOccurence()
+                                            newResponseEntry.itemList.Add(new ItemOccurence()
                                             {
-                                                item_id = currentMaterialIngredient.item_id,
-                                                item_name = currentInventoryItem.item_name, //Add code here to find the item name in inventory
-                                                item_type = currentMaterialIngredient.ingredient_type,
-                                                occurrence_count = 1
+                                                itemId = currentMaterialIngredient.item_id,
+                                                itemName = currentInventoryItem.item_name, //Add code here to find the item name in inventory
+                                                itemType = currentMaterialIngredient.ingredient_type,
+                                                occurrenceCount = 1
                                             });
                                         }
-                                        else { currentOccurenceEntry.occurrence_count += 1; }
+                                        else { currentOccurenceEntry.occurrenceCount += 1; }
                                         totalNumberOfIngredientsInInterval += 1;
                                     }
                                     break;
@@ -425,9 +425,9 @@ namespace API_TEST.Controllers
                     }
                 }
                 //Calculate the ratio for the ingredients in the occurence list
-                foreach (ItemOccurence currentItemForRatioCalculation in newResponseEntry.item_list)
+                foreach (ItemOccurence currentItemForRatioCalculation in newResponseEntry.itemList)
                 {
-                    currentItemForRatioCalculation.ratio = currentItemForRatioCalculation.occurrence_count / totalNumberOfIngredientsInInterval;
+                    currentItemForRatioCalculation.ratio = currentItemForRatioCalculation.occurrenceCount / totalNumberOfIngredientsInInterval;
                 }
             }
             await _actionLogger.LogAction(User, "GET", "All items by seasonal occurence");
@@ -447,14 +447,14 @@ namespace API_TEST.Controllers
             {
                 DesignTags? selectedTag = allTags.Where(x => x.design_tag_id == DesignTagsForCakes.design_tag_id).FirstOrDefault();
                 if (selectedTag == null) { continue; }
-                GetTagOccurrence? selectedResponseRow = response.Where(x => x.design_tag_id == selectedTag.design_tag_id).FirstOrDefault();
-                if (selectedResponseRow != null) { selectedResponseRow.occurrence_count += 1; }
+                GetTagOccurrence? selectedResponseRow = response.Where(x => x.designTagId == selectedTag.design_tag_id).FirstOrDefault();
+                if (selectedResponseRow != null) { selectedResponseRow.occurrenceCount += 1; }
                 else
                 {
                     GetTagOccurrence newResponseEntry = new GetTagOccurrence();
-                    newResponseEntry.design_tag_id = selectedTag.design_tag_id;
-                    newResponseEntry.design_tag_name = selectedTag.design_tag_name;
-                    newResponseEntry.occurrence_count = 1;
+                    newResponseEntry.designTagId = selectedTag.design_tag_id;
+                    newResponseEntry.designTagName = selectedTag.design_tag_name;
+                    newResponseEntry.occurrenceCount = 1;
                     newResponseEntry.ratio = 0.0;
                     response.Add(newResponseEntry);
                 }
@@ -462,7 +462,7 @@ namespace API_TEST.Controllers
             double totalAmountOfCakeTags = Convert.ToDouble(allTagsForCake.Count());
             foreach (GetTagOccurrence currentResponseRow in response)
             {
-                currentResponseRow.ratio = currentResponseRow.occurrence_count / totalAmountOfCakeTags;
+                currentResponseRow.ratio = currentResponseRow.occurrenceCount / totalAmountOfCakeTags;
             }
             //Sorting Algorithm
             if (sortBy != null)
@@ -476,10 +476,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.design_tag_name.CompareTo(x.design_tag_name));
+                                response.Sort((x, y) => y.designTagName.CompareTo(x.designTagName));
                                 break;
                             default:
-                                response.Sort((x, y) => x.design_tag_name.CompareTo(y.design_tag_name));
+                                response.Sort((x, y) => x.designTagName.CompareTo(y.designTagName));
                                 break;
                         }
                         break;
@@ -487,10 +487,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.occurrence_count.CompareTo(x.occurrence_count));
+                                response.Sort((x, y) => y.occurrenceCount.CompareTo(x.occurrenceCount));
                                 break;
                             default:
-                                response.Sort((x, y) => x.occurrence_count.CompareTo(y.occurrence_count));
+                                response.Sort((x, y) => x.occurrenceCount.CompareTo(y.occurrenceCount));
                                 break;
                         }
                         break;
@@ -509,10 +509,10 @@ namespace API_TEST.Controllers
                         switch (sortOrder)
                         {
                             case "DESC":
-                                response.Sort((x, y) => y.design_tag_id.CompareTo(x.design_tag_id));
+                                response.Sort((x, y) => y.designTagId.CompareTo(x.designTagId));
                                 break;
                             default:
-                                response.Sort((x, y) => x.design_tag_id.CompareTo(y.design_tag_id));
+                                response.Sort((x, y) => x.designTagId.CompareTo(y.designTagId));
                                 break;
                         }
                         break;
