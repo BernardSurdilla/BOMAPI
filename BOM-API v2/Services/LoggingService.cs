@@ -38,7 +38,7 @@ namespace BillOfMaterialsAPI.Services
 
             string lastLogId;
 
-            try { TransactionLogs logs = await _logs.TransactionLogs.OrderByDescending(x => x.logId).FirstAsync(); lastLogId = logs.logId; }
+            try { TransactionLogs logs = await _logs.TransactionLogs.OrderByDescending(x => x.log_id).FirstAsync(); lastLogId = logs.log_id; }
             catch
             {
                 string newLogId = IdPrefix.Logs;
@@ -68,7 +68,7 @@ namespace BillOfMaterialsAPI.Services
 
             string lastLogId;
 
-            try { TransactionLogs logs = await _logs.TransactionLogs.OrderByDescending(x => x.logId).FirstAsync(); lastLogId = logs.logId; }
+            try { TransactionLogs logs = await _logs.TransactionLogs.OrderByDescending(x => x.log_id).FirstAsync(); lastLogId = logs.log_id; }
             catch
             {
                 string newLogId = IdPrefix.Logs;
@@ -100,22 +100,22 @@ namespace BillOfMaterialsAPI.Services
     [PrimaryKey("log_id")]
     public class TransactionLogs
     {
-        [Required][Key][MaxLength(25)] public string logId { get; set; }
-        [Required] public string accountId { get; set; }
-        [Required] public string accountName { get; set; }
-        [EmailAddress][Required] public string accountEmail { get; set; }
-        [Required][MaxLength(100)] public string transactionType { get; set; }
-        [Required][MaxLength(100)] public string transactionDescription { get; set; }
+        [Required][Key][MaxLength(25)] public string log_id { get; set; }
+        [Required] public string account_id { get; set; }
+        [Required] public string account_name { get; set; }
+        [EmailAddress][Required] public string account_email { get; set; }
+        [Required][MaxLength(100)] public string transaction_type { get; set; }
+        [Required][MaxLength(100)] public string transaction_description { get; set; }
         [Required] public DateTime date { get; set; }
 
         public TransactionLogs(string log_id, string account_id, string account_name, string account_email, string transaction_type, string transaction_description, DateTime date)
         {
-            this.logId = log_id;
-            this.accountId = account_id;
-            this.accountName = account_name;
-            this.accountEmail = account_email;
-            this.transactionType = transaction_type;
-            this.transactionDescription = transaction_description;
+            this.log_id = log_id;
+            this.account_id = account_id;
+            this.account_name = account_name;
+            this.account_email = account_email;
+            this.transaction_type = transaction_type;
+            this.transaction_description = transaction_description;
             this.date = date;
         }
     }
@@ -138,7 +138,7 @@ namespace BillOfMaterialsAPI.Services
 
             if (log_type != null)
             {
-                if (possibleTypes.Contains(log_type.ToUpper())) { transactionLogsQuery = _logs.TransactionLogs.Where(x => x.transactionType == log_type); }
+                if (possibleTypes.Contains(log_type.ToUpper())) { transactionLogsQuery = _logs.TransactionLogs.Where(x => x.transaction_type == log_type); }
                 else { return new List<TransactionLogs>(); }
             }
 
