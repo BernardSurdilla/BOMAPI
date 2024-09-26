@@ -219,12 +219,35 @@ namespace BillOfMaterialsAPI.Helpers
         {
             Dictionary<string, List<string>> response = new Dictionary<string, List<string>>();
 
+            string[] validMassUnits = [
+                "Gram", "Kilogram", "Ounce", "Pound", "Milligram", "Grain"
+                ];
+            string[] validVolumeUnits = [
+                "Liter", "Milliliter", "UsLegalCup", "UsOunce", "UsGallon", "UsPint", "UsTablespoon", "UsTeaspoon", "MetricCup", "UsLegalCup", "UkTablespoon","AuTablespoon"
+                ];
+
             string[] validQuantities = ["Mass", "Volume"];
             foreach (string currentQuantity in validQuantities)
             {
                 List<string> currentQuantityUnits = new List<string>();
                 foreach (UnitInfo currentUnit in Quantity.ByName[currentQuantity].UnitInfos)
                 {
+                    switch (currentQuantity)
+                    {
+                        case "Mass":
+                            if (Array.Exists(validMassUnits, x => x == currentUnit.Name) == false)
+                            {
+                                continue;
+                            }
+                            break;
+                        case "Volume":
+                            if (Array.Exists(validVolumeUnits, x => x == currentUnit.Name) == false)
+                            {
+                                continue;
+                            }
+                            break;
+                    }
+
                     currentQuantityUnits.Add(currentUnit.Name);
                 }
                 response.Add(currentQuantity, currentQuantityUnits);
