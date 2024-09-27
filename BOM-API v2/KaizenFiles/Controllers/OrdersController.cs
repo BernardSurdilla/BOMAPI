@@ -6136,8 +6136,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             return quantities;
         }
 
-
-        [HttpPatch("{orderId}/approve")] // done
+        /*[HttpPatch("{orderId}/approve")] // done
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> UpdateOrderxStatus(string orderId, [FromQuery] string action)
         {
@@ -6259,6 +6258,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+        */
 
         private async Task UpdateStatus2(byte[] orderIdBinary, string action)//decide whether to use or nahh
         {

@@ -1,4 +1,6 @@
 ﻿using CRUDFI.Models;
+using JWTAuthentication.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using System.Data;
@@ -19,6 +21,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> AddAddOn([FromBody] Models.Adds.AddOnDetails addOnDetails)
         {
             try
@@ -135,7 +138,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return addOnDSOSList;
         }
 
-        [HttpPatch("{addOnsId}")] //test this soon
+        [HttpPatch("{addOnsId}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> UpdateAddOn(int addOnsId, [FromBody] Models.Adds.UpdateAddOnRequest updateRequest)
         {
             try
