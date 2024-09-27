@@ -29,12 +29,6 @@ namespace API_TEST.Controllers
             _kaizenTables = kaizenTables;
             _actionLogger = logger;
         }
-
-        [HttpGet("sss/{PMID}/{INGID}/{INGTYPE}")]
-        public async Task<double> TestEndp(string PMID, string INGID, string INGTYPE)
-        {
-            return await PriceCalculator.CalculatePastryMaterialPrice(PMID, _context, _kaizenTables);
-        }
     }
 
     [ApiController]
