@@ -4833,7 +4833,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                 string sql = @"
             SELECT pma.add_ons_id, pma.amount
-            FROM pastymaterialaddons pma
+            FROM pastrymaterialaddons pma
             JOIN pastrymaterials pm ON pm.pastry_material_id = pma.pastry_material_id
             WHERE pma.pastry_material_id = @pastryMaterialId
               AND pm.main_variant_name = @size";
@@ -7259,7 +7259,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             List<PastryMaterialAddOn> pastryMaterialAddOns = new List<PastryMaterialAddOn>();
 
             string sql = @"SELECT add_ons_id AS AddOnId, amount AS DefaultQuantity
-                   FROM pastymaterialaddons
+                   FROM pastrymaterialaddons
                    WHERE pastry_material_id = @pastryMaterialId";
 
             using (var command = new MySqlCommand(sql, connection, transaction))
