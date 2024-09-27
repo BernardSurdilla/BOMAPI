@@ -33,6 +33,14 @@ builder.Services.AddCors(options =>
         .AllowAnyHeader()
         .AllowAnyMethod();
     });
+    options.AddPolicy(name: "FrontEndAndOriginOnly", policy =>
+    {
+        policy.SetIsOriginAllowed((host) => true)
+        .WithOrigins("https://culo-t97g.vercel.app/")
+        .AllowCredentials()
+        .AllowAnyHeader()
+        .AllowAnyMethod();
+    });
 });
 builder.Services.AddControllers(options => options.Conventions.Add(new GlobalControllerRoutePrefixConvention(new GlobalControllerRoutePrefix(GLOBAL_ROUTE_PREFIX))))
     .AddJsonOptions(options =>
@@ -138,12 +146,12 @@ builder.Services.AddSingleton<ILiveChatConnectionManager, LiveChatConnectionMana
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger()
     .UseSwaggerUI()
-    .UseCors("DebugPolicy");
-}
+    .UseCors("FrontEndAndOriginOnly");
+//}
 
 
 app.UseHttpsRedirection();
