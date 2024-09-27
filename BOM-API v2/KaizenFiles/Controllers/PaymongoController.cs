@@ -41,128 +41,136 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
-        [HttpPost("{orderId}/payment")]
+        [HttpPost("payment")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)
+        public async Task<IActionResult> CreatePaymentLink([FromQuery] string orderId, [FromBody] PaymentRequest paymentRequest)
         {
-            try
+            if (string.IsNullOrWhiteSpace(orderId))
             {
-                // Validate the option and amount
-                if (paymentRequest == null || string.IsNullOrWhiteSpace(paymentRequest.option))
+                return BadRequest("Query parameter 'orderId' is required.");
+            }
+            else
+            {
+
+                try
                 {
-                    return BadRequest("Payment option is required.");
-                }
-
-                // Check the option value and modify the amount accordingly
-                double updatedAmount;
-                if (paymentRequest.option.ToLower().Trim() == "full")
-                {
-                    updatedAmount = paymentRequest.amount;
-                }
-                else if (paymentRequest.option.ToLower().Trim() == "half")
-                {
-                    updatedAmount = paymentRequest.amount / 2;
-                }
-                else
-                {
-                    return BadRequest("Invalid option. Choose either 'full' or 'half'.");
-                }
-
-                // Convert the amount to cents (PayMongo expects amounts in cents)
-                var amountInCents = (int)(updatedAmount * 100);
-
-                // Set a static description or customize as needed
-                var description = "Payment for order";
-
-                // Make the call to PayMongo API
-                var response = await CreatePayMongoPaymentLink(amountInCents, description);
-                _logger.LogInformation("PayMongo response: {0}", response.Content);
-
-                // If the response is successful, deserialize it into our new object model
-                if (response.IsSuccessful)
-                {
-                    // Deserialize the response content into the new PaymentRequestResponse class
-                    var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
-
-                    string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
-
-                    // Check if the order exists
-                    bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
-                    if (!orderExists)
+                    // Validate the option and amount
+                    if (paymentRequest == null || string.IsNullOrWhiteSpace(paymentRequest.option))
                     {
-                        Debug.Write(orderIdBinary);
-                        return NotFound("Order not found");
+                        return BadRequest("Payment option is required.");
                     }
 
-                    using (var connection = new MySqlConnection(connectionstring))
+                    // Check the option value and modify the amount accordingly
+                    double updatedAmount;
+                    if (paymentRequest.option.ToLower().Trim() == "full")
                     {
-                        await connection.OpenAsync();
-
-                        // Prepare the SQL update query
-                        string sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = @option, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
-
-                        // Execute the update command
-                        using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
-                        {
-                            updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
-                            updateCommand.Parameters.AddWithValue("@option", paymentRequest.option);
-                            updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
-
-                            int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
-                            if (rowsAffected == 0)
-                            {
-                                return NotFound("Order not found");
-                            }
-                        }
+                        updatedAmount = paymentRequest.amount;
                     }
-
-                    // Retrieve suborder IDs
-                    List<byte[]> suborderIds = await GetSuborderId(orderIdBinary);
-                    if (suborderIds == null || suborderIds.Count == 0)
+                    else if (paymentRequest.option.ToLower().Trim() == "half")
                     {
-                        return NotFound("No suborder ID found for the given order ID.");
-                    }
-
-                    // Update each suborder status
-                    foreach (var suborderId in suborderIds)
-                    {
-                        Debug.WriteLine(BitConverter.ToString(suborderId));
-                        await UpdateSuborderStatus(suborderId);
-                    }
-
-                    // Call the method to get customer ID and name
-                    var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
-
-                    if (!string.IsNullOrEmpty(customerId))
-                    {
-                        // Convert the customerId to the binary format needed
-                        string userId = ConvertGuidToBinary16(customerId).ToLower();
-
-                        // Construct the message
-                        string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
-
-                        // Send the notification
-                        await NotifyAsync(userId, message);
+                        updatedAmount = paymentRequest.amount / 2;
                     }
                     else
                     {
-                        // Handle case where customer info is not found
-                        Debug.Write("Customer not found for the given order.");
+                        return BadRequest("Invalid option. Choose either 'full' or 'half'.");
                     }
 
-                    // Return the deserialized PayMongo response
-                    return Ok(payMongoResponse);
+                    // Convert the amount to cents (PayMongo expects amounts in cents)
+                    var amountInCents = (int)(updatedAmount * 100);
+
+                    // Set a static description or customize as needed
+                    var description = "Payment for order";
+
+                    // Make the call to PayMongo API
+                    var response = await CreatePayMongoPaymentLink(amountInCents, description);
+                    _logger.LogInformation("PayMongo response: {0}", response.Content);
+
+                    // If the response is successful, deserialize it into our new object model
+                    if (response.IsSuccessful)
+                    {
+                        // Deserialize the response content into the new PaymentRequestResponse class
+                        var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
+
+                        string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                        // Check if the order exists
+                        bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
+                        if (!orderExists)
+                        {
+                            Debug.Write(orderIdBinary);
+                            return NotFound("Order not found");
+                        }
+
+                        using (var connection = new MySqlConnection(connectionstring))
+                        {
+                            await connection.OpenAsync();
+
+                            // Prepare the SQL update query
+                            string sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = @option, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
+
+                            // Execute the update command
+                            using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                            {
+                                updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                updateCommand.Parameters.AddWithValue("@option", paymentRequest.option);
+                                updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
+
+                                int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                                if (rowsAffected == 0)
+                                {
+                                    return NotFound("Order not found");
+                                }
+                            }
+                        }
+
+                        // Retrieve suborder IDs
+                        List<byte[]> suborderIds = await GetSuborderId(orderIdBinary);
+                        if (suborderIds == null || suborderIds.Count == 0)
+                        {
+                            return NotFound("No suborder ID found for the given order ID.");
+                        }
+
+                        // Update each suborder status
+                        foreach (var suborderId in suborderIds)
+                        {
+                            Debug.WriteLine(BitConverter.ToString(suborderId));
+                            await UpdateSuborderStatus(suborderId);
+                        }
+
+                        // Call the method to get customer ID and name
+                        var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
+
+                        if (!string.IsNullOrEmpty(customerId))
+                        {
+                            // Convert the customerId to the binary format needed
+                            string userId = ConvertGuidToBinary16(customerId).ToLower();
+
+                            // Construct the message
+                            string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
+
+                            // Send the notification
+                            await NotifyAsync(userId, message);
+                        }
+                        else
+                        {
+                            // Handle case where customer info is not found
+                            Debug.Write("Customer not found for the given order.");
+                        }
+
+                        // Return the deserialized PayMongo response
+                        return Ok(payMongoResponse);
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to create PayMongo link: {Content}, Status Code: {StatusCode}", response.Content, response.StatusCode);
+                        return StatusCode((int)response.StatusCode, response.Content);
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    _logger.LogError("Failed to create PayMongo link: {Content}, Status Code: {StatusCode}", response.Content, response.StatusCode);
-                    return StatusCode((int)response.StatusCode, response.Content);
+                    _logger.LogError(ex, "Error processing the payment link.");
+                    return StatusCode(500, "Internal server error.");
                 }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing the payment link.");
-                return StatusCode(500, "Internal server error.");
             }
         }
 
