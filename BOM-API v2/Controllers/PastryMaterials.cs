@@ -297,7 +297,7 @@ namespace BOM_API_v2.Controllers
 
             return Ok(new { message = "Data inserted to the database." });
         }
-        [HttpPost("{pastry_material_id}/add_ons")]
+        [HttpPost("{pastry_material_id}/add-ons")]
         public async Task<IActionResult> AddNewPastryMaterialAddOn(string pastry_material_id, PostPastryMaterialAddOns entry)
         {
             PastryMaterials? currentPastryMaterial = null;
