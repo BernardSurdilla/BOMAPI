@@ -78,8 +78,8 @@ namespace BOM_API_v2.Controllers
 
                 SubGetAddOn newMainVariantAddOnsEntry = new SubGetAddOn();
                 newMainVariantAddOnsEntry.pastry_material_add_on_id = currentPastryMaterialAddOn.pastry_material_add_on_id;
-                newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
-                newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
+                newMainVariantAddOnsEntry.id = referencedAddOns.add_ons_id;
+                newMainVariantAddOnsEntry.name = referencedAddOns.name;
                 newMainVariantAddOnsEntry.amount = currentPastryMaterialAddOn.amount;
                 newMainVariantAddOnsEntry.price = referencedAddOns.price;
 
@@ -106,8 +106,8 @@ namespace BOM_API_v2.Controllers
 
                     SubGetAddOn newMainVariantAddOnsEntry = new SubGetAddOn();
                     newMainVariantAddOnsEntry.pastry_material_add_on_id = currentSubVariantAddOn.pastry_material_sub_variant_add_on_id;
-                    newMainVariantAddOnsEntry.add_on_id = referencedAddOns.add_ons_id;
-                    newMainVariantAddOnsEntry.add_on_name = referencedAddOns.name;
+                    newMainVariantAddOnsEntry.id = referencedAddOns.add_ons_id;
+                    newMainVariantAddOnsEntry.name = referencedAddOns.name;
                     newMainVariantAddOnsEntry.amount = currentSubVariantAddOn.amount;
                     newMainVariantAddOnsEntry.price = referencedAddOns.price;
 

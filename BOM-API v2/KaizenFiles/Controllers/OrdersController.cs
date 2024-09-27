@@ -4917,10 +4917,10 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                         {
                             var addOn = new AddOnDPOS
                             {
-                                AddOnId = addOnsId, // Set AddOnId here
-                                AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price"),
-                                Quantity = 0 // Placeholder, will be set in the main method
+                                id = addOnsId, // Set AddOnId here
+                                name = reader.GetString("name"),
+                                price = reader.GetDouble("price"),
+                                quantity = 0 // Placeholder, will be set in the main method
                             };
 
                             addOns.Add(addOn);
@@ -6883,11 +6883,11 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             foreach (var manage in manageWrapper.manage)
             {
                 // Log the process for each add-on
-                _logger.LogInformation($"Managing AddOnId: {manage.addonId} for SubOrderId: {suborderId}");
+                _logger.LogInformation($"Managing AddOnId: {manage.id} for SubOrderId: {suborderId}");
 
                 // Fetch the add-on price and name
-                double addonPrice = await GetAddonPriceAsync(manage.addonId);
-                string name = await AddonName(manage.addonId);
+                double addonPrice = await GetAddonPriceAsync(manage.id);
+                string name = await AddonName(manage.id);
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -6898,11 +6898,11 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                         double total = manage.quantity * addonPrice;
 
                         // Insert or update the order add-ons for the current add-on
-                        await InsertOrUpdateOrderaddonWithSubOrderId(suborderIdBinary, manage.addonId, addonPrice, manage.quantity, name, total);
+                        await InsertOrUpdateOrderaddonWithSubOrderId(suborderIdBinary, manage.id, addonPrice, manage.quantity, name, total);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Transaction failed for AddOnId: {manage.addonId}, rolling back");
+                        _logger.LogError(ex, $"Transaction failed for AddOnId: {manage.id}, rolling back");
                     }
                 }
             }
@@ -7063,31 +7063,31 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                         Dictionary<int, (string Name, double Price)> addOnDetailsDict = new Dictionary<int, (string Name, double Price)>();
                         foreach (var addOn in allAddOns)
                         {
-                            var addOnDetails = await GetAddOnDetails(connection, transaction, addOn.AddOnId);
-                            addOnDetailsDict[addOn.AddOnId] = addOnDetails;
+                            var addOnDetails = await GetAddOnDetails(connection, transaction, addOn.id);
+                            addOnDetailsDict[addOn.id] = addOnDetails;
                         }
 
                         // Process the action
                         foreach (var addOn in allAddOns)
                         {
-                            if (addOn.AddOnId == modifiedAddOnId)
+                            if (addOn.id == modifiedAddOnId)
                             {
                                 if (action.ActionType.ToLower() == "quantity")
                                 {
                                     // Fetch add-on details
-                                    if (addOnDetailsDict.TryGetValue(addOn.AddOnId, out var addOnDetails))
+                                    if (addOnDetailsDict.TryGetValue(addOn.id, out var addOnDetails))
                                     {
                                         // Calculate total price
                                         double total = action.Quantity * addOnDetails.Price;
 
                                         // Insert or update quantity for the specified add-on in orderaddons
-                                        await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.AddOnId, action.Quantity, total, addOnDetailsDict);
+                                        await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.id, action.Quantity, total, addOnDetailsDict);
                                     }
                                 }
                                 else if (action.ActionType.ToLower() == "remove")
                                 {
                                     // Set quantity to 0 and remove add-on from orderaddons
-                                    await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.AddOnId, 0, 0, addOnDetailsDict);
+                                    await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.id, 0, 0, addOnDetailsDict);
                                 }
                                 else
                                 {
@@ -7097,9 +7097,9 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                             else
                             {
                                 // Insert add-on without modifying its quantity or total
-                                var addOnDetails = addOnDetailsDict[addOn.AddOnId];
-                                double total = addOn.Quantity * addOnDetails.Price;
-                                await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.AddOnId, addOn.Quantity, total, addOnDetailsDict);
+                                var addOnDetails = addOnDetailsDict[addOn.id];
+                                double total = addOn.quantity * addOnDetails.Price;
+                                await SetOrUpdateAddOn(connection, transaction, suborderIdBinary, addOn.id, addOn.quantity, total, addOnDetailsDict);
                             }
                         }
 
@@ -7160,8 +7160,8 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     {
                         PastryMaterialAddOn addOn = new PastryMaterialAddOn
                         {
-                            AddOnId = reader.GetInt32("AddOnId"),
-                            Quantity = reader.GetInt32("DefaultQuantity")
+                            id = reader.GetInt32("AddOnId"),
+                            quantity = reader.GetInt32("DefaultQuantity")
                         };
 
                         pastryMaterialAddOns.Add(addOn);
@@ -7192,8 +7192,8 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     {
                         PastryMaterialAddOn addOn = new PastryMaterialAddOn
                         {
-                            AddOnId = reader.GetInt32("AddOnId"),
-                            Quantity = reader.GetInt32("DefaultQuantity")
+                            id = reader.GetInt32("AddOnId"),
+                            quantity = reader.GetInt32("DefaultQuantity")
                         };
 
                         pastryMaterialAddOns.Add(addOn);

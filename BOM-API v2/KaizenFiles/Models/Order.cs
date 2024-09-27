@@ -447,10 +447,10 @@
 
     public class AddOnDPOS
     {
-        public int AddOnId { get; set; }
-        public string AddOnName { get; set; }
-        public double PricePerUnit { get; set; }
-        public int Quantity { get; set; }
+        public int id { get; set; }
+        public string name { get; set; }
+        public double price { get; set; }
+        public int quantity { get; set; }
     }
 
 
@@ -463,25 +463,25 @@
 
     public class AddOnDS2
     {
-        public int addOnsId { get; set; }
-        public string AddOnName { get; set; }
-        public string? Measurement { get; set; }
-        public double PricePerUnit { get; set; }
+        public int id { get; set; }
+        public string name { get; set; }
+        public string? measurement { get; set; }
+        public double price { get; set; }
         public double? size { get; set; }
-        public DateTime DateAdded { get; set; }
-        public DateTime? LastModifiedDate { get; set; }
+        public DateTime created { get; set; }
+        public DateTime? lastModified { get; set; }
     }
 
     public class AddOns
     {
-        public int addOnsId { get; set; }
+        public int id { get; set; }
         public string name { get; set; }
-        public double pricePerUnit { get; set; }
+        public double price { get; set; }
         public int quantity { get; set; }
         public double size { get; set; }
-        public DateTime DateAdded { get; set; }
-        public DateTime? LastModifiedDate { get; set; }
-        public bool IsActive { get; set; }
+        public DateTime created { get; set; }
+        public DateTime? lastModified { get; set; }
+        public bool isActive { get; set; }
     }
     public class ManageAddOnAction
     {
@@ -490,7 +490,7 @@
     }
     public class AddOn
     {
-        public int addonId { get; set; }
+        public int id { get; set; }
         public int quantity { get; set; }
     }
 
@@ -500,8 +500,8 @@
     }
     public class PastryMaterialAddOn
     {
-        public int AddOnId { get; set; }
-        public int Quantity { get; set; }
+        public int id { get; set; }
+        public int quantity { get; set; }
     }
     public class AddNewAddOnRequest
     {

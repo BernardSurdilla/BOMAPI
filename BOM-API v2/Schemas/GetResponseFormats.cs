@@ -323,8 +323,8 @@ namespace BillOfMaterialsAPI.Schemas
     public class SubGetAddOn
     {
         public string pastry_material_add_on_id { get; set; }
-        public int add_on_id { get; set; }
-        public string add_on_name { get; set; }
+        public int id { get; set; }
+        public string name { get; set; }
         public double amount { get; set; }
         public double stock { get; set; }
         public double price { get; set; }

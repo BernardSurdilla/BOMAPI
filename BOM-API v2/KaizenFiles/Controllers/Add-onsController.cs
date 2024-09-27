@@ -27,10 +27,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 var addOns = new AddOns
                 {
                     name = addOnDetails.name,
-                    pricePerUnit = addOnDetails.pricePerUnit,
+                    price = addOnDetails.pricePerUnit,
                     size = addOnDetails.size,
-                    DateAdded = DateTime.UtcNow,  // Current UTC time as DateAdded
-                    LastModifiedDate = null,      // Initial value for LastModifiedDate
+                    created = DateTime.UtcNow,  // Current UTC time as DateAdded
+                    lastModified = null,      // Initial value for LastModifiedDate
                 };
 
                 // Insert into database
@@ -60,12 +60,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@Name", addOns.name);
-                    command.Parameters.AddWithValue("@PricePerUnit", addOns.pricePerUnit);
+                    command.Parameters.AddWithValue("@PricePerUnit", addOns.price);
                     command.Parameters.AddWithValue("@Size", addOns.size);
                     command.Parameters.AddWithValue("@Measure", "piece");
                     command.Parameters.AddWithValue("@IngredientType", "element");
-                    command.Parameters.AddWithValue("@DateAdded", addOns.DateAdded);
-                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.DateAdded);
+                    command.Parameters.AddWithValue("@DateAdded", addOns.created);
+                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.created);
 
                     // Execute scalar to get the inserted ID
                     int newAddOnsId = Convert.ToInt32(await command.ExecuteScalarAsync());
@@ -113,15 +113,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             var addOnDSOS = new AddOnDS2
                             {
-                                AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price"),
-                                addOnsId = reader.GetInt32("add_ons_id"),
-                                Measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
+                                name = reader.GetString("name"),
+                                price = reader.GetDouble("price"),
+                                id = reader.GetInt32("add_ons_id"),
+                                measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
                                 size = reader.IsDBNull(reader.GetOrdinal("size")) ? null : reader.GetDouble("size"),
                                 // DateAdded is assumed to be non-nullable and should be directly read
-                                DateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
+                                created = reader.GetDateTime(reader.GetOrdinal("date_added")),
                                 // Handle LastModifiedDate as nullable
-                                LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("last_modified_date"))
+                                lastModified = reader.IsDBNull(reader.GetOrdinal("last_modified_date"))
                                     ? (DateTime?)null
                                     : reader.GetDateTime(reader.GetOrdinal("last_modified_date")),
                             };
