@@ -8,7 +8,6 @@
     public class PaymentRequest
     {
         public string option {  set; get; }
-        public double amount { get; set; }
     }   
 
     public class PaymentRequestResponse
