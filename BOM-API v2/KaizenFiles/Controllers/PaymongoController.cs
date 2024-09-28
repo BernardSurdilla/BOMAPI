@@ -41,9 +41,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
-        [HttpPost("payment")]
+        [HttpPost("/culo-api/v1/{orderId}/payment")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> CreatePaymentLink([FromQuery] string orderId, [FromBody] PaymentRequest paymentRequest)
+        public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)
         {
             if (string.IsNullOrWhiteSpace(orderId))
             {
@@ -59,16 +59,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         return BadRequest("Payment option is required.");
                     }
+                    string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                    double ingredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
+
+                    double addonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
+
+                    double totalPrice = ingredientPrice + addonPrice;
 
                     // Check the option value and modify the amount accordingly
                     double updatedAmount;
                     if (paymentRequest.option.ToLower().Trim() == "full")
                     {
-                        updatedAmount = paymentRequest.amount;
+                        updatedAmount = totalPrice;
                     }
                     else if (paymentRequest.option.ToLower().Trim() == "half")
                     {
-                        updatedAmount = paymentRequest.amount / 2;
+                        updatedAmount = totalPrice / 2;
                     }
                     else
                     {
@@ -91,7 +98,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         // Deserialize the response content into the new PaymentRequestResponse class
                         var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
 
-                        string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
 
                         // Check if the order exists
                         bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
@@ -297,9 +304,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         // Private method to calculate total price for the given orderId
-        /*private async Task<decimal> GetTotalPriceForOrderAsync(string orderId)
+        private async Task<double> GetTotalPriceForIngredientsAsync(string orderId)
         {
-            decimal totalPrice = 0;
+            double totalPrice = 0;
 
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -320,14 +327,47 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         if (await reader.ReadAsync())
                         {
-                            totalPrice = reader.IsDBNull(0) ? 0 : reader.GetDecimal("TotalPrice");
+                            totalPrice = reader.IsDBNull(0) ? 0 : reader.GetDouble("TotalPrice");
                         }
                     }
                 }
             }
 
             return totalPrice;
-        }*/
+        }
+
+        // Private method to calculate total price for the given orderId
+        private async Task<double> GetTotalPriceForAddonsAsync(string orderId)
+        {
+            double totalPrice = 0;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // SQL to retrieve price and quantity from suborders and calculate total price
+                string sql = @"
+        SELECT SUM(price * quantity) AS TotalPrice
+        FROM orderaddons
+        WHERE order_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Pass the orderId to the query
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            totalPrice = reader.IsDBNull(0) ? 0 : reader.GetDouble("TotalPrice");
+                        }
+                    }
+                }
+            }
+
+            return totalPrice;
+        }
 
         // Private method to make the RestSharp request to PayMongo
         private async Task<RestResponse> CreatePayMongoPaymentLink(int amount, string description)

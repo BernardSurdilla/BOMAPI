@@ -129,10 +129,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             addOnIds.AddRange(subVariantAddOnsId.Select(id => id.ToString()));
                         }
-                        else
-                        {
-                            return BadRequest($"No add-ons found with pastryId: {pastryMaterialId}");
-                        }
+
                     }
                     else
                     {
@@ -193,35 +190,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 _logger.LogError(ex, "An error occurred while processing the request.");
                 return StatusCode(500, "An error occurred while processing the request.");
             }
-        }
-
-        private async Task<double> CalculatesTotalPrice(string size, int quantity, string pastryId)
-        {
-
-            double SubTotalprice = await STotal2(pastryId);
-
-            Debug.WriteLine(SubTotalprice);
-
-            string mainId = await STotal1(pastryId, size);
-
-            double TotalPrice;
- 
-            if (SubTotalprice == 0)
-            {
-                double MainTotalprice = await Total(pastryId);
-                Debug.WriteLine(MainTotalprice);
-
-                TotalPrice = MainTotalprice * quantity;
-            }
-            else
-            {
-                double MainTotalprice = await Total(mainId);
-                Debug.WriteLine(MainTotalprice);
-
-                TotalPrice = (SubTotalprice + MainTotalprice) * quantity;
-            }
-
-            return TotalPrice; // Return the calculated total price
         }
 
         private async Task<List<int>> GetsMainVariantAddOns(string pastryMaterialId, string size)
@@ -549,10 +517,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     if (subVariantAddOnsId != null && subVariantAddOnsId.Count > 0)
                     {
                         addOnIds.AddRange(subVariantAddOnsId.Select(id => id.ToString()));
-                    }
-                    else
-                    {
-                        return BadRequest($"No add-ons found with pastryId: {pastryMaterialId}");
                     }
                 }
                 else
