@@ -2932,13 +2932,13 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     await connection.OpenAsync();
 
                     string sql = @"
-            SELECT 
-                suborder_id, order_id, customer_id, employee_id, created_at, status, 
-                HEX(design_id) as design_id, design_name, price, quantity, 
-                last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, pastry_id 
-            FROM suborders 
-            WHERE customer_id = @customerId AND status IN('cart')";
+    SELECT 
+        suborder_id, order_id, customer_id, employee_id, created_at, status, 
+        HEX(design_id) as design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, description, 
+        flavor, size, customer_name, employee_name, shape, color, pastry_id 
+    FROM suborders 
+    WHERE customer_id = @customerId AND status IN('cart')";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -2969,6 +2969,15 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
 
+                                double ingredientPrice = reader.GetDouble(reader.GetOrdinal("price"));
+
+                                // Calculate addonPrice using the private async method
+                                string orderIdBinary = BitConverter.ToString((byte[])reader["order_id"]).Replace("-", "").ToLower();
+                                double addonPrice = await GetAddonPriceAsync(orderIdBinary);
+
+                                // Calculate final price
+                                double finalPrice = ingredientPrice + addonPrice;
+
                                 orders.Add(new Cart
                                 {
                                     Id = orderId, // Handle null values for orderId
@@ -2982,7 +2991,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
-                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Price = finalPrice, // Use finalPrice instead of raw price
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
@@ -3011,6 +3020,41 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
+        // Private async method to calculate addon price for the order
+        private async Task<double> GetAddonPriceAsync(string orderIdBinary)
+        {
+            double addonPrice = 0;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+    SELECT SUM(price * quantity) AS TotalAddonPrice
+    FROM orderaddons
+    WHERE order_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            if (!reader.IsDBNull(reader.GetOrdinal("TotalAddonPrice")))
+                            {
+                                addonPrice = reader.GetDouble(reader.GetOrdinal("TotalAddonPrice"));
+                            }
+                        }
+                    }
+                }
+            }
+
+            return addonPrice;
+        }
+
 
         [HttpGet("/culo-api/v1/current-user/to-pay")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
@@ -3079,6 +3123,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                             string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
 
                             // Initialize an AdminInitial object with order details
                             AdminInitial order = new AdminInitial
@@ -3776,6 +3821,14 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
 
+                                double ingredientPrice = reader.GetDouble(reader.GetOrdinal("price"));
+
+                                // Calculate addonPrice using the private async method
+                                string orderIdBinary = BitConverter.ToString((byte[])reader["order_id"]).Replace("-", "").ToLower();
+                                double addonPrice = await GetAddonPriceAsync(orderIdBinary);
+                                // Calculate final price
+                                double finalPrice = ingredientPrice + addonPrice;
+
                                 orders.Add(new toPayInitial
                                 {
                                     Id = orderId, // Handle null values for orderId
@@ -3785,7 +3838,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
-                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Price = finalPrice,
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy ?? "",
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
@@ -4004,6 +4057,14 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
 
+                                double ingredientPrice = reader.GetDouble(reader.GetOrdinal("price"));
+
+                                // Calculate addonPrice using the private async method
+                                string orderIdBinary = BitConverter.ToString((byte[])reader["order_id"]).Replace("-", "").ToLower();
+                                double addonPrice = await GetAddonPriceAsync(orderIdBinary);
+                                // Calculate final price
+                                double finalPrice = ingredientPrice + addonPrice;
+
                                 orders.Add(new toPayInitial
                                 {
                                     Id = orderId, // Handle null values for orderId
@@ -4013,7 +4074,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
-                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Price = finalPrice,
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy ?? "",
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
@@ -4114,6 +4175,14 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                                     ? null
                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
 
+                                double ingredientPrice = reader.GetDouble(reader.GetOrdinal("price"));
+
+                                // Calculate addonPrice using the private async method
+                                string orderIdBinary = BitConverter.ToString((byte[])reader["order_id"]).Replace("-", "").ToLower();
+                                double addonPrice = await GetAddonPriceAsync(orderIdBinary);
+                                // Calculate final price
+                                double finalPrice = ingredientPrice + addonPrice;
+
                                 orders.Add(new Full
                                 {
                                     suborderId = suborderIdFromDb,
@@ -4128,7 +4197,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
-                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    Price = finalPrice,
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     lastUpdatedBy = lastUpdatedBy ?? string.Empty,
                                     lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
@@ -4278,26 +4347,17 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     Id = orderId, // Handle null values for orderId
                                     suborderId = suborderId,
                                     CustomerId = customerIdFromDb,
-                                    employeeId = employeeId,
-                                    pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
-                                    CreatedAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
                                     Status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
                                     DesignName = reader.GetString(reader.GetOrdinal("design_name")),
-                                    Price = reader.GetDouble(reader.GetOrdinal("price")),
                                     Quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                    lastUpdatedBy = lastUpdatedBy,
-                                    lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
-                                                    ? (DateTime?)null
-                                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
                                     isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
                                     Description = reader.GetString(reader.GetOrdinal("description")),
                                     Flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                     Size = reader.GetString(reader.GetOrdinal("size")),
                                     CustomerName = reader.GetString(reader.GetOrdinal("customer_name")),
-                                    employeeName = employeeName
                                 });
                             }
                         }
