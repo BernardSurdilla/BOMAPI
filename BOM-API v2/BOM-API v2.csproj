@@ -7,6 +7,7 @@
     <RootNamespace>BOM_API_v2</RootNamespace>
     <UserSecretsId>494b5b9f-6553-4e68-94e5-b9692a93465e</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
   </PropertyGroup>
 
   <ItemGroup>

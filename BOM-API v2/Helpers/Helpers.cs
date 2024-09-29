@@ -1574,7 +1574,9 @@ namespace BillOfMaterialsAPI.Helpers
                     currentSubVariantAddOnList.Add(newResponseSubVariantAddOnRow);
                 }
 
-                newSubVariantListRow.costEstimate = estimatedCostSubVariant;
+                newSubVariantListRow.costEstimate = await PriceCalculator.CalculatePastryMaterialPrice(currentSubVariant.pastry_material_sub_variant_id, context, kaizenTables);
+                newSubVariantListRow.costExactEstimate = estimatedCostSubVariant;
+
                 newSubVariantListRow.subVariantIngredients = currentSubVariantIngredientList;
                 newSubVariantListRow.subVariantAddOns = currentSubVariantAddOnList;
 
@@ -1585,7 +1587,9 @@ namespace BillOfMaterialsAPI.Helpers
             response.ingredientImportance = responsePastryMaterialImportanceList;
             response.addOns = responsePastryMaterialAddOns;
             response.subVariants = responsePastryMaterialSubVariants;
-            response.costEstimate = calculatedCost;
+            response.costExactEstimate = calculatedCost;
+
+            response.costEstimate = await PriceCalculator.CalculatePastryMaterialPrice(data.pastry_material_id, context, kaizenTables);
 
             return response;
         }
@@ -1926,6 +1930,9 @@ namespace BillOfMaterialsAPI.Helpers
 
                 response += calculatedAmount;
             }
+            
+            response = response % 100 < 50 ? Math.Ceiling(response / 100d) * 100 : (Math.Ceiling(response / 100d) * 100) + 50.0;
+
             return response;
         }
 

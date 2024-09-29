@@ -118,6 +118,7 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime lastModifiedDate { get; set; }
 
         public double costEstimate { get; set; }
+        public double costExactEstimate { get; set; }
 
         public string mainVariantName { get; set; }
         public bool ingredientsInStock { get; set; }
@@ -184,7 +185,10 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(26)] public string pastryMaterialId { get; set; }
 
         public string subVariantName { get; set; }
+
         public double costEstimate { get; set; }
+        public double costExactEstimate { get; set; }
+
         public bool ingredientsInStock { get; set; }
         public List<GetPastryMaterialSubVariantAddOns>? subVariantAddOns { get; set; }
         public List<SubGetPastryMaterialSubVariantIngredients> subVariantIngredients { get; set; }
