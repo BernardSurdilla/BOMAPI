@@ -99,20 +99,6 @@
         public decimal Price { get; set; }
     }
 
-    public class CustomPay
-    {
-        public string type { get; set; } = "";
-        public DateTime? PickupDateTime { get; set; }
-        public string payment { get; set; } = "";
-    }
-
-    // Class to hold the day and total quantity
-    public class DayQuantity
-    {
-        public string Day { get; set; } // Day of the month formatted as "01", "02", etc.
-        public int TotalQuantity { get; set; } // Total quantity for that day
-    }
-
     public class CustomPartial
     {
         public Guid customId { get; set; }
@@ -388,42 +374,6 @@
         public string pastryId { get; set; }
         public List<string> addonId { get; set; }
     }
-
-
-    public class FinalOrder
-    {
-        public string OrderId { get; set; }
-        public string PastryMaterialId { get; set; }
-        public string variantId { get; set; }
-        public Guid? customerId { get; set; }
-        public string CustomerName { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string status { get; set; } = "";
-        public string payment { get; set; } = "";
-        public string lastUpdatedBy { get; set; } = "";
-        public DateTime? lastUpdatedAt { get; set; }
-        public DateTime? PickupDateTime { get; set; }
-        public string Type { get; set; } // Type of the suborder
-        public bool IsActive { get; set; } // Whether the suborder is active
-        public List<OrderSummary> summary { get; set; } = new List<OrderSummary>();
-        public List<AddOnDetails2> AddOns { get; set; } = new List<AddOnDetails2>();
-        public List<CustomAddons> customAddons { get; set; } = new List<CustomAddons>();
-        public double allTotal { get; set; }
-    }
-    public class AddOnDetails2
-    {
-        public string name { get; set; }
-        public double pricePerUnit { get; set; }
-        public int quantity { get; set; }
-        public double total { get; set; }
-
-    }
-    public class CustomAddons
-    {
-        public string? name { get; set; }
-        public int? quantity { get; set; }
-        public double? price { get; set; }
-    }
     public class TotalOrders
     {
         public int Total { get; set; }
@@ -438,22 +388,6 @@
         public int total { get; set; }
         public DateTime date { get; set; }
     }
-
-
-    public class orderAddons
-    {
-        public string pastryId { get; set; }
-        public List<AddOnDPOS> addOnDPOs { get; set; }
-    }
-
-    public class AddOnDPOS
-    {
-        public int AddOnId { get; set; }
-        public string AddOnName { get; set; }
-        public double PricePerUnit { get; set; }
-        public int Quantity { get; set; }
-    }
-
 
     public class AddOnDSOS
     {
@@ -493,11 +427,6 @@
     {
         public int Id { get; set; }
         public int quantity { get; set; }
-    }
-
-    public class ManageAddOnQuantityWrapper
-    {
-        public List<AddOn> manage { get; set; }
     }
     public class PastryMaterialAddOn
     {
