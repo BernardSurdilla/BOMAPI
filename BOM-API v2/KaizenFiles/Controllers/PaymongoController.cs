@@ -42,7 +42,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpPost("/culo-api/v1/{orderId}/payment")]
-        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)
         {
             if (string.IsNullOrWhiteSpace(orderId))
@@ -147,10 +147,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         // Call the method to get customer ID and name
                         var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
 
-                        if (!string.IsNullOrEmpty(customerId))
+                        if (customerId != null && customerId.Length > 0)
                         {
-                            // Convert the customerId to the binary format needed
-                            string userId = ConvertGuidToBinary16(customerId).ToLower();
+                            // Convert the byte[] customerId to a hex string
+                            string userId = BitConverter.ToString(customerId).Replace("-", "").ToLower();
+
+                            Debug.Write("customer id: " + userId);
 
                             // Construct the message
                             string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
@@ -203,7 +205,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task<(string customerId, string customerName)> GetCustomerInfo(string order)
+        private async Task<(byte[] customerId, string customerName)> GetCustomerInfo(string order)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -217,18 +219,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         if (await reader.ReadAsync())
                         {
-                            string customerId = reader.GetString("customer_id");
+                            // Retrieve customer_id as byte[]
+                            byte[] customerId = (byte[])reader["customer_id"];
                             string customerName = reader.GetString("customer_name");
-                            return (customerId, customerName);  // Return both customer ID and name
+
+                            return (customerId, customerName);  // Return customerId as byte[] and customerName as string
                         }
                         else
                         {
-                            return (null, null); // Design not found
+                            return (null, null); // No matching record found
                         }
                     }
                 }
             }
         }
+
 
         private async Task<bool> CheckIfOrderExistsAsync(string orderIdBinary)
         {
