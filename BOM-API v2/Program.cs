@@ -7,12 +7,14 @@ using JWTAuthentication.Authentication;
 using LiveChat;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.Filters;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 
 
 const string API_VERSION = "v1";
@@ -142,6 +144,14 @@ builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Se
 builder.Services.AddTransient<IInventoryBOMBridge, BOMInventoryBridge>(); //Inventory BOM Bridge Service
 builder.Services.AddSingleton<ILiveChatConnectionManager, LiveChatConnectionManager>(); //Live chat connections
 
+builder.Services.AddRateLimiter(_ => _
+    .AddFixedWindowLimiter(policyName: "fixed", options =>
+    {
+        options.PermitLimit = 4;
+        options.Window = TimeSpan.FromSeconds(12);
+        options.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        options.QueueLimit = 2;
+    }));
 
 var app = builder.Build();
 
@@ -153,7 +163,7 @@ var app = builder.Build();
     .UseCors("FrontEndAndOriginOnly");
 //}
 
-
+app.UseRateLimiter();
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
