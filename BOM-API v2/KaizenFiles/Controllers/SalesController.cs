@@ -21,6 +21,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet]
+        [ProducesResponseType(typeof(Sales), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetAllSales()
         {
@@ -42,13 +43,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 Sales sale = new Sales
                                 {
-                                    Id = reader.GetInt32(reader.GetOrdinal("Id")),
-                                    Name = reader.GetString(reader.GetOrdinal("Name")),
-                                    Number = reader.GetString(reader.GetOrdinal("Contact")),
-                                    Email = reader.GetString(reader.GetOrdinal("Email")),
-                                    Cost = reader.GetDouble(reader.GetOrdinal("Cost")),
-                                    Total = reader.GetInt32(reader.GetOrdinal("Total")),
-                                    Date = reader.GetDateTime(reader.GetOrdinal("Date"))
+                                    id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                    name = reader.GetString(reader.GetOrdinal("Name")),
+                                    number = reader.GetString(reader.GetOrdinal("Contact")),
+                                    email = reader.GetString(reader.GetOrdinal("Email")),
+                                    price = reader.GetDouble(reader.GetOrdinal("Cost")),
+                                    total = reader.GetInt32(reader.GetOrdinal("Total")),
+                                    date = reader.GetDateTime(reader.GetOrdinal("Date"))
                                 };
                                 salesList.Add(sale);
                             }
@@ -66,6 +67,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet("totals")]
+        [ProducesResponseType(typeof(Totals), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetSalesTotal()
         {
@@ -84,7 +86,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         var result = await command.ExecuteScalarAsync();
                         if (result != null && result != DBNull.Value)
                         {
-                            totalSum.Total = Convert.ToInt32(result);
+                            totalSum.total = Convert.ToInt32(result);
                         }
                     }
                 }
@@ -100,6 +102,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
         [HttpGet("top-sales")]
+        [ProducesResponseType(typeof(SalesSum), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetTopSales()
         {
@@ -121,8 +124,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 SalesSum salesSummary = new SalesSum
                                 {
-                                    Name = reader.GetString(reader.GetOrdinal("Name")),
-                                    Total = reader.GetInt32(reader.GetOrdinal("Total"))
+                                    name = reader.GetString(reader.GetOrdinal("Name")),
+                                    total = reader.GetInt32(reader.GetOrdinal("Total"))
                                 };
                                 topSalesList.Add(salesSummary);
                             }
@@ -140,6 +143,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet("total/day")]
+        [ProducesResponseType(typeof(SalesResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetTotalSalesForDay([FromQuery] int year, [FromQuery] int month, [FromQuery] int day)
         {
@@ -151,12 +155,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Call the method to get total sales for the specific day
                 decimal totalSales = await GetTotalSalesForSpecificDay(specificDay);
 
-                // If total is 0, still return success with 0 total
-                return Ok(new
+                // Create the response object
+                var response = new SalesResponse
                 {
-                    Day = specificDay.ToString("dddd"), // Get the full name of the day (e.g., Monday)
-                    TotalSales = totalSales
-                });
+                    day = specificDay.ToString("dddd"), // Get the full name of the day (e.g., Monday)
+                    totalSales = totalSales
+                };
+
+                // If total is 0, still return success with 0 total
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -164,6 +171,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "Internal server error.");
             }
         }
+
 
         // Private method for fetching total sales on a specific day
         private async Task<decimal> GetTotalSalesForSpecificDay(DateTime specificDay)
@@ -191,6 +199,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet("total/week")]
+        [ProducesResponseType(typeof(SalesResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetTotalSalesForWeek([FromQuery] int year, [FromQuery] int month, [FromQuery] int day)
         {
@@ -205,15 +214,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // If no data found, return an empty array
                 if (weekSales.Count == 0)
                 {
-                    return Ok(new List<object>()); // Return an empty array
+                    return Ok(new List<SalesResponse>()); // Return an empty array of TotalSalesResponse
                 }
 
-                // Return result in the desired format
-                return Ok(weekSales.Select(s => new
+                // Map the weekSales data to the TotalSalesResponse class
+                var response = weekSales.Select(s => new SalesResponse
                 {
-                    Day = s.Key,
-                    TotalSales = s.Value
-                }));
+                    day = s.Key, // Assuming s.Key is a string representing the day
+                    totalSales = s.Value // Assuming s.Value is a decimal representing total sales
+                }).ToList();
+
+                // Return result in the desired format
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -221,6 +233,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "Internal server error.");
             }
         }
+
 
         // Private method for fetching sales totals for a specific week
         private async Task<Dictionary<string, decimal>> GetTotalSalesForSpecificWeek(DateTime startOfWeek)
@@ -257,34 +270,40 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             return sales;
         }
+
         [HttpGet("total/month")]
+        [ProducesResponseType(typeof(MonthSalesResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public async Task<IActionResult> GetTotalSalesForMonth([FromQuery] int year, [FromQuery] int month)
+public async Task<IActionResult> GetTotalSalesForMonth([FromQuery] int year, [FromQuery] int month)
+{
+    try
+    {
+        // Fetch total sales for the specific month
+        var dailySales = await GetTotalSalesForSpecificMonth(year, month);
+
+        // If no data found, return an empty array
+        if (dailySales.Count == 0)
         {
-            try
-            {
-                // Fetch total sales for the specific month
-                var dailySales = await GetTotalSalesForSpecificMonth(year, month);
-
-                // If no data found, return an empty array
-                if (dailySales.Count == 0)
-                {
-                    return Ok(new List<object>()); // Return an empty array
-                }
-
-                // Return result in the desired format
-                return Ok(dailySales.Select(s => new
-                {
-                    Day = s.Key, // Day number
-                    TotalSales = s.Value // Total sales for that day
-                }));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving total sales for the month.");
-                return StatusCode(500, "Internal server error.");
-            }
+            return Ok(new List<MonthSalesResponse>()); // Return an empty array of TotalSalesResponse
         }
+
+        // Map the dailySales data to the TotalSalesResponse class
+        var response = dailySales.Select(s => new MonthSalesResponse
+        {
+            day = s.Key, // Assuming s.Key is a string representing the day number
+            totalSales = s.Value // Assuming s.Value is a decimal representing total sales
+        }).ToList();
+
+        // Return result in the desired format
+        return Ok(response);
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Error retrieving total sales for the month.");
+        return StatusCode(500, "Internal server error.");
+    }
+}
+
 
         // Private method to get total sales for a specific month
         private async Task<Dictionary<int, decimal>> GetTotalSalesForSpecificMonth(int year, int month)
@@ -323,6 +342,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet("total/year")]
+        [ProducesResponseType(typeof(YearSalesResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> GetTotalSalesForYear([FromQuery] int year)
         {
@@ -334,15 +354,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // If no data found, return an empty array
                 if (yearlySales.Count == 0)
                 {
-                    return Ok(new List<object>()); // Return an empty array
+                    return Ok(new List<YearSalesResponse>()); // Return an empty array of TotalSalesResponse
                 }
 
-                // Return result in the desired format
-                return Ok(yearlySales.Select(s => new
+                // Map the yearlySales data to the TotalSalesResponse class
+                var response = yearlySales.Select(s => new YearSalesResponse
                 {
-                    Month = s.Key, // Month name
-                    TotalSales = s.Value // Total sales for that month
-                }));
+                    month = s.Key, // Assuming s.Key is a string representing the month name
+                    totalSales = s.Value // Assuming s.Value is a decimal representing total sales
+                }).ToList();
+
+                // Return result in the desired format
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -350,6 +373,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "Internal server error.");
             }
         }
+
 
         // Private method to get total sales for a specific year
         private async Task<Dictionary<string, decimal>> GetTotalSalesForSpecificYear(int year)

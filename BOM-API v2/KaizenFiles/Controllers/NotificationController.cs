@@ -33,6 +33,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
         [HttpGet("/culo-api/v1/current-user/notifications")]
+        [ProducesResponseType(typeof(Notif), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetNotifications()
         {
@@ -80,8 +81,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 var notif = new Notif
                                 {
                                     notifId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
-
-
                                     message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
                                     dateCreated = reader.GetDateTime("date_created"),
                                     isRead = reader.GetBoolean(reader.GetOrdinal("is_read"))
