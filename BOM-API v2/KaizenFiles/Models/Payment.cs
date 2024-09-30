@@ -43,16 +43,16 @@
 
     public class Tax
     {
-        public int Amount { get; set; }
-        public string Currency { get; set; }
-        public bool Inclusive { get; set; }
-        public string Name { get; set; }
-        public string Type { get; set; }
-        public string Value { get; set; }
+        public int amount { get; set; }
+        public string currency { get; set; }
+        public bool inclusive { get; set; }
+        public string name { get; set; }
+        public string type { get; set; }
+        public string value { get; set; }
     }
 
     public class PaymentDetail
     {
-        public PaymentAttributes Data { get; set; }
+        public PaymentAttributes data { get; set; }
     }
 }

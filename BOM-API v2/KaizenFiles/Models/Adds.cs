@@ -5,14 +5,14 @@
         public class AddOnDetails
         {
             public string name { get; set; }
-            public double pricePerUnit { get; set; }
+            public double price { get; set; }
             public double size { get; set; }
 
         }
         public class UpdateAddOnRequest
         {
-            public string AddOnName { get; set; }
-            public double PricePerUnit { get; set; }
+            public string name { get; set; }
+            public double price { get; set; }
         }
 
     }

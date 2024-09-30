@@ -1,4 +1,5 @@
-﻿using CRUDFI.Models;
+﻿using BOM_API_v2.KaizenFiles.Models;
+using CRUDFI.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -30,10 +31,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 var addOns = new AddOns
                 {
                     name = addOnDetails.name,
-                    pricePerUnit = addOnDetails.pricePerUnit,
+                    pricePerUnit = addOnDetails.price,
                     size = addOnDetails.size,
-                    DateAdded = DateTime.UtcNow,  // Current UTC time as DateAdded
-                    LastModifiedDate = null,      // Initial value for LastModifiedDate
+                    dateAdded = DateTime.UtcNow,  // Current UTC time as DateAdded
+                    lastModifiedDate = null,      // Initial value for LastModifiedDate
                 };
 
                 // Insert into database
@@ -67,8 +68,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     command.Parameters.AddWithValue("@Size", addOns.size);
                     command.Parameters.AddWithValue("@Measure", "piece");
                     command.Parameters.AddWithValue("@IngredientType", "element");
-                    command.Parameters.AddWithValue("@DateAdded", addOns.DateAdded);
-                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.DateAdded);
+                    command.Parameters.AddWithValue("@DateAdded", addOns.dateAdded);
+                    command.Parameters.AddWithValue("@LastModifiedDate", addOns.dateAdded);
 
                     // Execute scalar to get the inserted ID
                     int newAddOnsId = Convert.ToInt32(await command.ExecuteScalarAsync());
@@ -78,6 +79,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet]
+        [ProducesResponseType(typeof(AddOnDS2), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetAllAddOns()
         {
             try
@@ -116,15 +118,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             var addOnDSOS = new AddOnDS2
                             {
-                                AddOnName = reader.GetString("name"),
-                                PricePerUnit = reader.GetDouble("price"),
-                                addOnsId = reader.GetInt32("add_ons_id"),
-                                Measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
+                                addOnName = reader.GetString("name"),
+                                price = reader.GetDouble("price"),
+                                id = reader.GetInt32("add_ons_id"),
+                                measurement = reader.IsDBNull(reader.GetOrdinal("measurement")) ? null : reader.GetString("measurement"),
                                 size = reader.IsDBNull(reader.GetOrdinal("size")) ? null : reader.GetDouble("size"),
                                 // DateAdded is assumed to be non-nullable and should be directly read
-                                DateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
+                                dateAdded = reader.GetDateTime(reader.GetOrdinal("date_added")),
                                 // Handle LastModifiedDate as nullable
-                                LastModifiedDate = reader.IsDBNull(reader.GetOrdinal("last_modified_date"))
+                                lastModifiedDate = reader.IsDBNull(reader.GetOrdinal("last_modified_date"))
                                     ? (DateTime?)null
                                     : reader.GetDateTime(reader.GetOrdinal("last_modified_date")),
                             };
@@ -159,8 +161,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     using (var command = new MySqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@AddOnsId", addOnsId);
-                        command.Parameters.AddWithValue("@AddOnName", updateRequest.AddOnName);
-                        command.Parameters.AddWithValue("@PricePerUnit", updateRequest.PricePerUnit);
+                        command.Parameters.AddWithValue("@AddOnName", updateRequest.name);
+                        command.Parameters.AddWithValue("@PricePerUnit", updateRequest.price);
                         command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
 
                         int rowsAffected = await command.ExecuteNonQueryAsync();

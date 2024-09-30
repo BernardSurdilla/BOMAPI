@@ -183,6 +183,130 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        [HttpPost("/culo-api/v1/custom/{customorderId}/payment")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> CreateCustomPaymentLink(string customorderId, [FromBody] PaymentRequest paymentRequest)
+        {
+            if (string.IsNullOrWhiteSpace(customorderId))
+            {
+                return BadRequest("Query parameter 'orderId' is required.");
+            }
+            else
+            {
+
+                try
+                {
+                    // Validate the option and amount
+                    if (paymentRequest == null || string.IsNullOrWhiteSpace(paymentRequest.option))
+                    {
+                        return BadRequest("Payment option is required.");
+                    }
+                    string orderIdBinary = ConvertGuidToBinary16(customorderId).ToLower();
+
+                    double totalPrice = await GetTotalPriceForCustomOrdersAsync(orderIdBinary);
+
+                    // Check the option value and modify the amount accordingly
+                    double updatedAmount;
+                    if (paymentRequest.option.ToLower().Trim() == "full")
+                    {
+                        updatedAmount = totalPrice;
+                    }
+                    else if (paymentRequest.option.ToLower().Trim() == "half")
+                    {
+                        updatedAmount = totalPrice / 2;
+                    }
+                    else
+                    {
+                        return BadRequest("Invalid option. Choose either 'full' or 'half'.");
+                    }
+
+                    // Convert the amount to cents (PayMongo expects amounts in cents)
+                    var amountInCents = (int)(updatedAmount * 100);
+
+                    // Set a static description or customize as needed
+                    var description = "Payment for order";
+
+                    // Make the call to PayMongo API
+                    var response = await CreatePayMongoPaymentLink(amountInCents, description);
+                    _logger.LogInformation("PayMongo response: {0}", response.Content);
+
+                    // If the response is successful, deserialize it into our new object model
+                    if (response.IsSuccessful)
+                    {
+                        // Deserialize the response content into the new PaymentRequestResponse class
+                        var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
+
+
+
+                        // Check if the order exists
+                        bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
+                        if (!orderExists)
+                        {
+                            Debug.Write(orderIdBinary);
+                            return NotFound("Order not found");
+                        }
+
+                        using (var connection = new MySqlConnection(connectionstring))
+                        {
+                            await connection.OpenAsync();
+
+                            // Prepare the SQL update query
+                            string sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = @option, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
+
+                            // Execute the update command
+                            using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                            {
+                                updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                                updateCommand.Parameters.AddWithValue("@option", paymentRequest.option);
+                                updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
+
+                                int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                                if (rowsAffected == 0)
+                                {
+                                    return NotFound("Order not found");
+                                }
+                            }
+                        }
+
+                        // Call the method to get customer ID and name
+                        var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
+
+                        if (customerId != null && customerId.Length > 0)
+                        {
+                            // Convert the byte[] customerId to a hex string
+                            string userId = BitConverter.ToString(customerId).Replace("-", "").ToLower();
+
+                            Debug.Write("customer id: " + userId);
+
+                            // Construct the message
+                            string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
+
+                            // Send the notification
+                            await NotifyAsync(userId, message);
+                        }
+                        else
+                        {
+                            // Handle case where customer info is not found
+                            Debug.Write("Customer not found for the given order.");
+                        }
+
+                        // Return the deserialized PayMongo response
+                        return Ok(payMongoResponse);
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to create PayMongo link: {Content}, Status Code: {StatusCode}", response.Content, response.StatusCode);
+                        return StatusCode((int)response.StatusCode, response.Content);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing the payment link.");
+                    return StatusCode(500, "Internal server error.");
+                }
+            }
+        }
+
         private async Task NotifyAsync(string userId, string message)
         {
             using (var connection = new MySqlConnection(connectionstring))
@@ -306,6 +430,38 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     await command.ExecuteNonQueryAsync();
                 }
             }
+        }
+
+        private async Task<double> GetTotalPriceForCustomOrdersAsync(string orderId)
+        {
+            double totalPrice = 0;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // SQL to retrieve price and quantity from suborders and calculate total price
+                string sql = @"
+        SELECT SUM(price * quantity) AS TotalPrice
+        FROM customorders
+        WHERE order_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    // Pass the orderId to the query
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            totalPrice = reader.IsDBNull(0) ? 0 : reader.GetDouble("TotalPrice");
+                        }
+                    }
+                }
+            }
+
+            return totalPrice;
         }
 
         // Private method to calculate total price for the given orderId

@@ -31,6 +31,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+                // Validate the model state
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState); // Return validation errors
+                }
+
                 // Extract the username from the token
                 var username = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -206,13 +212,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                                 IngriDTP ingredientDto = new IngriDTP
                                 {
-                                    Id = Convert.ToInt32(reader["id"]),
+                                    id = Convert.ToInt32(reader["id"]),
                                     name = reader["item_name"].ToString(),
                                     quantity = quantity,
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
-                                    CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                    createdAt = Convert.ToDateTime(reader["created_at"]),
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
@@ -253,23 +259,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 foreach (var ingredient in activeIngredients)
                 {
                     // Fetch thresholds for each item
-                    var thresholds = await GetThresholdsForItemAsync(ingredient.Id);
+                    var thresholds = await GetThresholdsForItemAsync(ingredient.id);
 
                     ingredientsDto.Add(new IngriDTP
                     {
-                        Id = ingredient.Id,
+                        id = ingredient.id,
                         name = ingredient.name,
                         quantity = ingredient.quantity,
                         measurements = ingredient.measurements,
                         price = ingredient.price,
                         status = ingredient.status,
                         type = ingredient.type,
-                        CreatedAt = ingredient.CreatedAt,
+                        createdAt = ingredient.createdAt,
                         isActive = ingredient.isActive,
                         lastUpdatedBy = ingredient.lastUpdatedBy,
                         lastUpdatedAt = ingredient.lastUpdatedAt,
-                        GoodThreshold = thresholds.goodThreshold, // Assuming you add this field in your DTO
-                        CriticalThreshold = thresholds.criticalThreshold // Assuming you add this field in your DTO
+                        goodThreshold = thresholds.goodThreshold, // Assuming you add this field in your DTO
+                        criticalThreshold = thresholds.criticalThreshold // Assuming you add this field in your DTO
                     });
                 }
 
@@ -302,13 +308,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["id"]),
+                                id = Convert.ToInt32(reader["id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                createdAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -427,7 +433,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     price = ingredient.price,
                     status = ingredient.status,
                     type = ingredient.type,
-                    CreatedAt = ingredient.CreatedAt,
+                    createdAt = ingredient.createdAt,
                     lastUpdatedBy = ingredient.lastUpdatedBy,
                     lastUpdatedAt = ingredient.lastUpdatedAt
                 }).ToList();
@@ -462,7 +468,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     price = ingredient.price,
                     status = ingredient.status,
                     type = ingredient.type,
-                    CreatedAt = ingredient.CreatedAt,
+                    createdAt = ingredient.createdAt,
                     lastUpdatedBy = ingredient.lastUpdatedBy,
                     lastUpdatedAt = ingredient.lastUpdatedAt
                 }).ToList();
@@ -497,7 +503,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     price = ingredient.price,
                     status = ingredient.status,
                     type = ingredient.type,
-                    CreatedAt = ingredient.CreatedAt,
+                    createdAt = ingredient.createdAt,
                     lastUpdatedBy = ingredient.lastUpdatedBy,
                     lastUpdatedAt = ingredient.lastUpdatedAt
                 }).ToList();
@@ -737,7 +743,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     price = ingredient.price,
                     status = ingredient.status,
                     type = ingredient.type,
-                    CreatedAt = ingredient.CreatedAt,
+                    createdAt = ingredient.createdAt,
                     lastUpdatedBy = ingredient.lastUpdatedBy,
                     lastUpdatedAt = ingredient.lastUpdatedAt
                 }).ToList();
@@ -773,13 +779,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 Ingri ingredient = new Ingri
                                 {
-                                    Id = Convert.ToInt32(reader["Id"]),
+                                    id = Convert.ToInt32(reader["Id"]),
                                     name = reader["item_name"].ToString(),
                                     quantity = Convert.ToDouble(reader["quantity"]),
                                     price = Convert.ToDecimal(reader["price"]),
                                     status = reader["status"].ToString(),
                                     type = reader["type"].ToString(),
-                                    CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                    createdAt = Convert.ToDateTime(reader["created_at"]),
                                     lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                     lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                     measurements = reader["measurements"].ToString(),
@@ -853,13 +859,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["Id"]),
+                                id = Convert.ToInt32(reader["Id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                createdAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -894,13 +900,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["Id"]),
+                                id = Convert.ToInt32(reader["Id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                createdAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -935,13 +941,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             Ingri ingredient = new Ingri
                             {
-                                Id = Convert.ToInt32(reader["Id"]),
+                                id = Convert.ToInt32(reader["Id"]),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                createdAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -974,13 +980,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             return new Ingri
                             {
-                                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                                id = reader.GetInt32(reader.GetOrdinal("Id")),
                                 name = reader["item_name"].ToString(),
                                 quantity = Convert.ToDouble(reader["quantity"]),
                                 price = Convert.ToDecimal(reader["price"]),
                                 status = reader["status"].ToString(),
                                 type = reader["type"].ToString(),
-                                CreatedAt = Convert.ToDateTime(reader["created_at"]),
+                                createdAt = Convert.ToDateTime(reader["created_at"]),
                                 lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by")) ? null : reader.GetString(reader.GetOrdinal("last_updated_by")),
                                 lastUpdatedAt = reader["last_updated_at"] != DBNull.Value ? Convert.ToDateTime(reader["last_updated_at"]) : DateTime.MinValue,
                                 measurements = reader["measurements"].ToString(),
@@ -1003,7 +1009,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = "UPDATE Item SET item_name = @item_name, quantity = @quantity, price = @price, type = @type, measurements = @measurements, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at, is_active = @isActive WHERE Id = @id";
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@id", ingredient.Id);
+                    command.Parameters.AddWithValue("@id", ingredient.id);
                     command.Parameters.AddWithValue("@item_name", ingredient.name);
                     command.Parameters.AddWithValue("@quantity", ingredient.quantity);
                     command.Parameters.AddWithValue("@price", ingredient.price);
