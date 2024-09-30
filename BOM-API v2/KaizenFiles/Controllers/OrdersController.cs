@@ -440,6 +440,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpPost("/culo-api/v1/current-user/cart")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
         {
             try
@@ -506,7 +507,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Insert the order into the database
                 await InsertOrder(order, designIdHex, orderDto.flavor, orderDto.size, pastryId, customerId, orderDto.color, shape, suborderIdBinary);
 
-                await ManageAddOnsByPastryMaterialId(pastryId, suborderIdBinary);
+                await ManageAddOnsByPastryMaterialId(pastryId, suborderIdBinary);//until here goods
 
                 string userId = ConvertGuidToBinary16(customer.ToString()).ToLower();
                 string message = $"{order.customerName ?? "Unknown"} '{order.designName ?? "Design"}' has been added to your cart";
@@ -529,7 +530,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 // Log and return an error message if an exception occurs
                 _logger.LogError(ex, "An error occurred while creating the order");
-                return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
+                return StatusCode(500, "An error occurred while processing the request");
             }
         }
 
