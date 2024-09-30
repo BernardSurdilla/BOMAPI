@@ -638,10 +638,27 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpDelete("{id}")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult DeleteIngredient(int id)
+        public async Task<IActionResult> DeleteIngredient(int id)
         {
             try
             {
+                // Extract the username from the token
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the last updated by user
+                string lastUpdatedBy = await GetLastupdater(username);
+                if (lastUpdatedBy == null)
+                {
+                    return Unauthorized("Username not found");
+                }
+
+                DateTime lastUpdatedAt = DateTime.UtcNow;
+
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     connection.Open();
@@ -660,11 +677,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
 
                     // Set isActive to false instead of deleting
-                    string sqlUpdate = "UPDATE Item SET is_active = @isActive WHERE Id = @id";
+                    string sqlUpdate = "UPDATE Item SET is_active = @isActive, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at  WHERE Id = @id";
                     using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
                         updateCommand.Parameters.AddWithValue("@id", id);
                         updateCommand.Parameters.AddWithValue("@isActive", false);
+                        updateCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                        updateCommand.Parameters.AddWithValue("@last_updated_at", lastUpdatedAt);
                         updateCommand.ExecuteNonQuery();
                     }
                 }
@@ -678,12 +697,29 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPut]
+        [HttpPatch]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
-        public IActionResult ReactivateIngredient([FromQuery] int restore)
+        public async Task<IActionResult> ReactivateIngredient([FromQuery] int restore)
         {
             try
             {
+                // Extract the username from the token
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the last updated by user
+                string lastUpdatedBy = await GetLastupdater(username);
+                if (lastUpdatedBy == null)
+                {
+                    return Unauthorized("Username not found");
+                }
+
+                DateTime lastUpdatedAt = DateTime.UtcNow;
+
                 using (var connection = new MySqlConnection(connectionstring))
                 {
                     connection.Open();
@@ -702,11 +738,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
 
                     // Reactivate the ingredient by setting isActive to true
-                    string sqlUpdate = "UPDATE Item SET is_active = @isActive WHERE Id = @id";
+                    string sqlUpdate = "UPDATE Item SET is_active = @isActive, last_updated_by = @last_updated_by, last_updated_at = @last_updated_at WHERE Id = @id";
                     using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
                     {
                         updateCommand.Parameters.AddWithValue("@id", restore);
                         updateCommand.Parameters.AddWithValue("@isActive", true); // Reactivate the ingredient
+                        updateCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                        updateCommand.Parameters.AddWithValue("@last_updated_at", lastUpdatedAt);
                         updateCommand.ExecuteNonQuery();
                     }
                 }
