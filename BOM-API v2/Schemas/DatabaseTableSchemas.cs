@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Diagnostics.Contracts;
 
 namespace BillOfMaterialsAPI.Schemas
 {
@@ -63,6 +64,17 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime last_modified_date { get; set; }
 
         public PastryMaterials PastryMaterials { get; set; }
+    }
+    [PrimaryKey("pastry_material_additional_cost_id")]
+    public class PastryMaterialOtherCost
+    {
+        public Guid pastry_material_additional_cost_id { get; set; }
+        [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
+
+        public double additional_cost { get; set; }
+        
+        public PastryMaterials PastryMaterials { get; set; }
+
     }
 
 

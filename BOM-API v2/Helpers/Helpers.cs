@@ -509,6 +509,15 @@ namespace BillOfMaterialsAPI.Helpers
 
             return response;
         }
+        public static async Task<Guid> AddPastryMaterialOtherCost(string pastry_material_id, PostPastryMaterialOtherCost data, DatabaseContext context)
+        {
+            Guid response;
+
+            response = await TrackPastryMaterialOtherCostForInsertion(pastry_material_id, data, context);
+
+            return response;
+        }
+
 
         public static async Task<List<string>> AddPastryMaterialIngredient(string pastry_material_id, List<PostIngredients> data, DatabaseContext context)
         {
@@ -710,6 +719,20 @@ namespace BillOfMaterialsAPI.Helpers
             response = IdFormat.IncrementId(IdPrefix.PastryMaterialSubVariantAddOn, IdFormat.IdNumbersLength, pastry_material_sub_variant_add_on_id);
             return response;
         }
+        private static async Task<Guid> TrackPastryMaterialOtherCostForInsertion(string pastry_material_id, PostPastryMaterialOtherCost data, DatabaseContext context)
+        {
+            Guid response = Guid.NewGuid();
+
+            PastryMaterialOtherCost newOtherCost = new PastryMaterialOtherCost();
+
+            newOtherCost.pastry_material_additional_cost_id = response;
+            newOtherCost.pastry_material_id = pastry_material_id;
+            newOtherCost.additional_cost = data.additionalCost;
+
+            await context.PastryMaterialOtherCosts.AddAsync(newOtherCost);
+
+            return response;
+        }
     }
     public class DataRetrieval
     {
@@ -799,6 +822,18 @@ namespace BillOfMaterialsAPI.Helpers
             }
             catch { }
             throw new NotFoundInDatabaseException("No pastry material add on with the id " + pastry_material_add_on_id + " for the pastry material with the id " + pastry_material_id + " found in the database.");
+        }
+        public static async Task<PastryMaterialOtherCost> GetPastryMaterialOtherCostAsync(string pastry_material_id, DatabaseContext context)
+        {
+            PastryMaterialOtherCost? currentPastryMaterialOtherCost = null;
+            try
+            {
+                currentPastryMaterialOtherCost = await context.PastryMaterialOtherCosts.Where(x => x.pastry_material_id == pastry_material_id).FirstAsync();
+                return currentPastryMaterialOtherCost;
+            }
+            catch { }
+            throw new NotFoundInDatabaseException("No pastry material other cost entry for " + pastry_material_id + " found in the database.");
+
         }
 
         public static async Task<PastryMaterialSubVariants> GetPastryMaterialSubVariantAsync(string pastry_material_sub_variant_id, DatabaseContext context)
@@ -936,11 +971,13 @@ namespace BillOfMaterialsAPI.Helpers
             List<GetPastryMaterialIngredientImportance> responsePastryMaterialImportanceList = new List<GetPastryMaterialIngredientImportance>();
             List<GetPastryMaterialAddOns> responsePastryMaterialAddOns = new List<GetPastryMaterialAddOns>();
             List<GetPastryMaterialSubVariant> responsePastryMaterialSubVariants = new List<GetPastryMaterialSubVariant>();
+            GetPastryMaterialOtherCost responsePastryMaterialOtherCost = new GetPastryMaterialOtherCost();
             double calculatedCost = 0.0;
 
             List<Ingredients> currentPastryMaterialIngredients = await context.Ingredients.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             List<PastryMaterialIngredientImportance> currentPastryMaterialIngredientImportance = await context.PastryMaterialIngredientImportance.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
             List<PastryMaterialAddOns> currentPastryMaterialAddOns = await context.PastryMaterialAddOns.Where(x => x.is_active == true && x.pastry_material_id == data.pastry_material_id).ToListAsync();
+            PastryMaterialOtherCost? currentPastryMaterialOtherCost = await context.PastryMaterialOtherCosts.Where(x => x.pastry_material_id == data.pastry_material_id).FirstOrDefaultAsync();
 
             Dictionary<string, double> baseVariantIngredientAmountDict = new Dictionary<string, double>(); //Contains the ingredients for the base variant
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
@@ -1582,13 +1619,19 @@ namespace BillOfMaterialsAPI.Helpers
 
                 responsePastryMaterialSubVariants.Add(newSubVariantListRow);
             }
+            if (currentPastryMaterialOtherCost != null)
+            {
+                responsePastryMaterialOtherCost.pastryMaterialAdditionalCostId = currentPastryMaterialOtherCost.pastry_material_additional_cost_id;
+                responsePastryMaterialOtherCost.additionalCost = currentPastryMaterialOtherCost.additional_cost;
+            }
 
             response.ingredients = responsePastryMaterialList;
             response.ingredientImportance = responsePastryMaterialImportanceList;
             response.addOns = responsePastryMaterialAddOns;
             response.subVariants = responsePastryMaterialSubVariants;
-            response.costExactEstimate = calculatedCost;
 
+            response.otherCost = responsePastryMaterialOtherCost;
+            response.costExactEstimate = calculatedCost;
             response.costEstimate = await PriceCalculator.CalculatePastryMaterialPrice(data.pastry_material_id, context, kaizenTables);
 
             return response;
@@ -1929,6 +1972,17 @@ namespace BillOfMaterialsAPI.Helpers
 
 
                 response += calculatedAmount;
+            }
+
+            string pastryMaterialId = "";
+
+            try { PastryMaterials selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(variant_id, context); pastryMaterialId = selectedPastryMaterial.pastry_material_id; }
+            catch { try { PastryMaterialSubVariants selectedSubVariant = await DataRetrieval.GetPastryMaterialSubVariantAsync(variant_id, context); pastryMaterialId = selectedSubVariant.pastry_material_id; } catch { } }
+
+            PastryMaterialOtherCost? currentPastryMaterialOtherCost = context.PastryMaterialOtherCosts.Where(x => x.pastry_material_id == pastryMaterialId).FirstOrDefault();
+            if (currentPastryMaterialOtherCost != null) 
+            {
+                response += currentPastryMaterialOtherCost.additional_cost;
             }
             
             response = response % 100 < 50 ? Math.Ceiling(response / 100d) * 100 : (Math.Ceiling(response / 100d) * 100) + 50.0;

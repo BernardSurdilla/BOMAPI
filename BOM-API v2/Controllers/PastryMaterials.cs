@@ -230,6 +230,7 @@ namespace BOM_API_v2.Controllers
             await _context.SaveChangesAsync();
 
             await DataInsertion.AddPastryMaterialIngredient(newPastryMaterialId, newEntry.ingredients, _context);
+            if (newEntry.otherCost != null) await DataInsertion.AddPastryMaterialOtherCost(newPastryMaterialId, newEntry.otherCost, _context);
             if (newEntry.addOns != null) await DataInsertion.AddPastryMaterialAddOns(newPastryMaterialId, newEntry.addOns, _context);
             if (newEntry.ingredientImportance != null) await DataInsertion.AddPastryMaterialIngredientImportance(newPastryMaterialId, newEntry.ingredientImportance, _context);
             await _context.SaveChangesAsync();
@@ -278,6 +279,20 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add Ingredient " + newIngredientId + " to " + pastry_material_id);
             return Ok(new { message = "Data inserted to the database." });
 
+        }
+        [HttpPost("{pastry_material_id}/other-costs")]
+        public async Task<IActionResult> AddNewPastryMaterialOtherCost(string pastry_material_id, PostPastryMaterialOtherCost entry)
+        {
+
+            PastryMaterials? currentPastryMaterial;
+            try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            Guid newOtherCostsId = await DataInsertion.AddPastryMaterialOtherCost(pastry_material_id, entry, _context);
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "POST", "Add Additional Const " + newOtherCostsId.ToString() + " to " + pastry_material_id);
+            return Ok(new { message = "Data inserted to the database." });
         }
         [HttpPost("{pastry_material_id}/ingredient-importance")]
         public async Task<IActionResult> AddNewPastryMaterialIngredientImportance(string pastry_material_id, PostPastryMaterialIngredientImportance entry)
@@ -452,6 +467,24 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Ingredient " + pastry_material_id);
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
+        }
+        [HttpPatch("{pastry_material_id}/other-costs")]
+        public async Task<IActionResult> UpdatePastryMaterialOtherCost(string pastry_material_id, PatchPastryMaterialOtherCost entry)
+        {
+            PastryMaterials? currentPastryMaterial;
+            try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            PastryMaterialOtherCost? currentPastryMaterialOtherCost;
+            try { currentPastryMaterialOtherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(pastry_material_id, _context); }
+            catch (Exception e) { return NotFound(new { message = e.Message }); }
+
+            _context.PastryMaterialOtherCosts.Update(currentPastryMaterialOtherCost);
+            currentPastryMaterialOtherCost.additional_cost = entry.additionalCost;
+            await _context.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Other Cost " + pastry_material_id);
+            return Ok(new { message = "Pastry Material Other Cost updated." });
         }
         [HttpPatch("{pastry_material_id}/ingredient-importance/{pastry_material_ingredient_importance_id}")]
         public async Task<IActionResult> UpdatePastryMaterialIngredientImportance(string pastry_material_id, Guid pastry_material_ingredient_importance_id, PatchPastryMaterialIngredientImportance entry)

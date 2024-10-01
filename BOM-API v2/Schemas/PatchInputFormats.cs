@@ -26,7 +26,10 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][MaxLength(16)] public byte[] designId { get; set; }
         [Required] public string mainVariantName { get; set; }
     }
-
+    public class PatchPastryMaterialOtherCost
+    {
+        [Required] public double additionalCost { get; set; }
+    }
     public class PatchPastryMaterialIngredientImportance
     {
         [Required] public string itemId { get; set; }
