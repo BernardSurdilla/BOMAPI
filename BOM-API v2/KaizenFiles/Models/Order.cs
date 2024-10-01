@@ -1,4 +1,6 @@
-﻿namespace CRUDFI.Models
+﻿using BOM_API_v2.KaizenFiles.Models;
+
+namespace CRUDFI.Models
 {
     public class Order
     {
@@ -194,6 +196,18 @@
         public DateTime? lastUpdatedAt { get; set; }
         public bool isActive { get; set; }
     }
+    public class CustomerInitial
+    {
+        public Guid? customId { get; set; }
+        public Guid? orderId { get; set; }
+        public byte[]? designId { get; set; }
+        public DateTime createdAt { get; set; }
+        public string payment { get; set; }
+        public string status { get; set; }
+        public string type { get; set; }
+        public string designName { get; set; }
+        public DateTime? pickup { get; set; }
+    }
 
     public class toPayInitial
     {
@@ -253,6 +267,22 @@
     public class Cart
     {
         public Guid suborderId { get; set; }
+        public byte[]? designId { get; set; } = null;
+        public string pastryId { get; set; }
+        public string status { get; set; }
+        public string designName { get; set; }
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public double price { get; set; }
+        public int quantity { get; set; }
+        public string? description { get; set; }
+        public string flavor { get; set; }
+        public string size { get; set; }
+    }
+
+    public class Artist
+    {
+        public Guid suborderId { get; set; }
         public Guid? orderId { get; set; }
         public byte[]? designId { get; set; } = null;
         public Guid customerId { get; set; }
@@ -271,34 +301,6 @@
         public string description { get; set; }
         public string flavor { get; set; }
         public string size { get; set; }
-        public string lastUpdatedBy { get; set; } = "";
-        public DateTime? lastUpdatedAt { get; set; }
-        public bool isActive { get; set; }
-    }
-
-    public class OrderSummary
-    {
-        public Guid suborderId { get; set; }
-        public Guid? Id { get; set; }
-        public string PastryMaterialId { get; set; }
-        public byte[]? designId { get; set; } = null;
-        public Guid CustomerId { get; set; }
-        public Guid? employeeId { get; set; }
-        public string employeeName { get; set; } = string.Empty;
-        public string CustomerName { get; set; }
-        public DateTime CreatedAt { get; set; }
-        public string Payment { get; set; }
-        public string pastryId { get; set; }
-        public string Status { get; set; }
-        public string DesignName { get; set; }
-        public string color { get; set; } = string.Empty;
-        public string shape { get; set; } = string.Empty;
-        public string tier { get; set; } = string.Empty;
-        public double Price { get; set; }
-        public int Quantity { get; set; }
-        public string Description { get; set; }
-        public string Flavor { get; set; }
-        public string Size { get; set; }
         public string lastUpdatedBy { get; set; } = "";
         public DateTime? lastUpdatedAt { get; set; }
         public bool isActive { get; set; }
@@ -375,6 +377,7 @@
         public string flavor { get; set; }
         public string size { get; set; }
         public string color { get; set; }
+        public List<AddOn> addonItem { get; set; }
     }
 
     public class CheckOutRequest
