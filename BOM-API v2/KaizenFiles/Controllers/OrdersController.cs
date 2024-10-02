@@ -1554,6 +1554,75 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        [HttpGet("calendar/{orderId}/full")]
+        public async Task<IActionResult> GetOrdersForCalendar(string orderId)
+        {
+            try
+            {
+                List<CalendarFull> orders = new List<CalendarFull>();
+
+                string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, HEX(design_id) as design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color FROM suborders WHERE order_id = UNHEX(@)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            while (await reader.ReadAsync())
+                            {
+                                Guid suborderId = new Guid((byte[])reader["suborder_id"]);
+                                Guid customerId = reader.IsDBNull(reader.GetOrdinal("customer_id"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["customer_id"]);
+
+                                Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
+                                                  ? Guid.Empty
+                                                  : new Guid((byte[])reader["employee_id"]);
+                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
+                                                   ? null
+                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
+                                string? LastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                                orders.Add(new CalendarFull
+                                {
+                                    suborderId = suborderId,
+                                    customerId = customerId,
+                                    status = reader.GetString(reader.GetOrdinal("status")),
+                                    color = reader.GetString(reader.GetOrdinal("color")),
+                                    shape = reader.GetString(reader.GetOrdinal("shape")),
+                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    designName = reader.GetString(reader.GetOrdinal("design_name")),
+                                    price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                    description = reader.GetString(reader.GetOrdinal("description")),
+                                    flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                    size = reader.GetString(reader.GetOrdinal("size")),
+                                    customerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<CalendarFull>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
         [HttpGet("/culo-api/v1/current-user/custom-orders")]
         [ProducesResponseType(typeof(CustomPartial), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
