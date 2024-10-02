@@ -16,7 +16,7 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("pastry_material_id")]
     public class PastryMaterials
     {
-        [Required][ForeignKey("Designs")][MaxLength(16)] public byte[] design_id;
+        [Required][ForeignKey("Designs")][MaxLength(16)] public Guid design_id;
         [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public string main_variant_name { get; set; }
@@ -215,7 +215,7 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("design_id")]
     public class Designs
     {
-        [MaxLength(16)][Key] public byte[] design_id { get; set; }
+        [MaxLength(16)][Key] public Guid design_id { get; set; }
         [MaxLength(50)] public string display_name { get; set; }
         [MaxLength(50)] public string display_picture_url { get; set; }
         public string? cake_description { get; set; }
@@ -233,7 +233,7 @@ namespace BillOfMaterialsAPI.Schemas
     {
         [Key] public Guid design_tags_for_cake_id { get; set; }
 
-        [ForeignKey("Designs")] public byte[] design_id { get; set; }
+        [ForeignKey("Designs")] public Guid design_id { get; set; }
         [ForeignKey("DesignTags")] public Guid design_tag_id { get; set; }
 
         [Column("is_active")] public bool is_active { get; set; }
@@ -245,7 +245,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class DesignImage
     {
         [Key] public Guid design_picture_id { get; set; }
-        [ForeignKey("Designs")] public byte[] design_id { get; set; }
+        [ForeignKey("Designs")] public Guid design_id { get; set; }
         public byte[] picture_data { get; set; }
         [Column("is_active")] public bool is_active { get; set; }
 
@@ -255,7 +255,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class DesignShapes
     {
         [Key] public Guid design_shape_id { get; set; }
-        [ForeignKey("Designs")] public byte[] design_id { get; set; }
+        [ForeignKey("Designs")] public Guid design_id { get; set; }
         public string shape_name { get; set; }
         [Column("is_active")] public bool is_active { get; set; }
 
@@ -277,7 +277,7 @@ namespace BillOfMaterialsAPI.Schemas
 
         public DateTime created_at { get; set; }
         [MaxLength(50)] public string status { get; set; }
-        public byte[] design_id { get; set; }
+        public Guid design_id { get; set; }
         public double price { get; set; }
         [MaxLength(50)] public string? last_updated_by { get; set; }
         public DateTime? last_updated_at { get; set; }
@@ -352,7 +352,7 @@ namespace BillOfMaterialsAPI.Schemas
         public string Status { get; set; }
 
         [Column("DesignId")]
-        public byte[] DesignId { get; set; }
+        public Guid designId { get; set; }
 
         [Column("DesignName")]
         [MaxLength(50)]

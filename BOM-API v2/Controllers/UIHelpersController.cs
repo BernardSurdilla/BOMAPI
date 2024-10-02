@@ -41,25 +41,17 @@ namespace BOM_API_v2.Controllers
 
         }
         [HttpGet("get-design-info/{designId}")]
-        public async Task<GetDesignInfo> GetDesignInfo([FromRoute] string designId)
+        public async Task<GetDesignInfo> GetDesignInfo([FromRoute] Guid designId)
         {
             GetDesignInfo response = new GetDesignInfo();
 
             Designs? selectedDesign;
             PastryMaterials? selectedDesignPastryMaterial;
 
-            string decodedId = designId;
-            byte[]? byteArrEncodedId = null;
-            try
-            {
-                decodedId = Uri.UnescapeDataString(designId);
-                byteArrEncodedId = Convert.FromBase64String(decodedId);
-            }
-            catch { return response; }
-            try { selectedDesign = await _context.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(byteArrEncodedId)).FirstAsync(); }
+            try { selectedDesign = await _context.Designs.Where(x => x.is_active == true && x.design_id == designId).FirstAsync(); }
             catch (Exception e) { return response; }
 
-            try { selectedDesignPastryMaterial = await _context.PastryMaterials.Where(x => x.is_active == true && x.design_id.SequenceEqual(selectedDesign.design_id)).FirstAsync(); }
+            try { selectedDesignPastryMaterial = await _context.PastryMaterials.Where(x => x.is_active == true && x.design_id == selectedDesign.design_id).FirstAsync(); }
             catch (Exception e) { return response; }
 
             GetPastryMaterial parsedData = await DataParser.CreatePastryMaterialResponseFromDBRow(selectedDesignPastryMaterial, _context, _kaizenTables);

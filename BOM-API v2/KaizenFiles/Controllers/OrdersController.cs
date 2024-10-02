@@ -96,7 +96,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
 
 
-                    string designIdHex = BitConverter.ToString(orderItem.designId).Replace("-", "").ToLower();
+                    string designIdHex = BitConverter.ToString(orderItem.designId.ToByteArray()).Replace("-", "").ToLower();
 
                     string designName = await getDesignName(designIdHex);
                     if (designIdHex == null || designIdHex.Length == 0)
@@ -466,7 +466,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string customer = await GetUserIdByAllUsernameString(customerUsername);
 
                 // Convert designId from string to hex
-                string designIdHex = BitConverter.ToString(orderDto.designId).Replace("-", "").ToLower();
+                string designIdHex = BitConverter.ToString(orderDto.designId.ToByteArray()).Replace("-", "").ToLower();
                 string designName = await getDesignName(designIdHex);
                 if (designIdHex == null || designIdHex.Length == 0)
                 {
@@ -3734,7 +3734,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                 pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                 color = reader.GetString(reader.GetOrdinal("color")),
                                 shape = reader.GetString(reader.GetOrdinal("shape")),
-                                designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                designId = new Guid((byte[])reader["design_id"]),
                                 designName = reader.GetString(reader.GetOrdinal("design_name")),
                                 price = reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),

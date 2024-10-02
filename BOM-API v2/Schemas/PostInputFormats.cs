@@ -43,7 +43,7 @@ namespace BillOfMaterialsAPI.Schemas
 
     public class PostPastryMaterial
     {
-        [Required] public byte[] designId { get; set; }
+        [Required] public Guid designId { get; set; }
         [Required] public string mainVariantName { get; set; }
         [Required] public List<PostIngredients> ingredients { get; set; }
         public PostPastryMaterialOtherCost? otherCost { get; set; }

@@ -110,7 +110,7 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class GetPastryMaterial
     {
-        [Required] public string designId { get; set; }
+        [Required] public Guid designId { get; set; }
         [Required] public string designName { get; set; }
         [Required][MaxLength(26)] public string pastryMaterialId { get; set; }
 
@@ -132,7 +132,7 @@ namespace BillOfMaterialsAPI.Schemas
         public GetPastryMaterial() { }
         public GetPastryMaterial(PastryMaterials pastryMaterials, List<GetPastryMaterialIngredients> ingredients)
         {
-            this.designId = Convert.ToBase64String(pastryMaterials.design_id);
+            this.designId = pastryMaterials.design_id;
             this.pastryMaterialId = pastryMaterials.pastry_material_id;
             this.dateAdded = pastryMaterials.date_added;
             this.lastModifiedDate = pastryMaterials.last_modified_date;
@@ -276,7 +276,7 @@ namespace BillOfMaterialsAPI.Schemas
     //Design Related
     public class GetDesign
     {
-        [Required] public byte[] designId { get; set; }
+        [Required] public Guid designId { get; set; }
         [Required] public string displayName { get; set; }
         public string? cakeDescription { get; set; }
 
@@ -288,12 +288,12 @@ namespace BillOfMaterialsAPI.Schemas
     }
     public class GetDesignWithoutPastryMaterial
     {
-        [Required] public byte[] designId { get; set; }
+        [Required] public Guid designId { get; set; }
         [Required] public string displayName { get; set; }
     }
     public class GetDesignWithPastryMaterial
     {
-        [Required] public byte[] designId { get; set; }
+        [Required] public Guid designId { get; set; }
         [Required] public string displayName { get; set; }
         [Required] public string pastryMaterialId { get; set; }
     }

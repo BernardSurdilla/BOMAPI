@@ -330,7 +330,7 @@ namespace CRUDFI.Models
         public string pastryId { get; set; }
         public string color { get; set; }
         public string shape { get; set; }
-        public byte[] designId { get; set; }
+        public Guid designId { get; set; }
         public string designName { get; set; }
         public double price { get; set; }
         public int quantity { get; set; }
@@ -372,7 +372,7 @@ namespace CRUDFI.Models
     public class OrderDTO
     {
         public int quantity { get; set; }
-        public byte[] designId { get; set; }
+        public Guid designId { get; set; }
         public string? description { get; set; }
         public string flavor { get; set; }
         public string size { get; set; }

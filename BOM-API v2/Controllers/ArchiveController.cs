@@ -440,7 +440,7 @@ namespace BillOfMaterialsAPI.Controllers
             return response;
         }
         [HttpGet("designs/{design_id}")]
-        public async Task<Designs> GetSpecifiedDeletedDesign(byte[] design_id)
+        public async Task<Designs> GetSpecifiedDeletedDesign(Guid design_id)
         {
             if (design_id == null) { return new Designs(); }
 
@@ -804,7 +804,7 @@ namespace BillOfMaterialsAPI.Controllers
         */
 
         [HttpPatch("designs/{design_id}")]
-        public async Task<IActionResult> RestoreDesign(byte[] design_id)
+        public async Task<IActionResult> RestoreDesign(Guid design_id)
         {
             Designs? selectedRow;
             try { selectedRow = await _context.Designs.Where(x => x.is_active == false && x.design_id == design_id).FirstAsync(); }

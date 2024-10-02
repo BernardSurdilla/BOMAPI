@@ -78,7 +78,7 @@ namespace API_TEST.Controllers
                 while (ingItemEnum.MoveNext())
                 {
                     Designs? currentParentPastryMaterialReferencedDesign = null;
-                    try { currentParentPastryMaterialReferencedDesign = allDesigns.Where(x => x.design_id.SequenceEqual(ingItemEnum.Current.PastryMaterials.design_id)).First(); }
+                    try { currentParentPastryMaterialReferencedDesign = allDesigns.Where(x => x.design_id == ingItemEnum.Current.PastryMaterials.design_id).First(); }
                     catch (Exception e) { continue; }
 
                     string currentItemName = "N/A";
@@ -323,7 +323,7 @@ namespace API_TEST.Controllers
                 foreach (Orders currentOrder in ordersForCurrentDate)
                 {
                     DateTime currentOrderCreationDate = currentOrder.created_at;
-                    byte[] currentOrderDesignId = currentOrder.design_id;
+                    Guid currentOrderDesignId = currentOrder.design_id;
 
                     PastryMaterials? currentOrderDesignRow = allPastryMaterials.Find(x => x.design_id == currentOrderDesignId);
                     if (currentOrderDesignRow != null) { continue; }

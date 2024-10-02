@@ -351,7 +351,7 @@ namespace BillOfMaterialsAPI.Helpers
             return false;
         }
 
-        public static async Task<bool> DesignExistsAsync(byte[] designId, DatabaseContext context)
+        public static async Task<bool> DesignExistsAsync(Guid designId, DatabaseContext context)
         {
             Designs? selectedDesign;
             try
@@ -957,8 +957,8 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<GetPastryMaterial> CreatePastryMaterialResponseFromDBRow(PastryMaterials data, DatabaseContext context, KaizenTables kaizenTables)
         {
             GetPastryMaterial response = new GetPastryMaterial();
-            response.designId = Convert.ToBase64String(data.design_id);
-            try { Designs? selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id.SequenceEqual(data.design_id)).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.designName = selectedDesign.display_name; }
+            response.designId = data.design_id;
+            try { Designs? selectedDesign = await context.Designs.Where(x => x.is_active == true && x.design_id == data.design_id).Select(x => new Designs { display_name = x.display_name }).FirstAsync(); response.designName = selectedDesign.display_name; }
             catch (Exception e) { response.designName = "N/A"; }
 
             response.pastryMaterialId = data.pastry_material_id;
