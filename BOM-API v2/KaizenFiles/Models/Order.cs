@@ -1,5 +1,4 @@
-﻿using BOM_API_v2.KaizenFiles.Models;
-
+﻿
 namespace CRUDFI.Models
 {
     public class Order
@@ -42,6 +41,26 @@ namespace CRUDFI.Models
         public string size { get; set; }
 
         public string flavor { get; set; }
+    }
+
+    public class CalendarFull
+    {
+        public Guid suborderId { get; set; }
+        public byte[]? designId { get; set; } = null;
+        public Guid customerId { get; set; }
+        public string customerName { get; set; }
+        public string status { get; set; }
+        public string designName { get; set; }
+        public string color { get; set; } = string.Empty;
+        public string shape { get; set; } = string.Empty;
+        public string tier { get; set; } = string.Empty;
+        public double price { get; set; } 
+        public int quantity { get; set; }
+        public string description { get; set; }
+        public string flavor { get; set; }
+        public string size { get; set; }
+        public string payment { get; set; } = "";
+        public DateTime? pickupDateTime { get; set; }
     }
 
     public class OrderResponse //for daily and weekly
