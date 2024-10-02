@@ -16,7 +16,7 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("pastry_material_id")]
     public class PastryMaterials
     {
-        [Required][ForeignKey("Designs")][MaxLength(16)] public Guid design_id;
+        [Required][ForeignKey("Designs")] public Guid design_id;
         [Required][Key][MaxLength(26)] public string pastry_material_id { get; set; }
 
         [Required] public string main_variant_name { get; set; }
@@ -215,7 +215,7 @@ namespace BillOfMaterialsAPI.Schemas
     [PrimaryKey("design_id")]
     public class Designs
     {
-        [MaxLength(16)][Key] public Guid design_id { get; set; }
+        [Key] public Guid design_id { get; set; }
         [MaxLength(50)] public string display_name { get; set; }
         [MaxLength(50)] public string display_picture_url { get; set; }
         public string? cake_description { get; set; }
