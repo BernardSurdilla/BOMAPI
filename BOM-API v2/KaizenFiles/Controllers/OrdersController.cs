@@ -96,7 +96,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
 
 
-                    string designIdHex = BitConverter.ToString(orderItem.designId.ToByteArray()).Replace("-", "").ToLower();
+                    string designIdHex = orderItem.designId.ToString();
 
                     string designName = await getDesignName(designIdHex);
                     if (designIdHex == null || designIdHex.Length == 0)
@@ -254,7 +254,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"INSERT INTO suborders (
             suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
-            VALUES (UNHEX(@suborderid), UNHEX(@orderid), @customerId, @CustomerName, NULL, NOW(), @status, UNHEX(@designId), @price, 
+            VALUES (UNHEX(@suborderid), UNHEX(@orderid), @customerId, @CustomerName, NULL, NOW(), @status, @designId), @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -466,13 +466,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string customer = await GetUserIdByAllUsernameString(customerUsername);
 
                 // Convert designId from string to hex
-                string designIdHex = BitConverter.ToString(orderDto.designId.ToByteArray()).Replace("-", "").ToLower();
+                string designIdHex = orderDto.designId.ToString();
                 string designName = await getDesignName(designIdHex);
                 if (designIdHex == null || designIdHex.Length == 0)
                 {
                     return BadRequest($"Design '{orderDto.designId}' not found.");
                 }
-
+                Debug.WriteLine("desing id hex: " +designIdHex);
+                Debug.WriteLine("design name: " + designName);
                 string shape = await GetDesignShapes(designIdHex);
 
                 // Get the pastry material ID using design ID and size
@@ -480,6 +481,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string pastryMaterialId = await GetPastryMaterialIdBySubersIdAndSize(subersId, orderDto.size);
                 string subVariantId = await GetPastryMaterialSubVariantId(subersId, orderDto.size);
                 string pastryId = !string.IsNullOrEmpty(subVariantId) ? subVariantId : pastryMaterialId;
+
+                Debug.Write("pastry material id: " + pastryId);
 
                 // Calculate total price
                 double totalPrice = await PriceCalculator.CalculatePastryMaterialPrice(pastryId, _context, _kaizenTables);
@@ -576,7 +579,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string designQuery = "SELECT shape_name FROM designshapes WHERE design_id = UNHEX(@design_id)";
+                string designQuery = "SELECT shape_name FROM designshapes WHERE design_id = @design_id";
                 using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@design_id", design);
@@ -599,7 +602,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT pastry_material_id FROM pastrymaterials WHERE design_id = UNHEX(@designId)";
+                string sql = "SELECT pastry_material_id FROM pastrymaterials WHERE design_id = @designId";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@designId", designIdHex);
@@ -638,7 +641,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"INSERT INTO suborders (
             suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
-            VALUES (UNHEX(@suborderid), NULL, @customerId, @CustomerName, NULL, NOW(), @status, UNHEX(@designId), @price, 
+            VALUES (UNHEX(@suborderid), NULL, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -1484,7 +1487,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, HEX(design_id) as design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color FROM suborders";
+                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color FROM suborders";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -1495,6 +1498,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
                                                 ? (Guid?)null
                                                 : new Guid((byte[])reader["order_id"]);
+                                Guid? designId = reader.IsDBNull(reader.GetOrdinal("design_id"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["design_id"]);
 
                                 Guid suborderId = new Guid((byte[])reader["suborder_id"]);
                                 Guid customerId = reader.IsDBNull(reader.GetOrdinal("customer_id"))
@@ -1522,7 +1528,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    designId = designId,
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -1567,7 +1573,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, HEX(design_id) as design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color FROM suborders WHERE order_id = UNHEX(@)";
+                    string sql = "SELECT suborder_id, order_id, customer_id, employee_id, created_at, pastry_id, status, design_id, design_name, price, quantity, last_updated_by, last_updated_at, is_active, description, flavor, size, customer_name, employee_name, shape, color FROM suborders WHERE order_id = UNHEX(@)";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -1579,7 +1585,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 Guid customerId = reader.IsDBNull(reader.GetOrdinal("customer_id"))
                                                   ? Guid.Empty
                                                   : new Guid((byte[])reader["customer_id"]);
-
+                                Guid? designId = reader.IsDBNull(reader.GetOrdinal("design_id"))
+                                                ? (Guid?)null
+                                                : new Guid((byte[])reader["design_id"]);
                                 Guid employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id"))
                                                   ? Guid.Empty
                                                   : new Guid((byte[])reader["employee_id"]);
@@ -1597,7 +1605,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    designId = designId,
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -2245,7 +2253,7 @@ SELECT
 
                 string sql = @"
 SELECT 
-    HEX(design_id) as design_id, design_name 
+    design_id, design_name 
 FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -2257,10 +2265,11 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     {
                         while (await reader.ReadAsync())
                         {
-
+                            // Read design_id as a string and convert to Guid, handle null values
+                            Guid? designId = new Guid((byte[])reader["design_id"]);
                             orders.Add(new AdminInitial
                             {
-                                designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                designId = designId,
                                 designName = reader.GetString(reader.GetOrdinal("design_name")),
                             });
                         }
@@ -2661,7 +2670,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     string sql = @"
 SELECT 
     suborder_id, order_id, customer_id, employee_id, created_at, status, 
-    HEX(design_id) as design_id, design_name, price, quantity, 
+    design_id, design_name, price, quantity, 
     last_updated_by, last_updated_at, is_active, description, 
     flavor, size, customer_name, employee_name, shape, color, pastry_id 
 FROM suborders 
@@ -2679,6 +2688,9 @@ WHERE customer_id = @customerId AND status IN('cart')";
 
                                 double ingredientPrice = reader.GetDouble(reader.GetOrdinal("price"));
 
+                                // Read design_id as a string and convert to Guid, handle null values
+                                Guid? designId = new Guid((byte[])reader["design_id"]);
+
                                 orders.Add(new Cart
                                 {
                                     suborderId = suborderId,
@@ -2686,11 +2698,11 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    designId = designId,
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = ingredientPrice, // Use finalPrice instead of raw price
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                    description = reader.IsDBNull(reader.GetOrdinal("description"))? null: reader.GetString(reader.GetOrdinal("description")),
+                                    description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
                                     flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                     size = reader.GetString(reader.GetOrdinal("size")),
                                 });
@@ -2950,7 +2962,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
 
                 string sql = @"
 SELECT 
-    HEX(design_id) as design_id, design_name 
+    design_id, design_name 
 FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -2962,10 +2974,12 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     {
                         while (await reader.ReadAsync())
                         {
+                            // Read design_id as a string and convert to Guid, handle null values
+                            Guid? designId = new Guid((byte[])reader["design_id"]);
 
                             orders.Add(new CustomerInitial
                             {
-                                designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                designId = designId,
                                 designName = reader.GetString(reader.GetOrdinal("design_name")),
                             });
                         }
@@ -3052,7 +3066,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     string sql = @"
     SELECT 
         suborder_id, order_id, customer_id, created_at, status, 
-        HEX(design_id) as design_id, design_name, price, quantity, 
+        design_id, design_name, price, quantity, 
         last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
     FROM suborders 
     WHERE customer_id = @customerId AND status IN('assigning artist', 'baking', 'for approval')";
@@ -3086,6 +3100,9 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                 // Calculate final price
                                 double finalPrice = ingredientPrice + addonPrice;
 
+                                // Read design_id as a string and convert to Guid, handle null values
+                                Guid? designId = new Guid((byte[])reader["design_id"]);
+
                                 orders.Add(new toPayInitial
                                 {
                                     Id = orderId, // Handle null values for orderId
@@ -3093,7 +3110,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     customerId = customerIdFromDb,
                                     createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
-                                    designId = FromHexString(reader.GetString(reader.GetOrdinal("design_id"))),
+                                    designId = designId,
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = finalPrice,
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -3161,7 +3178,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     string sql = @"
     SELECT 
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
-                HEX(design_id) as design_id, design_name, price, quantity, 
+                design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
                 flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
@@ -3288,9 +3305,9 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     await connection.OpenAsync();
 
                     string sql = @"
-                SELECT 
+                SELECT
                     suborder_id, order_id, customer_id, created_at, status, 
-                    HEX(design_id) as design_id, design_name, price, quantity, 
+                    design_id, design_name, price, quantity, 
                     last_updated_by, last_updated_at, is_active, customer_name, pastry_id 
                 FROM suborders 
                 WHERE customer_id = @customerId AND status = 'for pick up'";
@@ -3426,7 +3443,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     string sql = @"
     SELECT 
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
-                HEX(design_id) as design_id, design_name, price, quantity, 
+                design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
                 flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
@@ -3595,7 +3612,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                     string sql = @"
             SELECT 
                 suborder_id, order_id, customer_id, employee_id, created_at, status, 
-                HEX(design_id) as design_id, design_name, price, quantity, 
+                design_id, design_name, price, quantity, 
                 last_updated_by, last_updated_at, is_active, description, 
                 flavor, size, customer_name, employee_name, shape, color, pastry_id 
             FROM suborders 
@@ -3771,7 +3788,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 string suborderSql = @"
     SELECT 
         suborder_id, order_id, customer_id, employee_id, created_at, status, 
-        HEX(design_id) as design_id, design_name, price, quantity, 
+        design_id, design_name, price, quantity, 
         last_updated_by, last_updated_at, is_active, description, 
         flavor, size, customer_name, employee_name, shape, color, pastry_id 
     FROM suborders 
@@ -4256,21 +4273,16 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             return binary16String;
         }
 
-        private byte[] FromHexString(string hexString)
+        public static Guid FromHexString(string hexString)
         {
-            // Remove the leading "0x" if present
-            if (hexString.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-            {
-                hexString = hexString.Substring(2);
-            }
+            // Convert the hex string to a byte array
+            byte[] bytes = Enumerable.Range(0, hexString.Length)
+                                     .Where(x => x % 2 == 0)
+                                     .Select(x => Convert.ToByte(hexString.Substring(x, 2), 16))
+                                     .ToArray();
 
-            // Convert the hexadecimal string to a byte array
-            byte[] bytes = new byte[hexString.Length / 2];
-            for (int i = 0; i < bytes.Length; i++)
-            {
-                bytes[i] = Convert.ToByte(hexString.Substring(i * 2, 2), 16);
-            }
-            return bytes;
+            // Create a Guid from the byte array
+            return new Guid(bytes);
         }
 
 
@@ -5467,7 +5479,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
             {
                 await connection.OpenAsync();
 
-                string designQuery = "SELECT display_name FROM designs WHERE design_id = UNHEX(@displayName)";
+                string designQuery = "SELECT display_name FROM designs WHERE design_id = @displayName";
                 using (var designcommand = new MySqlCommand(designQuery, connection))
                 {
                     designcommand.Parameters.AddWithValue("@displayName", design);
