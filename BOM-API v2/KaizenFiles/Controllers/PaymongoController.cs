@@ -166,6 +166,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             Debug.Write("Customer not found for the given order.");
                         }
 
+                        // Call CreatePayMongoWebhook to register the webhook for this payment link
+                        await CreatePayMongoWebhook();
+
+
                         // Return the deserialized PayMongo response
                         return Ok(payMongoResponse);
                     }
@@ -306,6 +310,123 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
+
+
+        [HttpPost("/culo-api/v1/webhooks/paymongo")]
+        public async Task<IActionResult> HandlePayMongoWebhook([FromBody] PayMongoWebhookEvent webhookEvent)
+        {
+            // Check if the webhook event is valid and if it's the event we're interested in
+            if (webhookEvent == null || webhookEvent.attributes == null)
+            {
+                return BadRequest("Invalid webhook event structure.");
+            }
+
+            try
+            {
+                // Extract the necessary information from the webhook payload
+                var paymentLinkId = webhookEvent.id;
+                var status = webhookEvent.attributes.status; // Changed from events[0] to status
+
+                // Check if the status is "paid"
+                if (status.ToLower() == "paid") // Assuming "paid" is the status you are checking
+                {
+                    Debug.WriteLine("Your payment has been paid!");
+
+                    // Return a success message
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Your payment is successful." // Add the message here
+                    });
+                }
+                else
+                {
+                    return BadRequest(new { success = false, message = "Payment not successful." });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing PayMongo webhook.");
+                return StatusCode(500, new { success = false, message = "Internal server error." });
+            }
+        }
+
+
+        /*[HttpPost("/culo-api/v1/create-webhook")]
+        public async Task<IActionResult> SetupWebhook()
+        {
+            try
+            {
+                // Create the webhook
+                var response = await CreatePayMongoWebhook();
+
+                // Log the successful response
+                Debug.WriteLine("Webhook created successfully: " + response);
+
+                return Ok(new { success = true, response });
+            }
+            catch (Exception ex)
+            {
+                // Log the full exception message and stack trace
+                Debug.WriteLine("Error setting up webhook: " + ex.ToString());
+                return StatusCode(500, "Internal server error.");
+            }
+        }*/
+
+        private async Task<string> CreatePayMongoWebhook()
+        {
+            var options = new RestClientOptions("https://api.paymongo.com/v1/webhooks")
+            {
+                ThrowOnAnyError = false // Disable throwing on errors to handle them manually
+            };
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            request.AddHeader("accept", "application/json");
+            request.AddHeader("authorization", "Basic c2tfdGVzdF9hdE53NnFHbkRBZnpjWld5Tkp1cmt5Z2M6");
+
+            // Hardcoded values for webhook creation
+            string webhookUrl = "https://resentekaizen280-001-site1.etempurl.com/culo-api/v1/webhooks/paymongo";
+            var events = new[] { "link.payment.paid" };
+
+            // Create the JSON body
+            var jsonBody = new
+            {
+                data = new
+                {
+                    attributes = new
+                    {
+                        url = webhookUrl,
+                        events = events
+                    }
+                }
+            };
+
+            // Log the JSON body for debugging
+            Debug.WriteLine("Request JSON: " + JsonConvert.SerializeObject(jsonBody));
+
+            request.AddJsonBody(jsonBody);
+
+            // Send the POST request
+            var response = await client.PostAsync(request);
+
+            // Check for successful response
+            if (response.IsSuccessful)
+            {
+                return response.Content; // Returns the JSON response from PayMongo
+            }
+            else
+            {
+                // Log detailed error information
+                Debug.WriteLine($"Error Status Code: {response.StatusCode}");
+                Debug.WriteLine($"Error Headers: {string.Join(", ", response.Headers.Select(h => $"{h.Name}: {h.Value}"))}");
+                Debug.WriteLine($"Error Content: {response.Content}");
+
+                // Throw a specific exception for further handling in SetupWebhook
+                throw new HttpRequestException($"Request failed with status code {response.StatusCode}: {response.Content}");
+            }
+        }
+
 
         private async Task NotifyAsync(string userId, string message)
         {

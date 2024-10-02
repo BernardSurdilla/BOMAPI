@@ -1,10 +1,27 @@
 ﻿namespace BOM_API_v2.KaizenFiles.Models
 {
-    public class SetPayment
+
+    public class PayMongoWebhookEvent
     {
-        public double amount { get; set; }
-        public string option { get; set; }
+        public string id { get; set; }
+        public string type { get; set; }
+        public WebhookAttributes attributes { get; set; }
     }
+
+    public class WebhookAttributes
+    {
+        public int amount { get; set; }
+        public bool archived { get; set; }
+        public string currency { get; set; }
+        public string description { get; set; }
+        public bool livemode { get; set; }
+        public int fee { get; set; }
+        public string remarks { get; set; }
+        public string status { get; set; }
+        public int tax_amount { get; set; }
+    }
+
+
     public class PaymentRequest
     {
         public string option {  set; get; }
