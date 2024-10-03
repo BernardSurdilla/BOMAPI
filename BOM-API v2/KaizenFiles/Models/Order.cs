@@ -225,7 +225,14 @@ namespace CRUDFI.Models
         public string status { get; set; }
         public string type { get; set; }
         public string designName { get; set; }
+        public Prices price { get; set; }
         public DateTime? pickup { get; set; }
+    }
+
+    public class Prices
+    {
+        public double full { get; set; }
+        public double half { get; set;}
     }
 
     public class toPayInitial

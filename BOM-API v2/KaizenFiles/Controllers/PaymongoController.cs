@@ -48,10 +48,16 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)
         {
-            if (string.IsNullOrWhiteSpace(orderId))
+
+            string orderIdB = ConvertGuidToBinary16(orderId).ToLower();
+
+            bool isApprove = await IsOrderStatusToPayAsync(orderIdB);
+
+            if (!isApprove)
             {
-                return BadRequest("Query parameter 'orderId' is required.");
+                return BadRequest("Your order is not yet approved by owner");
             }
+
             else
             {
 
@@ -118,15 +124,54 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        public async Task<bool> IsOrderStatusToPayAsync(string orderId)
+        {
+            // Define the SQL query to check the status
+            string sql = @"SELECT status FROM orders 
+                   WHERE order_id = UNHEX(@orderId)";
+
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        // Add the orderId parameter to the query
+                        command.Parameters.AddWithValue("@orderId", orderId);
+
+                        // Execute the query and retrieve the status
+                        var status = await command.ExecuteScalarAsync();
+
+                        // Check if the status is 'to pay'
+                        return status != null && status.ToString() == "to pay";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle or log the exception as necessary
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return false;
+            }
+        }
+
+
         [HttpPost("/culo-api/v1/custom/{customorderId}/payment")]
         [ProducesResponseType(typeof(PaymentRequestResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateCustomPaymentLink(string customorderId, [FromBody] PaymentRequest paymentRequest)
         {
-            if (string.IsNullOrWhiteSpace(customorderId))
+            string orderIdB = ConvertGuidToBinary16(customorderId).ToLower();
+
+            bool isApprove = await IsCustomOrderStatusToPayAsync(orderIdB);
+
+            if (!isApprove)
             {
-                return BadRequest("Query parameter 'orderId' is required.");
+                return BadRequest("Your order is not yet approved by owner");
             }
+
             else
             {
 
@@ -186,6 +231,38 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     _logger.LogError(ex, "Error processing the payment link.");
                     return StatusCode(500, "Internal server error.");
                 }
+            }
+        }
+
+        public async Task<bool> IsCustomOrderStatusToPayAsync(string customorderId)
+        {
+            // Define the SQL query to check the status
+            string sql = @"SELECT status FROM customorders 
+                   WHERE custom_id = UNHEX(@orderId)";
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        // Add the orderId parameter to the query
+                        command.Parameters.AddWithValue("@orderId", customorderId);
+
+                        // Execute the query and retrieve the status
+                        var status = await command.ExecuteScalarAsync();
+
+                        // Check if the status is 'to pay'
+                        return status != null && status.ToString() == "to pay";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle or log the exception as necessary
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                return false;
             }
         }
 
@@ -363,12 +440,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("{customorderId}/custom-order/update-status")]
+        [HttpPost("{orderId}/custom-order/update-status")]
         [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
-        public async Task<IActionResult> PostCustomOrder(string customorderId, [FromBody] GetRequest request)
+        public async Task<IActionResult> PostCustomOrder(string orderId, [FromBody] GetRequest request)
         {
             // Log the request details
-            _logger.LogInformation($"Received PostOrder request for OrderId: {customorderId}");
+            _logger.LogInformation($"Received PostOrder request for OrderId: {orderId}");
 
             try
             {
@@ -421,7 +498,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
 
                     // Proceed with further processing once the status is "paid"
-                    string orderIdBinary = ConvertGuidToBinary16(customorderId).ToLower();
+                    string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
                     double totalPrice = await GetTotalPriceForCustomOrdersAsync(orderIdBinary);
 
                     double indicator = payMongoResponse.data[0].attributes.amount / 100;
@@ -480,17 +557,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
 
                     // Retrieve suborder IDs
-                    List<byte[]> suborderIds = await GetSuborderId(orderIdBinary);
-                    if (suborderIds == null || suborderIds.Count == 0)
+                    List<byte[]> customIds = await GetCustomId(orderIdBinary);
+                    if (customIds == null || customIds.Count == 0)
                     {
                         return NotFound("No suborder ID found for the given order ID.");
                     }
 
                     // Update each suborder status
-                    foreach (var suborderId in suborderIds)
+                    foreach (var customId in customIds)
                     {
-                        Debug.WriteLine(BitConverter.ToString(suborderId));
-                        await UpdateSuborderStatus(suborderId);
+                        Debug.WriteLine(BitConverter.ToString(customId));
+                        await UpdateCustomorderStatus(customId);
                     }
 
                     // Call the method to get customer ID and name
@@ -984,6 +1061,42 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        async Task<List<byte[]>> GetCustomId(string orderIdBinary)
+        {
+            List<byte[]> customIds = new List<byte[]>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Specify the columns you want to select
+                string sql = "SELECT custom_id FROM customorders WHERE order_id = UNHEX(@orderId)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    // Use ExecuteReaderAsync to execute the SELECT query
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            // Return the binary value of suborder_id directly
+                            byte[] customBytes = (byte[])reader["custom_id"];
+
+                            // Debug.WriteLine to display the value of suborderIdBytes
+                            Debug.WriteLine($"Suborder ID bytes for order ID '{orderIdBinary}': {BitConverter.ToString(customBytes)}");
+
+                            // Add each suborder_id to the list
+                            customIds.Add(customBytes);
+                        }
+                    }
+                }
+            }
+
+            // Return the list of suborder_id byte arrays
+            return customIds;
+        }
 
         async Task<List<byte[]>> GetSuborderId(string orderIdBinary)
         {
@@ -1029,6 +1142,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 await connection.OpenAsync();
 
                 string sqlUpdate = "UPDATE suborders SET status = 'assigning artist' WHERE suborder_id = @orderId";
+
+                using (var command = new MySqlCommand(sqlUpdate, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+        private async Task UpdateCustomorderStatus(byte[] orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sqlUpdate = "UPDATE customorders SET status = 'assigning artist' WHERE custom_id = @orderId";
 
                 using (var command = new MySqlCommand(sqlUpdate, connection))
                 {
