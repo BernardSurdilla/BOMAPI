@@ -167,9 +167,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         }
 
                         // Call CreatePayMongoWebhook to register the webhook for this payment link
-                        await CreatePayMongoWebhook();
+                        //await CreatePayMongoWebhook();
 
-
+                        
                         // Return the deserialized PayMongo response
                         return Ok(payMongoResponse);
                     }
