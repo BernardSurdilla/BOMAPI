@@ -323,7 +323,7 @@ namespace BOM_API_v2.Controllers
         public async Task<IActionResult> AddNewDesign(PostDesign input)
         {
             Guid newEntryId = Guid.NewGuid();
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             Designs newEntry = new Designs();
             newEntry.design_id = newEntryId;

@@ -216,7 +216,7 @@ namespace BOM_API_v2.Controllers
 
             PastryMaterials newPastryMaterialEntry = new PastryMaterials();
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             string newPastryMaterialId = await IdFormat.GetNewestPastryMaterialId(_context);
 
             newPastryMaterialEntry.pastry_material_id = newPastryMaterialId;
@@ -354,7 +354,7 @@ namespace BOM_API_v2.Controllers
                 }
             }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             string lastPastryMaterialSubVariantId = await IdFormat.GetNewestPastryMaterialSubVariantId(_context);
 
             PastryMaterialSubVariants newSubMaterialDbEntry = new PastryMaterialSubVariants();
@@ -427,7 +427,7 @@ namespace BOM_API_v2.Controllers
             try { currentPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(pastry_material_id, _context); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             _context.PastryMaterials.Update(currentPastryMaterial);
             currentPastryMaterial.design_id = entry.designId;
@@ -454,7 +454,7 @@ namespace BOM_API_v2.Controllers
             try { await DataVerification.IsIngredientItemValid(entry.itemId, entry.ingredientType, entry.amountMeasurement, _context, _kaizenTables); }
             catch (Exception e) { return BadRequest(new { message = e.Message }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             _context.Ingredients.Update(currentIngredient);
             currentIngredient.item_id = entry.itemId;
@@ -503,7 +503,7 @@ namespace BOM_API_v2.Controllers
 
             if (importanceForSelectedIngredient != null) return BadRequest(new { message = "Importance entry for the item with the id " + entry.itemId + " and ingredient type " + entry.ingredientType + " already exists, please modify that instead" });
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             _context.PastryMaterialIngredientImportance.Update(currentIngredientImportance);
             currentIngredientImportance.item_id = entry.itemId;
@@ -535,7 +535,7 @@ namespace BOM_API_v2.Controllers
             _context.PastryMaterialAddOns.Update(currentPastryMaterialAddOn);
             currentPastryMaterialAddOn.add_ons_id = selectedAddOn.add_ons_id;
             currentPastryMaterialAddOn.amount = entry.amount;
-            currentPastryMaterialAddOn.last_modified_date = DateTime.Now;
+            currentPastryMaterialAddOn.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             await _context.SaveChangesAsync();
 
@@ -554,7 +554,7 @@ namespace BOM_API_v2.Controllers
             if (currentPastryMaterial.main_variant_name.Equals(entry.subVariantName)) { return BadRequest(new { message = "Sub variants cannot have the same name as the main variant" }); }
 
             _context.PastryMaterialSubVariants.Update(currentPastryMaterialSubVariant);
-            currentPastryMaterialSubVariant.last_modified_date = DateTime.Now;
+            currentPastryMaterialSubVariant.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             currentPastryMaterialSubVariant.sub_variant_name = entry.subVariantName;
             await _context.SaveChangesAsync();
 
@@ -584,7 +584,7 @@ namespace BOM_API_v2.Controllers
             currentPastryMaterialSubVariantIngredient.ingredient_type = entry.ingredientType;
             currentPastryMaterialSubVariantIngredient.amount = entry.amount;
             currentPastryMaterialSubVariantIngredient.amount_measurement = entry.amountMeasurement;
-            currentPastryMaterialSubVariantIngredient.last_modified_date = DateTime.Now;
+            currentPastryMaterialSubVariantIngredient.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH", "Update sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
@@ -612,7 +612,7 @@ namespace BOM_API_v2.Controllers
             _context.PastryMaterialSubVariantAddOns.Update(currentPastryMaterialSubVariantAddOn);
             currentPastryMaterialSubVariantAddOn.add_ons_id = selectedAddOn.add_ons_id;
             currentPastryMaterialSubVariantAddOn.amount = entry.amount;
-            currentPastryMaterialSubVariantAddOn.last_modified_date = DateTime.Now;
+            currentPastryMaterialSubVariantAddOn.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             await _context.SaveChangesAsync();
 
@@ -629,7 +629,7 @@ namespace BOM_API_v2.Controllers
 
             if (currentPastryMaterial == null) { return NotFound(new { message = "No Pastry Material with the specified id found." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             List<Ingredients> ingredients = await _context.Ingredients.Where(x => x.pastry_material_id == pastry_material_id && x.is_active == true).ToListAsync();
 
@@ -658,7 +658,7 @@ namespace BOM_API_v2.Controllers
             try { ingredientAboutToBeDeleted = await DataRetrieval.GetPastryMaterialIngredientAsync(pastry_material_id, ingredient_id, _context); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             _context.Ingredients.Update(ingredientAboutToBeDeleted);
             ingredientAboutToBeDeleted.last_modified_date = currentTime;
             ingredientAboutToBeDeleted.is_active = false;
@@ -678,7 +678,7 @@ namespace BOM_API_v2.Controllers
             try { currentIngredientImportance = await DataRetrieval.GetPastryMaterialIngredientImportanceAsync(pastry_material_id, pastry_material_ingredient_importance_id, _context); }
             catch (Exception e) { return NotFound(new { message = e.Message }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             _context.PastryMaterialIngredientImportance.Update(currentIngredientImportance);
             currentIngredientImportance.last_modified_date = currentTime;
@@ -703,7 +703,7 @@ namespace BOM_API_v2.Controllers
 
             _context.PastryMaterialAddOns.Update(currentPastryMaterialAddOn);
             currentPastryMaterialAddOn.is_active = false;
-            currentPastryMaterialAddOn.last_modified_date = DateTime.Now;
+            currentPastryMaterialAddOn.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             await _context.SaveChangesAsync();
 
@@ -722,7 +722,7 @@ namespace BOM_API_v2.Controllers
 
             _context.PastryMaterialSubVariants.Update(currentPastryMaterialSubVariant);
             currentPastryMaterialSubVariant.is_active = false;
-            currentPastryMaterialSubVariant.last_modified_date = DateTime.Now;
+            currentPastryMaterialSubVariant.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id);
@@ -745,7 +745,7 @@ namespace BOM_API_v2.Controllers
 
             _context.PastryMaterialSubVariantIngredients.Update(currentPastryMaterialSubVariantIngredient);
             currentPastryMaterialSubVariantIngredient.is_active = false;
-            currentPastryMaterialSubVariantIngredient.last_modified_date = DateTime.Now;
+            currentPastryMaterialSubVariantIngredient.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
@@ -768,7 +768,7 @@ namespace BOM_API_v2.Controllers
 
             _context.PastryMaterialSubVariantAddOns.Update(currentPastryMaterialSubVariantAddOn);
             currentPastryMaterialSubVariantAddOn.is_active = false;
-            currentPastryMaterialSubVariantAddOn.last_modified_date = DateTime.Now;
+            currentPastryMaterialSubVariantAddOn.last_modified_date = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             await _context.SaveChangesAsync();
 

@@ -198,7 +198,7 @@ namespace LiveChat
             {
                 senderConnectionId = connectionId,
                 senderMessage = message,
-                senderMessageTimeSent = DateTime.Now
+                senderMessageTimeSent = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"))
             };
 
             if (senderAccount == null)

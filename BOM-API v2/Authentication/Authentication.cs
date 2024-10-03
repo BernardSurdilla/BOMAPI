@@ -147,7 +147,7 @@ namespace JWTAuthentication.Controllers
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
 
             };
-
+                
                 foreach (var userRole in userRoles)
                 {
                     authClaims.Add(new Claim(ClaimTypes.Role, userRole));
@@ -158,7 +158,7 @@ namespace JWTAuthentication.Controllers
                 var token = new JwtSecurityToken(
                     issuer: _configuration.GetSection("JWT").GetValue<string>("ValidIssuer"),
                     audience: _configuration.GetSection("JWT").GetValue<string>("ValidAudience"),
-                    expires: DateTime.Now.AddHours(3),
+                    expires: TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
                     claims: authClaims,
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                     );
@@ -187,7 +187,7 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now,
+                JoinDate = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
                 PhoneNumber = model.ContactNumber,
             };
 
@@ -221,7 +221,7 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now,
+                JoinDate = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
                 PhoneNumber = model.ContactNumber,
             };
 
@@ -254,7 +254,7 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now,
+                JoinDate = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
                 PhoneNumber = model.ContactNumber,
             };
 
@@ -290,7 +290,7 @@ namespace JWTAuthentication.Controllers
                 Email = model.Email,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 UserName = model.Username,
-                JoinDate = DateTime.Now,
+                JoinDate = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
                 PhoneNumber = model.ContactNumber,
             };
 
@@ -380,7 +380,7 @@ namespace JWTAuthentication.Controllers
 
             string currentEmailConfirmationKey = Convert.ToBase64String(new HMACSHA256().Key);
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             EmailConfirmationKeys? currentUserKey = null;
 
             try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
@@ -427,7 +427,7 @@ namespace JWTAuthentication.Controllers
             if (currentUser == null) { return NotFound(new { message = "User not found." }); }
             if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             EmailConfirmationKeys? currentUserKey = null;
 
             try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }

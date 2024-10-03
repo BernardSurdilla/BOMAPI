@@ -611,7 +611,7 @@ namespace API_TEST.Controllers
             {
                 ingredient_subtraction_history_id = new Guid(),
                 item_subtraction_info = dataForSubtractionHistory,
-                date_subtracted = DateTime.Now,
+                date_subtracted = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
             };
             await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
 
@@ -710,7 +710,7 @@ namespace API_TEST.Controllers
             {
                 ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId,
                 item_subtraction_info = dataForSubtractionHistory,
-                date_subtracted = DateTime.Now,
+                date_subtracted = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
             };
             await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
             await _context.SaveChangesAsync();

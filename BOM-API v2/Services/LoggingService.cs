@@ -52,7 +52,7 @@ namespace BillOfMaterialsAPI.Services
                     currentUserData.Email == null ? "N/A" : currentUserData.Email,
                     transaction_type,
                     transaction_description,
-                    DateTime.Now
+                    TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"))
                     );
 
             _logs.TransactionLogs.Add(newLog);
@@ -82,7 +82,7 @@ namespace BillOfMaterialsAPI.Services
                     email == null ? "N/A" : email,
                     "LOGIN",
                     "User " + userName + " logged in.",
-                    DateTime.Now
+                    TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"))
                     );
 
             _logs.TransactionLogs.Add(newLog);

@@ -521,7 +521,7 @@ namespace BillOfMaterialsAPI.Controllers
             if (selectedPastryMaterialsEntry.is_active == true) { return NotFound(new { message = "Specified pastry materials with the selected pastry_material_id still exists." }); }
 
             _context.PastryMaterials.Update(selectedPastryMaterialsEntry);
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             selectedPastryMaterialsEntry.last_modified_date = currentTime;
             selectedPastryMaterialsEntry.is_active = true;
 
@@ -579,7 +579,7 @@ namespace BillOfMaterialsAPI.Controllers
 
             if (selectedIngredientEntry.pastry_material_id != pastry_material_id) { NotFound(new { message = "Specified ingredient with the selected ingredient_id does not exist in" + pastry_material_id + "." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             switch (selectedIngredientEntry.ingredient_type)
             {
@@ -633,7 +633,7 @@ namespace BillOfMaterialsAPI.Controllers
             if (materialAboutToBeRestored == null) { return NotFound(new { message = "Specified material with the selected material_id not found." }); }
             if (materialAboutToBeRestored.is_active == true) { return NotFound(new { message = "Specified material with the selected material_id still exists." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             _context.Materials.Update(materialAboutToBeRestored);
             materialAboutToBeRestored.last_modified_date = currentTime;
             materialAboutToBeRestored.is_active = true;
@@ -765,7 +765,7 @@ namespace BillOfMaterialsAPI.Controllers
             if (materialIngredientAboutToBeRestored == null) { return NotFound(new { message = "Specified material ingredient with the selected material_ingredient_id not found." }); }
             if (materialIngredientAboutToBeRestored.is_active == true) { return BadRequest(new { message = "Specified material ingredient with the selected material_ingredient_id still exists." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             switch (materialIngredientAboutToBeRestored.ingredient_type)
             {

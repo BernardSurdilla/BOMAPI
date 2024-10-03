@@ -377,7 +377,7 @@
                 Materials newMaterialsEntry = new Materials();
                 List<MaterialIngredients> newIngredientsEntry = new List<MaterialIngredients>();
 
-                DateTime currentTime = DateTime.Now;
+                DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
                 string lastMaterialId = "";
                 string lastMaterialIngredientId = "";
@@ -530,7 +530,7 @@
                 MaterialIngredients currentMatIng = new MaterialIngredients();
                 string newMaterialIngredientId = IdFormat.IncrementId(IdFormat.materialIngredientIdFormat, IdFormat.idNumLength, lastMaterialIngredientId);
 
-                DateTime currentTime = DateTime.Now;
+                DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
                 currentMatIng.material_id = material_id;
                 currentMatIng.item_id = i.item_id;
@@ -568,7 +568,7 @@
             if (materialAboutToBeUpdated.isActive == false) { return NotFound(new { message = "Specified material entry with the selected material_id not found or deleted." }); }
             if (ValidUnits.IsUnitValid(entry.amount_measurement) == false) { return BadRequest(new { message = "The measurement unit " + entry.amount_measurement + " is not valid" }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             _context.Materials.Update(materialAboutToBeUpdated);
             materialAboutToBeUpdated.material_name = entry.material_name;
@@ -621,7 +621,7 @@
                     return NotFound(new { message = "Something went wrong, this is caused by the invalid entry in the column ingredient_type in the database." }); ;
             }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             _context.MaterialIngredients.Update(materialIngredientAboutToBeUpdated);
             materialIngredientAboutToBeUpdated.item_id = entry.item_id;
@@ -648,7 +648,7 @@
             if (materialAboutToBeDeleted == null) { return NotFound(new { message = "Specified material with the selected material_id not found." }); }
             if (materialAboutToBeDeleted.isActive == false) { return NotFound(new { message = "Specified material with the selected material_id already deleted." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             _context.Materials.Update(materialAboutToBeDeleted);
             materialAboutToBeDeleted.last_modified_date = currentTime;
             materialAboutToBeDeleted.isActive = false;
@@ -706,7 +706,7 @@
             if (materialIngredientAboutToBeDeleted == null) { return NotFound(new { message = "Specified material ingredient with the selected material_ingredient_id not found." }); }
             if (materialIngredientAboutToBeDeleted.isActive == false) { return NotFound(new { message = "Specified material ingredient with the selected material_ingredient_id already deleted." }); }
 
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             _context.MaterialIngredients.Update(materialIngredientAboutToBeDeleted);
             materialIngredientAboutToBeDeleted.last_modified_date = currentTime;
             materialIngredientAboutToBeDeleted.isActive = false;

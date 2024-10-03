@@ -605,7 +605,7 @@ namespace BillOfMaterialsAPI.Helpers
             string response = "";
 
             Ingredients newIngredientsEntry = new Ingredients();
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             newIngredientsEntry.ingredient_id = ingredient_id;
 
@@ -632,7 +632,7 @@ namespace BillOfMaterialsAPI.Helpers
             response = Guid.NewGuid();
 
             PastryMaterialIngredientImportance newIngredientImportanceEntry = new PastryMaterialIngredientImportance();
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             newIngredientImportanceEntry.pastry_material_ingredient_importance_id = response;
             newIngredientImportanceEntry.pastry_material_id = pastry_material_id;
@@ -654,7 +654,7 @@ namespace BillOfMaterialsAPI.Helpers
             string response = "";
 
             PastryMaterialAddOns newAddOnEntry = new PastryMaterialAddOns();
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             newAddOnEntry.pastry_material_add_on_id = pastry_material_add_on_id;
 
@@ -676,7 +676,7 @@ namespace BillOfMaterialsAPI.Helpers
             string response = "";
 
             PastryMaterialSubVariantIngredients newSubVariantIngredient = new PastryMaterialSubVariantIngredients();
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             newSubVariantIngredient.pastry_material_sub_variant_ingredient_id = pastry_material_sub_variant_ingredient_id;
 
@@ -702,7 +702,7 @@ namespace BillOfMaterialsAPI.Helpers
             string response = "";
 
             PastryMaterialSubVariantAddOns newSubVariantAddOn = new PastryMaterialSubVariantAddOns();
-            DateTime currentTime = DateTime.Now;
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
 
             newSubVariantAddOn.pastry_material_sub_variant_add_on_id = pastry_material_sub_variant_add_on_id;
             newSubVariantAddOn.pastry_material_sub_variant_id = pastry_material_sub_variant_id;
