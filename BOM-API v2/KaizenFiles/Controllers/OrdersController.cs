@@ -764,8 +764,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     await connection.OpenAsync();
 
                     // Insert new order into the 'orders' table
-                    string sqlInsert = @"
-                UPDATE orders SET status = 'to pay' WHERE order_id = UNHEX(@orderid)";
+                    string sqlInsert = @"UPDATE orders SET status = 'to pay' WHERE order_id = UNHEX(@orderid) AND status ='for approval'";
 
                     using (var command = new MySqlCommand(sqlInsert, connection))
                     {
@@ -2654,6 +2653,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                 {
                     await connection.OpenAsync();
 
+                    // First, fetch all the suborders
                     string sql = @"
 SELECT 
     suborder_id, order_id, customer_id, employee_id, created_at, status, 
@@ -2684,7 +2684,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
                                     designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
-                                    price = ingredientPrice, // Use finalPrice instead of raw price
+                                    price = ingredientPrice, // Temporarily set price without addons
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
                                     flavor = reader.GetString(reader.GetOrdinal("flavor")),
@@ -2692,6 +2692,13 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                 });
                             }
                         }
+                    }
+
+                    // Now fetch the addons for each suborder and update the prices
+                    foreach (var order in orders)
+                    {
+                        double addonsTotal = await GetAddonsTotalForSuborder(connection, order.suborderId);
+                        order.price += addonsTotal; // Update the final price
                     }
                 }
 
@@ -2706,6 +2713,21 @@ WHERE customer_id = @customerId AND status IN('cart')";
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
+
+        private async Task<double> GetAddonsTotalForSuborder(MySqlConnection connection, Guid suborderId)
+        {
+            string sql = @"SELECT IFNULL(SUM(total), 0) FROM orderaddons WHERE order_id = @suborderId";
+
+            using (var command = new MySqlCommand(sql, connection))
+            {
+                command.Parameters.AddWithValue("@suborderId", suborderId.ToString());
+
+                object result = await command.ExecuteScalarAsync();
+                return result != null ? Convert.ToDouble(result) : 0.0;
+            }
+        }
+
 
         // Private async method to calculate addon price for the order
         private async Task<double> GetAddonPriceAsync(string orderIdBinary)
@@ -2800,9 +2822,8 @@ WHERE customer_id = @customerId AND status IN('cart')";
                         while (await reader.ReadAsync())
                         {
                             Guid? orderId = reader.IsDBNull(reader.GetOrdinal("order_id"))
-                                            ? (Guid?)null
-                                            : new Guid((byte[])reader["order_id"]);
-
+                                             ? (Guid?)null
+                                             : new Guid((byte[])reader["order_id"]);
 
                             // Initialize an AdminInitial object with order details
                             CustomerInitial order = new CustomerInitial
@@ -2810,19 +2831,32 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                 orderId = orderId,
                                 type = reader.GetString(reader.GetOrdinal("type")),
                                 pickup = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
-                                         ? (DateTime?)null
-                                         : reader.GetDateTime(reader.GetOrdinal("pickup_date")),
+                                          ? (DateTime?)null
+                                          : reader.GetDateTime(reader.GetOrdinal("pickup_date")),
+                                payment = reader.GetString(reader.GetOrdinal("payment")),
                                 status = reader.GetString(reader.GetOrdinal("status")),
+                                price = new Prices() // Initialize the price list
                             };
 
-                            // If the order ID is valid, fetch design details and total price
+                            // If the order ID is valid, fetch the total price and design details
                             if (order.orderId.HasValue)
                             {
-                                // Convert order ID to string and pass to FetchDesignAndTotalPriceAsync
+                                // Convert order ID to string and pass to CalculateTotalPriceForOrderAsync
                                 string orderIdString = BitConverter.ToString(order.orderId.Value.ToByteArray()).Replace("-", "").ToLower();
-                                List<CustomerInitial> designDetails = await FetchDesignToPayCustomerAsync(orderIdString);
+                                double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
 
-                                // Append design details (like DesignName and Total) to the order
+                                // Calculate half price
+                                double halfPrice = totalPrice / 2;
+
+                                // Add the total price to the Prices list in the CustomerInitial object
+                                order.price = new Prices
+                                {
+                                    full = totalPrice,  // Assign the total price to the full property
+                                    half = halfPrice    // Assign the half price to the half property
+                                };
+
+                                // Fetch design details (similar to before)
+                                List<CustomerInitial> designDetails = await FetchDesignToPayCustomerAsync(orderIdString);
                                 if (designDetails.Any())
                                 {
                                     order.designId = designDetails.First().designId;
@@ -2838,6 +2872,72 @@ WHERE customer_id = @customerId AND status IN('cart')";
 
             return orders;
         }
+
+        private async Task<double> CalculateTotalPriceForOrderAsync(string orderId)
+        {
+            double totalPrice = 0;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Retrieve the suborder_id and sum of price * quantity from suborders table
+                string sqlSuborders = @"SELECT suborder_id, (price * quantity) AS SuborderTotal
+                                FROM suborders
+                                WHERE order_id = UNHEX(@orderId)";
+                using (var command = new MySqlCommand(sqlSuborders, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            // Get the suborder_id as a string for further usage
+                            string suborderId = BitConverter.ToString((byte[])reader["suborder_id"]).Replace("-", "").ToLower();
+
+                            // Sum the total price for the suborder (price * quantity)
+                            totalPrice += reader.GetDouble(reader.GetOrdinal("SuborderTotal"));
+
+                            // Calculate the addon price for this suborder and add to the total
+                            double addonPrice = await CalculateTotalAddonPriceForSuborderAsync(suborderId);
+                            totalPrice += addonPrice;
+                        }
+                    }
+                }
+            }
+
+            return totalPrice;
+        }
+
+        private async Task<double> CalculateTotalAddonPriceForSuborderAsync(string suborderId)
+        {
+            double addonTotal = 0;
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Sum all the total column from orderaddons table for this suborder
+                string sqlAddons = @"SELECT SUM(total) AS AddonTotal
+                             FROM orderaddons
+                             WHERE order_id = UNHEX(@suborderId)";
+                using (var command = new MySqlCommand(sqlAddons, connection))
+                {
+                    command.Parameters.AddWithValue("@suborderId", suborderId);
+
+                    object result = await command.ExecuteScalarAsync();
+                    if (result != DBNull.Value)
+                    {
+                        addonTotal = Convert.ToDouble(result);
+                    }
+                }
+            }
+
+            return addonTotal;
+        }
+
+
 
         [HttpGet("/culo-api/v1/current-user/for-approval")]
         [ProducesResponseType(typeof(CustomerInitial), StatusCodes.Status200OK)]
