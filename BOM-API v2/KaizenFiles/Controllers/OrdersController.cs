@@ -1525,7 +1525,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -1599,7 +1599,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -1765,7 +1765,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 customId = suborderId,
                                 customerId = customerIdFromDb,
                                 createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                                designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                 Price = Price,
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 customerName = reader.GetString(reader.GetOrdinal("customer_name")),
@@ -1829,7 +1829,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 customId = suborderId,
                                 customerId = customerIdFromDb,
                                 createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                                designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                 Price = reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 customerName = reader.GetString(reader.GetOrdinal("customer_name")),
@@ -1897,7 +1897,7 @@ WHERE customer_id = @id";
                                 employeeId = employeeId,
                                 employeeName = employeeName,
                                 createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                                designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                 Price = Price,
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 designName = reader.IsDBNull(reader.GetOrdinal("design_name")) ? string.Empty : reader.GetString(reader.GetOrdinal("design_name")),
@@ -1994,7 +1994,7 @@ WHERE customer_id = @id";
                                     employeeId = employeeId,
                                     employeeName = employeeName,
                                     createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     price = Price,
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     designName = reader.IsDBNull(reader.GetOrdinal("design_name")) ? string.Empty : reader.GetString(reader.GetOrdinal("design_name")),
@@ -2257,7 +2257,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                         {
                             orders.Add(new AdminInitial
                             {
-                                designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                 designName = reader.GetString(reader.GetOrdinal("design_name")),
                             });
                         }
@@ -2545,7 +2545,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                         employeeId = employeeId,
                                         employeeName = employeeName,
                                         createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                                        designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                        designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                         price = price,
                                         quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                         designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
@@ -2682,7 +2682,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = ingredientPrice, // Use finalPrice instead of raw price
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -2961,7 +2961,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
 
                             orders.Add(new CustomerInitial
                             {
-                                designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                 designName = reader.GetString(reader.GetOrdinal("design_name")),
                             });
                         }
@@ -3090,7 +3090,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     customerId = customerIdFromDb,
                                     createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = finalPrice,
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -3206,7 +3206,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = reader.GetDouble(reader.GetOrdinal("price")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -3335,7 +3335,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     customerId = customerIdFromDb,
                                     createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = finalPrice,
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -3479,7 +3479,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     price = finalPrice,
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
@@ -3635,7 +3635,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                     status = reader.GetString(reader.GetOrdinal("status")),
                                     color = reader.GetString(reader.GetOrdinal("color")),
                                     shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                    designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                     designName = reader.GetString(reader.GetOrdinal("design_name")),
                                     quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                     isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
@@ -3800,7 +3800,7 @@ FROM suborders WHERE order_id = UNHEX(@orderId)";
                                 pastryId = reader.GetString(reader.GetOrdinal("pastry_id")),
                                 color = reader.GetString(reader.GetOrdinal("color")),
                                 shape = reader.GetString(reader.GetOrdinal("shape")),
-                                designId = reader.GetString(reader.GetOrdinal("design_id")),
+                                designId = reader.GetGuid(reader.GetOrdinal("design_id")),
                                 designName = reader.GetString(reader.GetOrdinal("design_name")),
                                 price = reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
