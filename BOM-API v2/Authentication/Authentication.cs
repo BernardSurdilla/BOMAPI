@@ -158,7 +158,7 @@ namespace JWTAuthentication.Controllers
                 var token = new JwtSecurityToken(
                     issuer: _configuration.GetSection("JWT").GetValue<string>("ValidIssuer"),
                     audience: _configuration.GetSection("JWT").GetValue<string>("ValidAudience"),
-                    expires: TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
+                    expires: TimeZoneInfo.ConvertTime(DateTime.Now.AddHours(8), TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
                     claims: authClaims,
                     signingCredentials: new SigningCredentials(authSigningKey, SecurityAlgorithms.HmacSha256)
                     );
