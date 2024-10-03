@@ -17,6 +17,8 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using RestSharp;
 using System;
+using Microsoft.Extensions.Logging;
+using Azure;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -42,6 +44,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpPost("/culo-api/v1/{orderId}/payment")]
+        [ProducesResponseType(typeof(PaymentRequestResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)
         {
@@ -98,7 +101,585 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         // Deserialize the response content into the new PaymentRequestResponse class
                         var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
 
+                        // Return the deserialized PayMongo response
+                        return Ok(payMongoResponse);
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to create PayMongo link: {Content}, Status Code: {StatusCode}", response.Content, response.StatusCode);
+                        return StatusCode((int)response.StatusCode, response.Content);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing the payment link.");
+                    return StatusCode(500, "Internal server error.");
+                }
+            }
+        }
 
+        [HttpPost("/culo-api/v1/custom/{customorderId}/payment")]
+        [ProducesResponseType(typeof(PaymentRequestResponse), StatusCodes.Status200OK)]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> CreateCustomPaymentLink(string customorderId, [FromBody] PaymentRequest paymentRequest)
+        {
+            if (string.IsNullOrWhiteSpace(customorderId))
+            {
+                return BadRequest("Query parameter 'orderId' is required.");
+            }
+            else
+            {
+
+                try
+                {
+                    // Validate the option and amount
+                    if (paymentRequest == null || string.IsNullOrWhiteSpace(paymentRequest.option))
+                    {
+                        return BadRequest("Payment option is required.");
+                    }
+                    string orderIdBinary = ConvertGuidToBinary16(customorderId).ToLower();
+
+                    double totalPrice = await GetTotalPriceForCustomOrdersAsync(orderIdBinary);
+
+                    // Check the option value and modify the amount accordingly
+                    double updatedAmount;
+                    if (paymentRequest.option.ToLower().Trim() == "full")
+                    {
+                        updatedAmount = totalPrice;
+                    }
+                    else if (paymentRequest.option.ToLower().Trim() == "half")
+                    {
+                        updatedAmount = totalPrice / 2;
+                    }
+                    else
+                    {
+                        return BadRequest("Invalid option. Choose either 'full' or 'half'.");
+                    }
+
+                    // Convert the amount to cents (PayMongo expects amounts in cents)
+                    var amountInCents = (int)(updatedAmount * 100);
+
+                    // Set a static description or customize as needed
+                    var description = "Payment for order";
+
+                    // Make the call to PayMongo API
+                    var response = await CreatePayMongoPaymentLink(amountInCents, description);
+                    _logger.LogInformation("PayMongo response: {0}", response.Content);
+
+                    // If the response is successful, deserialize it into our new object model
+                    if (response.IsSuccessful)
+                    {
+                        // Deserialize the response content into the new PaymentRequestResponse class
+                        var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
+
+                        // Return the deserialized PayMongo response
+                        return Ok(payMongoResponse);
+                    }
+                    else
+                    {
+                        _logger.LogError("Failed to create PayMongo link: {Content}, Status Code: {StatusCode}", response.Content, response.StatusCode);
+                        return StatusCode((int)response.StatusCode, response.Content);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error processing the payment link.");
+                    return StatusCode(500, "Internal server error.");
+                }
+            }
+        }
+
+        [HttpPost("{orderId}/update-status")]
+        [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> PostOrder(string orderId, [FromBody] GetRequest request)
+        {
+            // Log the request details
+            _logger.LogInformation($"Received PostOrder request for OrderId: {orderId}");
+
+            try
+            {
+                var response = await GetPaymentLinkAsync(request.reference);
+
+                // Log the response status code and content
+                _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
+
+                // Check if the response is successful
+                if (response.IsSuccessful)
+                {
+                    var payMongoResponse = JsonConvert.DeserializeObject<GetResponse>(response.Content);
+                    var status = payMongoResponse.data[0].attributes.status;
+                    Debug.WriteLine("Initial status: " + status);
+
+                    // Loop until the status is "paid" or until the limit of 5 loops
+                    int loopCount = 0;
+                    while (status != "paid" && loopCount < 6)
+                    {
+                        // Sleep for 10 seconds
+                        await Task.Delay(10000); 
+
+                        // Fetch the payment link again to check the status
+                        response = await GetPaymentLinkAsync(request.reference);
+
+                        // Log the response status code and content
+                        _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
+
+                        // Check if the response is successful
+                        if (response.IsSuccessful)
+                        {
+                            payMongoResponse = JsonConvert.DeserializeObject<GetResponse>(response.Content);
+                            status = payMongoResponse.data[0].attributes.status;
+                            Debug.WriteLine("Updated status: " + status);
+                        }
+                        else
+                        {
+                            // Handle case where fetching the payment link fails
+                            _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
+                            return NotFound("Payment link not found.");
+                        }
+
+                        loopCount++;
+                    }
+
+                    // If the loop count reaches 5 and status is still not "paid"
+                    if (status != "paid")
+                    {
+                        return Ok("Order not paid"); // Return an appropriate message
+                    }
+
+                    // Proceed with further processing once the status is "paid"
+                    string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+                    double ingredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
+                    double addonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
+                    double totalPrice = ingredientPrice + addonPrice;
+                    double indicator = payMongoResponse.data[0].attributes.amount / 100;
+                    double price = totalPrice / 2;
+
+                    Debug.WriteLine("Indicator value: " + indicator);
+                    Debug.WriteLine("Price value: " + price);
+
+                    string option;
+                    double updatedAmount;
+
+                    // Check the option value and modify the amount accordingly
+                    if (indicator == totalPrice)
+                    {
+                        option = "full";
+                    }
+                    else if (indicator == price)
+                    {
+                        option = "half";
+                    }
+                    else
+                    {
+                        return BadRequest("Price/amount is incorrect");
+                    }
+
+                    // Check if the order exists
+                    bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
+                    if (!orderExists)
+                    {
+                        Debug.Write(orderIdBinary);
+                        return NotFound("Order not found");
+                    }
+
+                    Debug.WriteLine("Option: " + option);
+
+                    using (var connection = new MySqlConnection(connectionstring))
+                    {
+                        await connection.OpenAsync();
+
+                        // Prepare the SQL update query
+                        string sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = @option, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
+
+                        // Execute the update command
+                        using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                        {
+                            updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                            updateCommand.Parameters.AddWithValue("@option", option);
+                            updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
+
+                            int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                            if (rowsAffected == 0)
+                            {
+                                return NotFound("Order not found");
+                            }
+                        }
+                    }
+
+                    // Retrieve suborder IDs
+                    List<byte[]> suborderIds = await GetSuborderId(orderIdBinary);
+                    if (suborderIds == null || suborderIds.Count == 0)
+                    {
+                        return NotFound("No suborder ID found for the given order ID.");
+                    }
+
+                    // Update each suborder status
+                    foreach (var suborderId in suborderIds)
+                    {
+                        Debug.WriteLine(BitConverter.ToString(suborderId));
+                        await UpdateSuborderStatus(suborderId);
+                    }
+
+                    // Call the method to get customer ID and name
+                    var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
+
+                    if (customerId != null && customerId.Length > 0)
+                    {
+                        // Convert the byte[] customerId to a hex string
+                        string userId = BitConverter.ToString(customerId).Replace("-", "").ToLower();
+
+                        Debug.Write("Customer ID: " + userId);
+
+                        // Construct the message
+                        string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
+
+                        // Send the notification
+                        await NotifyAsync(userId, message);
+                    }
+                    else
+                    {
+                        // Handle case where customer info is not found
+                        Debug.Write("Customer not found for the given order.");
+                    }
+
+                    // Return the content directly
+                    return Ok(response.Content); // You can choose to return the raw content as needed
+                }
+                else
+                {
+                    // Log an error if the request fails
+                    _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
+                    return NotFound("Payment link not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                _logger.LogError(ex, "Error processing order");
+
+                // Return a 500 Internal Server Error response
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the order.");
+            }
+        }
+
+        [HttpPost("{customorderId}/custom-order/update-status")]
+        [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
+        public async Task<IActionResult> PostCustomOrder(string customorderId, [FromBody] GetRequest request)
+        {
+            // Log the request details
+            _logger.LogInformation($"Received PostOrder request for OrderId: {customorderId}");
+
+            try
+            {
+                var response = await GetPaymentLinkAsync(request.reference);
+
+                // Log the response status code and content
+                _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
+
+                // Check if the response is successful
+                if (response.IsSuccessful)
+                {
+                    var payMongoResponse = JsonConvert.DeserializeObject<GetResponse>(response.Content);
+                    var status = payMongoResponse.data[0].attributes.status;
+                    Debug.WriteLine("Initial status: " + status);
+
+                    // Loop until the status is "paid" or until the limit of 5 loops
+                    int loopCount = 0;
+                    while (status != "paid" && loopCount < 6)
+                    {
+                        // Sleep for 10 seconds
+                        await Task.Delay(10000);
+
+                        // Fetch the payment link again to check the status
+                        response = await GetPaymentLinkAsync(request.reference);
+
+                        // Log the response status code and content
+                        _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
+
+                        // Check if the response is successful
+                        if (response.IsSuccessful)
+                        {
+                            payMongoResponse = JsonConvert.DeserializeObject<GetResponse>(response.Content);
+                            status = payMongoResponse.data[0].attributes.status;
+                            Debug.WriteLine("Updated status: " + status);
+                        }
+                        else
+                        {
+                            // Handle case where fetching the payment link fails
+                            _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
+                            return NotFound("Payment link not found.");
+                        }
+
+                        loopCount++;
+                    }
+
+                    // If the loop count reaches 5 and status is still not "paid"
+                    if (status != "paid")
+                    {
+                        return Ok("Order not paid"); // Return an appropriate message
+                    }
+
+                    // Proceed with further processing once the status is "paid"
+                    string orderIdBinary = ConvertGuidToBinary16(customorderId).ToLower();
+                    double totalPrice = await GetTotalPriceForCustomOrdersAsync(orderIdBinary);
+
+                    double indicator = payMongoResponse.data[0].attributes.amount / 100;
+                    double price = totalPrice / 2;
+
+                    Debug.WriteLine("Indicator value: " + indicator);
+                    Debug.WriteLine("Price value: " + price);
+
+                    string option;
+                    double updatedAmount;
+
+                    // Check the option value and modify the amount accordingly
+                    if (indicator == totalPrice)
+                    {
+                        option = "full";
+                    }
+                    else if (indicator == price)
+                    {
+                        option = "half";
+                    }
+                    else
+                    {
+                        return BadRequest("Price/amount is incorrect");
+                    }
+
+                    // Check if the order exists
+                    bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
+                    if (!orderExists)
+                    {
+                        Debug.Write(orderIdBinary);
+                        return NotFound("Order not found");
+                    }
+
+                    Debug.WriteLine("Option: " + option);
+
+                    using (var connection = new MySqlConnection(connectionstring))
+                    {
+                        await connection.OpenAsync();
+
+                        // Prepare the SQL update query
+                        string sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = @option, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
+
+                        // Execute the update command
+                        using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                        {
+                            updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                            updateCommand.Parameters.AddWithValue("@option", option);
+                            updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
+
+                            int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
+                            if (rowsAffected == 0)
+                            {
+                                return NotFound("Order not found");
+                            }
+                        }
+                    }
+
+                    // Retrieve suborder IDs
+                    List<byte[]> suborderIds = await GetSuborderId(orderIdBinary);
+                    if (suborderIds == null || suborderIds.Count == 0)
+                    {
+                        return NotFound("No suborder ID found for the given order ID.");
+                    }
+
+                    // Update each suborder status
+                    foreach (var suborderId in suborderIds)
+                    {
+                        Debug.WriteLine(BitConverter.ToString(suborderId));
+                        await UpdateSuborderStatus(suborderId);
+                    }
+
+                    // Call the method to get customer ID and name
+                    var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
+
+                    if (customerId != null && customerId.Length > 0)
+                    {
+                        // Convert the byte[] customerId to a hex string
+                        string userId = BitConverter.ToString(customerId).Replace("-", "").ToLower();
+
+                        Debug.Write("Customer ID: " + userId);
+
+                        // Construct the message
+                        string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
+
+                        // Send the notification
+                        await NotifyAsync(userId, message);
+                    }
+                    else
+                    {
+                        // Handle case where customer info is not found
+                        Debug.Write("Customer not found for the given order.");
+                    }
+
+                    // Return the content directly
+                    return Ok(response.Content); // You can choose to return the raw content as needed
+                }
+                else
+                {
+                    // Log an error if the request fails
+                    _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
+                    return NotFound("Payment link not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log the error
+                _logger.LogError(ex, "Error processing order");
+
+                // Return a 500 Internal Server Error response
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the order.");
+            }
+        }
+
+
+        [HttpPost("debug")]
+        [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetInactiveIngredients([FromQuery] string reference)
+        {
+            try
+            {
+                var response = await GetPaymentLinkAsync(reference);
+
+                // Log the response status code and content
+                _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
+
+                // Check if the response is successful
+                if (response.IsSuccessful)
+                {
+                    var payMongoResponse = JsonConvert.DeserializeObject<GetResponse>(response.Content);
+
+                    // Return the content directly
+                    return Ok(response.Content); // You can choose to return the raw content as needed
+                }
+                else
+                {
+                    // Log an error if the request fails
+                    _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
+                    return NotFound("Payment link not found.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while fetching inactive ingredients");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
+
+        private async Task<RestResponse> GetPaymentLinkAsync(string id)
+        {
+            // Build the API call to PayMongo, using the passed id as a query parameter
+            var options = new RestClientOptions($"https://api.paymongo.com/v1/links?reference_number={id}");
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            // Set the headers
+            request.AddHeader("accept", "application/json");
+            request.AddHeader("authorization", "Basic c2tfdGVzdF9hdE53NnFHbkRBZnpjWld5Tkp1cmt5Z2M6");
+
+            // Call the API using GET method and return the raw response
+            return await client.GetAsync(request);
+        }
+
+
+
+
+        /*[HttpPost("/culo-api/v1/webhooks/paymongo")]
+        public async Task<IActionResult> HandlePayMongoWebhook([FromBody] PayMongoWebhookEvent webhookEvent)
+        {
+            // Check if the webhook event is valid and if it's the event we're interested in
+            if (webhookEvent == null || webhookEvent.attributes == null)
+            {
+                return BadRequest("Invalid webhook event structure.");
+            }
+
+            try
+            {
+                // Extract the necessary information from the webhook payload
+                var paymentLinkId = webhookEvent.id;
+                var status = webhookEvent.attributes.status; // Changed from events[0] to status
+
+                // Check if the status is "paid"
+                if (status.ToLower() == "paid") // Assuming "paid" is the status you are checking
+                {
+                    Debug.WriteLine("Your payment has been paid!");
+
+                    // Return a success message
+                    return Ok(new
+                    {
+                        success = true,
+                        message = "Your payment is successful." // Add the message here
+                    });
+                }
+                else
+                {
+                    return BadRequest(new { success = false, message = "Payment not successful." });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing PayMongo webhook.");
+                return StatusCode(500, new { success = false, message = "Internal server error." });
+            }
+        }
+
+        [HttpPost("/culo-api/v1/{orderId}/source")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
+        public async Task<IActionResult> CreatePaymentSource(string orderId, [FromBody] PaymentRequest paymentRequest)
+        {
+            if (string.IsNullOrWhiteSpace(orderId))
+            {
+                return BadRequest("Query parameter 'orderId' is required.");
+            }
+            else
+            {
+
+                try
+                {
+                    // Validate the option and amount
+                    if (paymentRequest == null || string.IsNullOrWhiteSpace(paymentRequest.option))
+                    {
+                        return BadRequest("Payment option is required.");
+                    }
+                    string orderIdBinary = ConvertGuidToBinary16(orderId).ToLower();
+
+                    double ingredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
+
+                    double addonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
+
+                    double totalPrice = ingredientPrice + addonPrice;
+
+                    // Check the option value and modify the amount accordingly
+                    double updatedAmount;
+                    if (paymentRequest.option.ToLower().Trim() == "full")
+                    {
+                        updatedAmount = totalPrice;
+                    }
+                    else if (paymentRequest.option.ToLower().Trim() == "half")
+                    {
+                        updatedAmount = totalPrice / 2;
+                    }
+                    else
+                    {
+                        return BadRequest("Invalid option. Choose either 'full' or 'half'.");
+                    }
+
+                    // Convert the amount to cents (PayMongo expects amounts in cents)
+                    var amountInCents = (int)(updatedAmount * 100);
+
+                    // Make the call to PayMongo API
+                    var response = await CreatePaymentSourceAsync(amountInCents);
+                    _logger.LogInformation("PayMongo response: {0}", response.Content);
+
+                    // If the response is successful, deserialize it into our new object model
+                    if (response.IsSuccessful)
+                    {
+                        // Deserialize the response content into the new PaymentRequestResponse class
+                        var payMongoResponse = JsonConvert.DeserializeObject<SourceResponse>(response.Content);
 
                         // Check if the order exists
                         bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
@@ -169,130 +750,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         // Call CreatePayMongoWebhook to register the webhook for this payment link
                         //await CreatePayMongoWebhook();
 
-                        
-                        // Return the deserialized PayMongo response
-                        return Ok(payMongoResponse);
-                    }
-                    else
-                    {
-                        _logger.LogError("Failed to create PayMongo link: {Content}, Status Code: {StatusCode}", response.Content, response.StatusCode);
-                        return StatusCode((int)response.StatusCode, response.Content);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error processing the payment link.");
-                    return StatusCode(500, "Internal server error.");
-                }
-            }
-        }
-
-        [HttpPost("/culo-api/v1/custom/{customorderId}/payment")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> CreateCustomPaymentLink(string customorderId, [FromBody] PaymentRequest paymentRequest)
-        {
-            if (string.IsNullOrWhiteSpace(customorderId))
-            {
-                return BadRequest("Query parameter 'orderId' is required.");
-            }
-            else
-            {
-
-                try
-                {
-                    // Validate the option and amount
-                    if (paymentRequest == null || string.IsNullOrWhiteSpace(paymentRequest.option))
-                    {
-                        return BadRequest("Payment option is required.");
-                    }
-                    string orderIdBinary = ConvertGuidToBinary16(customorderId).ToLower();
-
-                    double totalPrice = await GetTotalPriceForCustomOrdersAsync(orderIdBinary);
-
-                    // Check the option value and modify the amount accordingly
-                    double updatedAmount;
-                    if (paymentRequest.option.ToLower().Trim() == "full")
-                    {
-                        updatedAmount = totalPrice;
-                    }
-                    else if (paymentRequest.option.ToLower().Trim() == "half")
-                    {
-                        updatedAmount = totalPrice / 2;
-                    }
-                    else
-                    {
-                        return BadRequest("Invalid option. Choose either 'full' or 'half'.");
-                    }
-
-                    // Convert the amount to cents (PayMongo expects amounts in cents)
-                    var amountInCents = (int)(updatedAmount * 100);
-
-                    // Set a static description or customize as needed
-                    var description = "Payment for order";
-
-                    // Make the call to PayMongo API
-                    var response = await CreatePayMongoPaymentLink(amountInCents, description);
-                    _logger.LogInformation("PayMongo response: {0}", response.Content);
-
-                    // If the response is successful, deserialize it into our new object model
-                    if (response.IsSuccessful)
-                    {
-                        // Deserialize the response content into the new PaymentRequestResponse class
-                        var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
-
-
-
-                        // Check if the order exists
-                        bool orderExists = await CheckIfOrderExistsAsync(orderIdBinary);
-                        if (!orderExists)
-                        {
-                            Debug.Write(orderIdBinary);
-                            return NotFound("Order not found");
-                        }
-
-                        using (var connection = new MySqlConnection(connectionstring))
-                        {
-                            await connection.OpenAsync();
-
-                            // Prepare the SQL update query
-                            string sqlUpdate = "UPDATE orders SET status = 'assigning artist', payment = @option, is_active = 1, last_updated_at = @lastUpdatedAt WHERE order_id = UNHEX(@orderId)";
-
-                            // Execute the update command
-                            using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
-                            {
-                                updateCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
-                                updateCommand.Parameters.AddWithValue("@option", paymentRequest.option);
-                                updateCommand.Parameters.AddWithValue("@lastUpdatedAt", DateTime.UtcNow);
-
-                                int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
-                                if (rowsAffected == 0)
-                                {
-                                    return NotFound("Order not found");
-                                }
-                            }
-                        }
-
-                        // Call the method to get customer ID and name
-                        var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
-
-                        if (customerId != null && customerId.Length > 0)
-                        {
-                            // Convert the byte[] customerId to a hex string
-                            string userId = BitConverter.ToString(customerId).Replace("-", "").ToLower();
-
-                            Debug.Write("customer id: " + userId);
-
-                            // Construct the message
-                            string message = ((customerName ?? "Unknown") + " your order has been approved; assigning artist");
-
-                            // Send the notification
-                            await NotifyAsync(userId, message);
-                        }
-                        else
-                        {
-                            // Handle case where customer info is not found
-                            Debug.Write("Customer not found for the given order.");
-                        }
 
                         // Return the deserialized PayMongo response
                         return Ok(payMongoResponse);
@@ -310,49 +767,77 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
+        
 
-
-        [HttpPost("/culo-api/v1/webhooks/paymongo")]
-        public async Task<IActionResult> HandlePayMongoWebhook([FromBody] PayMongoWebhookEvent webhookEvent)
+        private async Task<RestResponse> CreatePaymentSourceAsync(int amount)
         {
-            // Check if the webhook event is valid and if it's the event we're interested in
-            if (webhookEvent == null || webhookEvent.attributes == null)
-            {
-                return BadRequest("Invalid webhook event structure.");
-            }
+            RestResponse response = null;
 
             try
             {
-                // Extract the necessary information from the webhook payload
-                var paymentLinkId = webhookEvent.id;
-                var status = webhookEvent.attributes.status; // Changed from events[0] to status
+                // Build the API call to PayMongo
+                var options = new RestClientOptions("https://api.paymongo.com/v1/sources");
+                var client = new RestClient(options);
+                var request = new RestRequest("", Method.Post);
 
-                // Check if the status is "paid"
-                if (status.ToLower() == "paid") // Assuming "paid" is the status you are checking
+                // Set the headers
+                request.AddHeader("accept", "application/json");
+                request.AddHeader("authorization", "Basic cGtfdGVzdF8yUzdIZW5MRnJ0ajZNTVhIOXlTeDNlc3Q6");
+
+                string currency = "PHP";
+                string success = "https://resentekaizen280-001-site1.etempurl.com/swagger/index.html";
+                string failed = "https://github.com/BernardSurdilla/BOMAPI/pull/111";
+                string type = "gcash";
+
+                // Construct the body for the API request
+                var jsonBody = new
                 {
-                    Debug.WriteLine("Your payment has been paid!");
-
-                    // Return a success message
-                    return Ok(new
+                    data = new
                     {
-                        success = true,
-                        message = "Your payment is successful." // Add the message here
-                    });
+                        attributes = new
+                        {
+                            type = type,
+                            amount = amount,
+                            currency = currency,
+                            redirect = new
+                            {
+                                success = success,
+                                failed = failed,
+                            }
+                        }
+                    }
+                };
+
+                // Add JSON body
+                request.AddJsonBody(jsonBody);
+
+                // Call the API
+                response = await client.PostAsync(request);
+                if (response.IsSuccessful)
+                {
+                    // Deserialize the response into our custom SourceResponse class
+                    var sourceResponse = JsonConvert.DeserializeObject<SourceResponse>(response.Content);
+                    _logger.LogInformation("Payment source created successfully.");
                 }
                 else
                 {
-                    return BadRequest(new { success = false, message = "Payment not successful." });
+                    // Log the error
+                    _logger.LogError("Failed to create source: {Content}", response.Content);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing PayMongo webhook.");
-                return StatusCode(500, new { success = false, message = "Internal server error." });
+                // Catch and log any exception that occurs during the process
+                _logger.LogError(ex, "Error creating the payment source.");
             }
+
+            // Ensure that we return the response, even if it's null or an error occurred
+            return response;
         }
 
 
-        /*[HttpPost("/culo-api/v1/create-webhook")]
+
+        [HttpPost("/culo-api/v1/create-webhook")]
         public async Task<IActionResult> SetupWebhook()
         {
             try
@@ -371,7 +856,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 Debug.WriteLine("Error setting up webhook: " + ex.ToString());
                 return StatusCode(500, "Internal server error.");
             }
-        }*/
+        }
 
         private async Task<string> CreatePayMongoWebhook()
         {
@@ -426,7 +911,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 throw new HttpRequestException($"Request failed with status code {response.StatusCode}: {response.Content}");
             }
         }
-
+        */
 
         private async Task NotifyAsync(string userId, string message)
         {
