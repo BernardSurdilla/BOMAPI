@@ -124,7 +124,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        public async Task<bool> IsOrderStatusToPayAsync(string orderId)
+        private async Task<bool> IsOrderStatusToPayAsync(string orderId)
         {
             // Define the SQL query to check the status
             string sql = @"SELECT status FROM orders 
@@ -234,7 +234,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        public async Task<bool> IsCustomOrderStatusToPayAsync(string customorderId)
+        private async Task<bool> IsCustomOrderStatusToPayAsync(string customorderId)
         {
             // Define the SQL query to check the status
             string sql = @"SELECT status FROM customorders 

@@ -2,6 +2,7 @@
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
 using BOM_API_v2.Services;
+using Castle.Components.DictionaryAdapter.Xml;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -731,5 +732,64 @@ namespace API_TEST.Controllers
             return Ok(new { message = "Ingredients sucessfully deducted." });
         }
 
+        [HttpPost("custom-ingredient-subtraction")]
+        [Authorize(Roles = UserRoles.Admin)]
+        public async Task<IActionResult> SubtractIngredientsFromForm(List<PostIngredients> data)
+        {
+            foreach (PostIngredients currentIngredient in data)
+            {
+                try { await DataVerification.IsIngredientItemValid(currentIngredient.itemId, currentIngredient.ingredientType, currentIngredient.amountMeasurement, _context, _kaizenTables); }
+                catch (Exception e) { return BadRequest(new { message = e.Message }); }
+
+            }
+            
+            List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>();
+            foreach (PostIngredients currentIngredient in data)
+            {
+                Item referencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(currentIngredient.itemId, _kaizenTables);
+
+                ItemSubtractionInfo currentRecordForSubtractionHistory = new ItemSubtractionInfo
+                {
+                    item_id = currentIngredient.itemId,
+                    item_name = referencedInventoryItem.item_name,
+                    amount_quantity_type = ValidUnits.UnitQuantityMeasurement(referencedInventoryItem.measurements),
+                    amount_unit = currentIngredient.amountMeasurement,
+                    amount = currentIngredient.amount
+                };
+                dataForSubtractionHistory.Add(currentRecordForSubtractionHistory);
+
+                _kaizenTables.Item.Update(referencedInventoryItem);
+
+                double amountToBeSubtracted = 0.0;
+                if (currentRecordForSubtractionHistory.amount_quantity_type.Equals("Count"))
+                {
+                    amountToBeSubtracted = currentRecordForSubtractionHistory.amount;
+
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentRecordForSubtractionHistory.amount;
+                }
+                else
+                {
+                    amountToBeSubtracted = UnitConverter.ConvertByName(currentRecordForSubtractionHistory.amount, currentRecordForSubtractionHistory.amount_quantity_type, currentRecordForSubtractionHistory.amount_unit, referencedInventoryItem.measurements);
+
+                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - amountToBeSubtracted;
+                }
+
+                dataForSubtractionHistory.Add(currentRecordForSubtractionHistory);
+            }
+
+
+            IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
+            {
+                ingredient_subtraction_history_id = Guid.NewGuid(),
+                item_subtraction_info = dataForSubtractionHistory,
+                date_subtracted = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
+            };
+
+            await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
+            await _kaizenTables.SaveChangesAsync();
+
+            await _actionLogger.LogAction(User, "POST", "Manual subtraction");
+            return Ok(new { message = "Successfuly subtracted ingredients!" });
+        }
     }
 }
