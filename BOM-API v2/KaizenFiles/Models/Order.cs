@@ -4,19 +4,19 @@ namespace CRUDFI.Models
     public class Order
     {
 
-        public Guid? orderId { get; set; }
-        public Guid suborderId { get; set; }
+        public string? orderId { get; set; }
+        public string suborderId { get; set; }
         public string pastryId { get; set; }
-        public Guid? customerId { get; set; }
+        public string? customerId { get; set; }
         public string customerName { get; set; } = string.Empty;
 
         public string? employeeName { get; set; } = string.Empty;
 
         public string designName { get; set; } = string.Empty;
 
-        public Guid designId { get; set; }
+        public string designId { get; set; }
 
-        public Guid? employeeId { get; set; }
+        public string? employeeId { get; set; }
 
         public bool isActive { get; set; }
         public string color { get; set; } = string.Empty;
@@ -115,6 +115,10 @@ namespace CRUDFI.Models
         public string pickupTime { get; set; } = "hh:mm AM/PM";
         public string message { get; set; }
         public string type { get; set; }
+        public string status { get; set; }
+        public string designName { get; set; }
+        public double price { get; set; }
+        public bool isActive { get; set; }
     }
     public class PostCustomOrder
     {
@@ -140,10 +144,10 @@ namespace CRUDFI.Models
 
     public class CustomPartial
     {
-        public Guid customId { get; set; }
-        public Guid? orderId { get; set; }
-        public Guid designId { get; set; }
-        public Guid customerId { get; set; }
+        public string customId { get; set; }
+        public string? orderId { get; set; }
+        public string designId { get; set; }
+        public string customerId { get; set; }
         public string customerName { get; set; }
         public DateTime createdAt { get; set; }
         public string? designName { get; set; }
@@ -159,15 +163,15 @@ namespace CRUDFI.Models
         public string picture { get; set; }
         public string message { get; set; }
         public string type { get; set; }
-        public Guid? employeeId { get; set; }
+        public string? employeeId { get; set; }
         public string? employeeName { get; set; } = string.Empty;
     }
     public class CustomOrderFull
     {
-        public Guid customId { get; set; }
-        public Guid? orderId { get; set; }
-        public Guid designId { get; set; }
-        public Guid customerId { get; set; }
+        public string customId { get; set; }
+        public string? orderId { get; set; }
+        public string designId { get; set; }
+        public string customerId { get; set; }
         public string customerName { get; set; }
         public DateTime createdAt { get; set; }
         public string? designName { get; set; }
@@ -183,7 +187,7 @@ namespace CRUDFI.Models
         public string picture { get; set; }
         public string message { get; set; }
         public string type { get; set; }
-        public Guid? employeeId { get; set; }
+        public string? employeeId { get; set; }
         public string employeeName { get; set; } = string.Empty;
         public string payment { get; set; } = "";
         public DateTime? pickupDateTime { get; set; }
@@ -200,10 +204,9 @@ namespace CRUDFI.Models
     }
     public class AdminInitial
     {
-        public Guid? customId { get; set; }
-        public Guid? orderId { get; set; }
-        public Guid designId { get; set; }
-        public Guid customerId { get; set; }
+        public string? customId { get; set; }
+        public string? orderId { get; set; }
+        public string designId { get; set; }
         public string customerName { get; set; }
         public DateTime createdAt { get; set; }
         public string payment { get; set; }
@@ -217,9 +220,9 @@ namespace CRUDFI.Models
     }
     public class CustomerInitial
     {
-        public Guid? customId { get; set; }
-        public Guid? orderId { get; set; }
-        public Guid designId { get; set; }
+        public string? customId { get; set; }
+        public string orderId { get; set; }
+        public string designId { get; set; }
         public DateTime createdAt { get; set; }
         public string payment { get; set; }
         public string status { get; set; }
@@ -237,10 +240,10 @@ namespace CRUDFI.Models
 
     public class toPayInitial
     {
-        public Guid suborderId { get; set; }
-        public Guid? Id { get; set; }
-        public Guid designId { get; set; }
-        public Guid customerId { get; set; }
+        public string suborderId { get; set; }
+        public string? Id { get; set; }
+        public string designId { get; set; }
+        public string customerId { get; set; }
         public string customerName { get; set; }
         public DateTime createdAt { get; set; }
         public string pastryId { get; set; }
@@ -255,11 +258,11 @@ namespace CRUDFI.Models
     }
     public class Full
     {
-        public Guid suborderId { get; set; }
-        public Guid? orderId { get; set; }
-        public Guid designId { get; set; }
-        public Guid customerId { get; set; }
-        public Guid? employeeId { get; set; }
+        public string suborderId { get; set; }
+        public string? orderId { get; set; }
+        public string designId { get; set; }
+        public string customerId { get; set; }
+        public string? employeeId { get; set; }
         public string employeeName { get; set; } = string.Empty;
         public string customerName { get; set; }
         public DateTime createdAt { get; set; }
@@ -282,7 +285,7 @@ namespace CRUDFI.Models
     }
     public class OrderDetails
     {
-        public Guid? orderId { get; set; }
+        public string? orderId { get; set; }
         public string status { get; set; }
         public string payment { get; set; } = "";
         public string type { get; set; } = "";
@@ -292,9 +295,9 @@ namespace CRUDFI.Models
 
     public class Cart
     {
-        public Guid suborderId { get; set; }
-        public Guid designId { get; set; }
-        public string pastryId { get; set; }
+        public string suborderId { get; set; }
+        public string designId { get; set; }
+        public string? pastryId { get; set; }
         public string status { get; set; }
         public string designName { get; set; }
         public string color { get; set; } = string.Empty;
@@ -308,11 +311,11 @@ namespace CRUDFI.Models
 
     public class Artist
     {
-        public Guid suborderId { get; set; }
-        public Guid? orderId { get; set; }
-        public Guid designId { get; set; }
-        public Guid customerId { get; set; }
-        public Guid? employeeId { get; set; }
+        public string suborderId { get; set; }
+        public string? orderId { get; set; }
+        public string designId { get; set; }
+        public string customerId { get; set; }
+        public string? employeeId { get; set; }
         public string employeeName { get; set; } = string.Empty;
         public string customerName { get; set; }
         public DateTime createdAt { get; set; }
@@ -333,7 +336,7 @@ namespace CRUDFI.Models
     }
     public class CheckOutDetails
     {
-        public Guid orderId { get; set; }
+        public string orderId { get; set; }
         public string status { get; set; }
         public string paymentMethod { get; set; }
         public string orderType { get; set; }
@@ -346,17 +349,17 @@ namespace CRUDFI.Models
 
     public class OrderItem
     {
-        public Guid suborderId { get; set; }
-        public Guid orderId { get; set; }
-        public Guid customerId { get; set; }
-        public Guid employeeId { get; set; }
+        public string suborderId { get; set; }
+        public string orderId { get; set; }
+        public string customerId { get; set; }
+        public string employeeId { get; set; }
         public string employeeName { get; set; }
         public DateTime createdAt { get; set; }
         public string status { get; set; }
         public string pastryId { get; set; }
         public string color { get; set; }
         public string shape { get; set; }
-        public Guid designId { get; set; }
+        public string designId { get; set; }
         public string designName { get; set; }
         public double price { get; set; }
         public int quantity { get; set; }
@@ -392,7 +395,13 @@ namespace CRUDFI.Models
         public string pickupDate { get; set; } = "yyyy-mm-dd";
         public string pickupTime { get; set; } = "hh:mm AM/PM";
         public string payment { get; set; }
-        public List<OrderDTO> orderItem { get; set; } = new List<OrderDTO>();
+        public int quantity { get; set; }
+        public string designId { get; set; }
+        public string? description { get; set; }
+        public string flavor { get; set; }
+        public string size { get; set; }
+        public string color { get; set; }
+        public List<AddOn> addonItem { get; set; }
     }
 
     public class OrderDTO
@@ -412,7 +421,7 @@ namespace CRUDFI.Models
         public string pickupDate { get; set; } = "yyyy-mm-dd";
         public string pickupTime { get; set; } = "hh:mm AM/PM";
         public string payment { get; set; }
-        public List<Guid> suborderIds { get; set; }
+        public List<string> suborderIds { get; set; }
     }
 
 
@@ -427,7 +436,6 @@ namespace CRUDFI.Models
     }
     public class forSales
     {
-        public Guid saleId { get; set; }
         public string name { get; set; }
         public string email { get; set; }
         public double cost { get; set; }
