@@ -40,13 +40,13 @@
       });
       connection.on("RecieveMessage", function (parsed_message) {
         var encodedUser = $("<div />")
-          .text(parsed_message.sender_name)
+          .text(parsed_message.senderName)
           .html();
         var encodedMsg = $("<div />")
           .text(
-            parsed_message.sender_message +
+            parsed_message.senderMessage +
               " " +
-              parsed_message.sender_message_time_sent
+              parsed_message.senderMessageTimeSent
           )
           .html();
         $("#chatBox").append(
