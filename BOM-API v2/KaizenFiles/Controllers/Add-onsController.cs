@@ -108,7 +108,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT name, price, add_ons_id, measurement, size, date_added, last_modified_date FROM addons";
+                string sql = "SELECT name, price, add_ons_id, measurement, size, date_added, last_modified_date FROM addons WHERE is_active = 1";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -179,6 +179,151 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error updating Add-On in the database.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+        [HttpDelete("{id}")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> DeactivateAddOn(int id)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                UPDATE addons 
+                SET 
+                    is_active = 0,
+                    last_modified_date = @LastModifiedDate 
+                WHERE add_ons_id = @AddOnsId";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@AddOnsId", id);
+                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound($"Add-On with ID '{id}' not found.");
+                        }
+
+                        return Ok($"Add-On '{id}' deactivated successfully.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deactivating Add-On in the database.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        [HttpPost("{id}/restore")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> ActivateAddOn(int id)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                UPDATE addons 
+                SET 
+                    is_active = 1,
+                    last_modified_date = @LastModifiedDate 
+                WHERE add_ons_id = @AddOnsId";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@AddOnsId", id);
+                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound($"Add-On with ID '{id}' not found.");
+                        }
+
+                        return Ok($"Add-On '{id}' activated successfully.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error activating Add-On in the database.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        [HttpDelete("deactivate-all")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> DeactivateAllAddOns()
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                UPDATE addons 
+                SET 
+                    is_active = 0,
+                    last_modified_date = @LastModifiedDate";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        return Ok($"{rowsAffected} Add-Ons deactivated successfully.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deactivating all Add-Ons in the database.");
+                return StatusCode(500, "An error occurred while processing the request.");
+            }
+        }
+
+        [HttpPut("activate-all")]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> ActivateAllAddOns()
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    string sql = @"
+                UPDATE addons 
+                SET 
+                    is_active = 1,
+                    last_modified_date = @LastModifiedDate";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        return Ok($"{rowsAffected} Add-Ons activated successfully.");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error activating all Add-Ons in the database.");
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
