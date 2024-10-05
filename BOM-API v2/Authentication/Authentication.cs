@@ -14,6 +14,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 
 
 
@@ -339,7 +340,7 @@ namespace JWTAuthentication.Controllers
                 newResponseEntry.username = user.UserName;
                 newResponseEntry.email = user.Email;
                 newResponseEntry.phoneNumber = user.PhoneNumber;
-                newResponseEntry.isEmailConfirmed = currentUser.EmailConfirmed;
+                newResponseEntry.isEmailConfirmed = user.EmailConfirmed;
                 newResponseEntry.joinDate = user.JoinDate;
 
                 newResponseEntry.roles = (List<string>)await userManager.GetRolesAsync(user);
@@ -378,7 +379,7 @@ namespace JWTAuthentication.Controllers
             if (currentUser == null) { return NotFound(new { message = "User not found." }); }
             if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
 
-            string currentEmailConfirmationKey = Convert.ToBase64String(new HMACSHA256().Key);
+            string currentEmailConfirmationKey = Regex.Replace(Convert.ToBase64String(new HMACSHA256().Key), @"[^a-zA-Z0-9]", "");
 
             DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             EmailConfirmationKeys? currentUserKey = null;
@@ -419,18 +420,17 @@ namespace JWTAuthentication.Controllers
                 return StatusCode(500, new { message = "Email failed to send to " + email });
             }
         }
-        [Authorize]
         [HttpPost("/culo-api/v1/current-user/confirm-email/")]
         public async Task<IActionResult> ConfirmUserEmail(string confirmationCode)
         {
-            var currentUser = await userManager.GetUserAsync(User);
-            if (currentUser == null) { return NotFound(new { message = "User not found." }); }
-            if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
+            //var currentUser = await userManager.GetUserAsync(User);
+            //if (currentUser == null) { return NotFound(new { message = "User not found." }); }
+            //if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
 
             DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
             EmailConfirmationKeys? currentUserKey = null;
 
-            try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.ConfirmationKey == confirmationCode).FirstAsync(); }
             catch { }
 
             if (currentUserKey == null) { return BadRequest(new { message = "Please send a confirmation code to the user's email first" }); }
@@ -439,6 +439,10 @@ namespace JWTAuthentication.Controllers
             string validationKey = currentUserKey.ConfirmationKey;
 
             if (confirmationCode != validationKey) { return BadRequest(new { message = "Validation code is incorrect." }); }
+
+            var currentUser = await userManager.FindByIdAsync(currentUserKey.Id);
+            if (currentUser == null) { return NotFound(new { message = "User not found." }); }
+            if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
 
             if (confirmationCode == validationKey)
             {
