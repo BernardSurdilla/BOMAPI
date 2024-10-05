@@ -2,7 +2,7 @@
 {
     public class Notif
     {
-        public Guid? notifId { get; set; }
+        public string? notifId { get; set; }
         public DateTime dateCreated { get; set; }
         public string message { get; set; }
         public bool isRead { get; set; }
@@ -11,6 +11,10 @@
     {
         public int unread { get; set; }
         public List<Notif> notifs { get; set; } = new List<Notif>();
+    }
+    public class NotifReq
+    {
+        public string userId { get; set; }
     }
 }
 

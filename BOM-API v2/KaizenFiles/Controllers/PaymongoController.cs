@@ -57,7 +57,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 return BadRequest("Your order is not yet approved by owner");
             }
-
             else
             {
                 try
@@ -135,6 +134,48 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     _logger.LogError(ex, "Error processing the payment link.");
                     return StatusCode(500, "Internal server error.");
+                }
+            }
+        }
+
+        private async Task<bool> IsRushOrder(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"SELECT COUNT(1) 
+                       FROM orders 
+                       WHERE order_id = @orderId AND type = 'rush'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    // Execute the query and check if a row exists
+                    var result = await command.ExecuteScalarAsync();
+                    return Convert.ToInt32(result) > 0;
+                }
+            }
+        }
+
+        private async Task<bool> IsHalfPaid(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"SELECT COUNT(1) 
+                       FROM transactions 
+                       WHERE order_id = @orderId AND status = 'half paid'";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    // Execute the query and check if a row exists
+                    var result = await command.ExecuteScalarAsync();
+                    return Convert.ToInt32(result) > 0;
                 }
             }
         }
@@ -338,6 +379,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         string transactionStatus = (indicator == totalPrice) ? "paid" : "half paid";
 
                         await InsertTransaction(transacId, orderIdBinary, userId, totalPrice, indicator, transactionStatus);
+
+                        if(transactionStatus == "half paid")
+                        {
+                            await CheckAndSchedulePickupNotification(orderIdBinary, userId);
+                        }
                     }
                     else
                     {
@@ -362,32 +408,80 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-
-        [HttpPost("debug")]
-        [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetInactiveIngredients([FromQuery] string reference)
+        private async Task CheckAndSchedulePickupNotification(string orderIdBinary, string userId)
         {
             try
             {
-                var response = await GetPaymentLinkAsync(reference);
-
-                // Log the response status code and content
-                _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
-
-                // Check if the response is successful
-                if (response.IsSuccessful)
+                // Loop indefinitely to check every 24 hours
+                while (true)
                 {
-                    var payMongoResponse = JsonConvert.DeserializeObject<GetResponse>(response.Content);
+                    // Call the method to schedule pickup notification
+                    await SchedulePickupNotification(orderIdBinary, userId);
 
-                    // Return the content directly
-                    return Ok(response.Content); // You can choose to return the raw content as needed
+                    // Sleep for 24 hours (86400000 milliseconds)
+                    await Task.Delay(TimeSpan.FromHours(24));
+
+
                 }
-                else
+            }
+            catch (Exception ex)
+            {
+                // Log any exceptions that occur
+                _logger.LogError(ex, "Error scheduling pickup notification for order {OrderId} and user {UserId}", orderIdBinary, userId);
+                // You might want to handle specific exceptions or rethrow them
+                throw;
+            }
+        }
+
+        private async Task SchedulePickupNotification(string orderIdBinary, string userId)
+        {
+            // Retrieve the pickup date from the database
+            DateTime? pickupDate = await GetPickupDate(orderIdBinary);
+
+            if (pickupDate.HasValue)
+            {
+                // Check if today is 3 days before the pickup date
+                if (pickupDate.Value.Date == DateTime.UtcNow.Date.AddDays(3))
                 {
-                    // Log an error if the request fails
-                    _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
-                    return NotFound("Payment link not found.");
+                    // Construct the message
+                    string message = "Your order has a remaining balance to be paid.";
+
+                    Guid notId = Guid.NewGuid();
+                    string notifId = notId.ToString().ToLower();
+
+                    // Send the notification
+                    await NotifyAsync(notifId, userId, message);
                 }
+            }
+        }
+
+        private async Task<DateTime?> GetPickupDate(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"SELECT pickup_date FROM orders WHERE order_id = @orderId";
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    var result = await command.ExecuteScalarAsync();
+                    return result != null ? (DateTime?)Convert.ToDateTime(result) : null;
+                }
+            }
+        }
+
+
+        [HttpPost("debug")]
+        [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
+        public async Task<IActionResult> GetInactiveIngredients([FromQuery] string orderid, [FromQuery] string userid)
+        {
+            try
+            {
+                await CheckAndSchedulePickupNotification(orderid, userid);
+
+                return Ok();
             }
             catch (Exception ex)
             {

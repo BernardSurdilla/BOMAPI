@@ -51,7 +51,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 // Retrieve userId from the username
                 string userId = await GetUserIdByAllUsername(username);
-                string user = ConvertGuidToBinary16(userId).ToLower();
+                string user = userId.ToLower();
 
                 if (userId == null || userId.Length == 0)
                 {
@@ -64,10 +64,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     // Modify the SQL query to filter notifications by user_id
                     string sql = @"
-
-                SELECT notif_id, message, date_created, is_read
-                FROM notification
-                WHERE user_id = UNHEX(@userId)"; // Filtering by user_id
+            SELECT notif_id, message, date_created, is_read
+            FROM notification
+            WHERE user_id = @userId
+            ORDER BY date_created DESC";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -80,7 +80,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             {
                                 var notif = new Notif
                                 {
-                                    notifId = reader.IsDBNull(reader.GetOrdinal("notif_id")) ? (Guid?)null : new Guid((byte[])reader["notif_id"]),
+                                    notifId = reader.GetString(reader.GetOrdinal("notif_id")),
                                     message = reader.IsDBNull("message") ? string.Empty : reader.GetString("message"),
                                     dateCreated = reader.GetDateTime("date_created"),
                                     isRead = reader.GetBoolean(reader.GetOrdinal("is_read"))
@@ -120,23 +120,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
-                var username = User.FindFirst(ClaimTypes.Name)?.Value;
-
-                if (string.IsNullOrEmpty(username))
-                {
-                    return Unauthorized("User is not authorized.");
-                }
-
-                string userId = await GetUserIdByAllUsername(username);
-
-                if (userId == null)
-                {
-                    return BadRequest("User not found.");
-                }
-
-                string user = ConvertGuidToBinary16(userId).ToLower();
-
-                string notif = ConvertGuidToBinary16(notifId).ToLower();
+                string notif = notifId.ToLower();
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -144,13 +128,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     string sql = @"
                     UPDATE notification
-                    SET is_read = @read
-                    WHERE notif_id = UNHEX(@notifId)";
+                    SET is_read = 1
+                    WHERE notif_id = @notifId";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
                         command.Parameters.AddWithValue("@notifId", notif);
-                        command.Parameters.AddWithValue("@read", true);
 
                         int rowsAffected = await command.ExecuteNonQueryAsync();
 
@@ -172,6 +155,102 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        private async Task<bool> IsTransactionHalfPaidAsync(string orderId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT 1 FROM transactions WHERE order_id = @orderId AND status = 'half paid' LIMIT 1";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    // Execute the command and check if any record is found
+                    object result = await command.ExecuteScalarAsync();
+
+                    // If result is not null, it means the transaction exists with 'half paid' status
+                    return result != null;
+                }
+            }
+        }
+
+
+        [HttpPost("/culo-api/v1/current-user/{id}/half-paid/simulation")]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> SimulateNotification([FromBody] NotifReq request, string id)
+        {
+            try
+            {
+                // Check if the transaction is 'half paid'
+                var isHalfPaid = await IsTransactionHalfPaidAsync(id);
+
+                if (!isHalfPaid)
+                {
+                    return BadRequest("Order is not paid in half.");
+                }
+
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized.");
+                }
+
+                string userId = await GetUserIdByAllUsername(username);
+
+                if (userId == null)
+                {
+                    return BadRequest("User not found.");
+                }
+
+                // Construct the message
+                string message = "Pay remaining balance or the order will be considered cancelled.";
+
+                // Ensure userId is in the correct format (GUID or as it is)
+                string userBinary = userId.ToLower(); // No conversion since userId is varchar(255) in the database
+
+                // Proceed to insert notification into the database
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // Insert the notification
+                    string sql = @"
+                INSERT INTO notification (notif_id, user_id, message, date_created, is_read)
+                VALUES (@notifId, @userId, @message, NOW(), false)";
+
+                    using (var command = new MySqlCommand(sql, connection))
+                    {
+                        // Generate a new notification ID
+                        string notifId = Guid.NewGuid().ToString();
+
+                        command.Parameters.AddWithValue("@notifId", notifId);
+                        command.Parameters.AddWithValue("@userId", userBinary);
+                        command.Parameters.AddWithValue("@message", message);
+
+                        int rowsAffected = await command.ExecuteNonQueryAsync();
+
+                        if (rowsAffected > 0)
+                        {
+                            return Ok("Notification sent successfully.");
+                        }
+                        else
+                        {
+                            return StatusCode(500, "Failed to send notification.");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error sending notification: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+
         private async Task<int> CountUnreadNotificationsAsync(string userId)
         {
             int unreadCount = 0;
@@ -183,7 +262,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"
             SELECT COUNT(*) 
             FROM notification 
-            WHERE user_id = UNHEX(@userId) AND is_read = 0";
+            WHERE user_id = @userId AND is_read = 0";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -225,7 +304,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (1, 2, 3, 4)";
+                string sql = "SELECT customer_id FROM suborders WHERE customer_name = @username";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -234,16 +313,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     if (result != null && result != DBNull.Value)
                     {
-                        // Cast the result to byte[] since UserId is stored as binary(16)
-                        byte[] userIdBytes = (byte[])result;
+                        // Directly cast the result to string since customer_id is stored as varchar
+                        string userId = result.ToString(); // Use ToString() to get the GUID format
 
-                        // Convert the byte[] to a hex string (without dashes)
-                        string userIdHex = BitConverter.ToString(userIdBytes).Replace("-", "").ToLower();
+                        // Debug.WriteLine to display the value of userId
+                        Debug.WriteLine($"UserId for username '{username}': {userId}");
 
-                        // Debug.WriteLine to display the value of userIdHex
-                        Debug.WriteLine($"UserId hex for username '{username}': {userIdHex}");
-
-                        return userIdHex;
+                        return userId; // Return the customer_id in string format
                     }
                     else
                     {
@@ -252,5 +328,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
+
     }
 }
