@@ -130,12 +130,30 @@ namespace CRUDFI.Models
         public string description { get; set; }
         public string size { get; set; }
         public string flavor { get; set; }
-        public string picture { get; set; }
-        public string message { get; set; }
         public string type { get; set; }
+        public string payment { get; set; }
+        public string pictureBase64 { get; set; } = "";
         public string pickupDate { get; set; } = "yyyy-mm-dd";
         public string pickupTime { get; set; } = "hh:mm AM/PM";
     }
+
+    public class CustomOrderPictureResponse
+    {
+        public string DesignName { get; set; }
+        public string PictureData { get; set; }
+
+        public CustomOrderPictureResponse(string designName, string pictureData)
+        {
+            DesignName = designName;
+            PictureData = pictureData;
+        }
+    }
+
+    public class debugshit
+    {
+        public string pictureBase64 { get; set; } = "";
+    }
+
     public class CustomOrderUpdateRequest
     {
         public string designName { get; set; }
@@ -220,22 +238,34 @@ namespace CRUDFI.Models
     }
     public class CustomerInitial
     {
-        public string? customId { get; set; }
         public string orderId { get; set; }
         public string designId { get; set; }
-        public DateTime createdAt { get; set; }
-        public string payment { get; set; }
+        public string? payment { get; set; }
         public string status { get; set; }
         public string type { get; set; }
-        public string designName { get; set; }
+        public string? designName { get; set; }
         public Prices price { get; set; }
         public DateTime? pickup { get; set; }
+        public string pictureData { get; set; }
     }
+
+    public class CustomInitial
+    {
+        public string suborderId { get; set; }
+        public string orderId { get; set; }
+        public string designId { get; set; }
+        public string status { get; set; }
+        public string? designName { get; set; }
+        public string cover { get; set; }
+        public string tier { get; set; }
+        public string pictureData { get; set; }
+    }
+
 
     public class Prices
     {
-        public double full { get; set; }
-        public double half { get; set;}
+        public double? full { get; set; }
+        public double? half { get; set;}
     }
 
     public class toPayInitial
