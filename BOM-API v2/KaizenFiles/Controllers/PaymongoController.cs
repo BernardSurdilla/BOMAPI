@@ -19,6 +19,7 @@ using RestSharp;
 using System;
 using Microsoft.Extensions.Logging;
 using Azure;
+using BillOfMaterialsAPI.Schemas;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -48,7 +49,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)
         {
-
             string orderIdB = orderId.ToLower();
 
             bool isApprove = await IsOrderStatusToPayAsync(orderIdB);
@@ -60,7 +60,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             else
             {
-
                 try
                 {
                     // Validate the option and amount
@@ -68,12 +67,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     {
                         return BadRequest("Payment option is required.");
                     }
+
                     string orderIdBinary = orderId.ToLower();
 
                     double ingredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
-
                     double addonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
-
                     double totalPrice = ingredientPrice + addonPrice;
 
                     // Check the option value and modify the amount accordingly
@@ -101,13 +99,30 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     var response = await CreatePayMongoPaymentLink(amountInCents, description);
                     _logger.LogInformation("PayMongo response: {0}", response.Content);
 
-                    // If the response is successful, deserialize it into our new object model
+                    // If the response is successful, deserialize it into our new PaymentRequestResponse class
                     if (response.IsSuccessful)
                     {
                         // Deserialize the response content into the new PaymentRequestResponse class
                         var payMongoResponse = JsonConvert.DeserializeObject<PaymentRequestResponse>(response.Content);
 
-                        // Return the deserialized PayMongo response
+                        // Manually set the orderId property in the deserialized object
+                        payMongoResponse.orderId = orderIdBinary;
+
+                        // Return the PayMongo response immediately to the user
+                        Task.Run(async () =>
+                        {
+                            try
+                            {
+                                // Asynchronously process the order after returning the response
+                                await ProcessOrderAsync(orderIdBinary, payMongoResponse.Data.attributes.reference_number);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogError(ex, "Error processing the order in background.");
+                            }
+                        });
+
+                        // Return the deserialized and updated PayMongo response
                         return Ok(payMongoResponse);
                     }
                     else
@@ -123,6 +138,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
+
 
         private async Task<bool> IsOrderStatusToPayAsync(string orderId)
         {
@@ -157,17 +173,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("{orderId}/update-status")]
-        [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> PostOrder(string orderId, [FromBody] GetRequest request)
+        private async Task<string> ProcessOrderAsync(string orderId, string reference)
         {
             // Log the request details
-            _logger.LogInformation($"Received PostOrder request for OrderId: {orderId}");
+            _logger.LogInformation($"Received ProcessOrder request for OrderId: {orderId}");
 
             try
             {
-                var response = await GetPaymentLinkAsync(request.reference);
+                var response = await GetPaymentLinkAsync(reference);
+
+                // Proceed with further processing once the status is "paid"
+                string orderIdBinary = orderId.ToLower();
 
                 // Log the response status code and content
                 _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
@@ -184,10 +200,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     while (status != "paid" && loopCount < 6)
                     {
                         // Sleep for 10 seconds
-                        await Task.Delay(10000); 
+                        await Task.Delay(10000);
 
                         // Fetch the payment link again to check the status
-                        response = await GetPaymentLinkAsync(request.reference);
+                        response = await GetPaymentLinkAsync(reference);
 
                         // Log the response status code and content
                         _logger.LogInformation("API Response Status: {StatusCode}, Content: {Content}", response.StatusCode, response.Content);
@@ -203,7 +219,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             // Handle case where fetching the payment link fails
                             _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
-                            return NotFound("Payment link not found.");
+                            return "Payment link not found.";
                         }
 
                         loopCount++;
@@ -212,11 +228,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     // If the loop count reaches 5 and status is still not "paid"
                     if (status != "paid")
                     {
-                        return Ok("Order not paid"); // Return an appropriate message
+                        double unpaidIngredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
+                        double unpaidAddonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
+                        double unpaidTotalPrice = unpaidIngredientPrice + unpaidAddonPrice;
+                        double unpaidIndicator = 0;
+                        string unpaidStatus = "unpaid";
+
+                        // Call the method to get customer ID and name
+                        var (unpaidcustomerId, unpaidcustomerName) = await GetCustomerInfo(orderIdBinary);
+                        string unpaiduserId = unpaidcustomerId.ToLower();
+
+                        string transacId = payMongoResponse.data[0].id.ToLower();
+
+                        await InsertTransaction(transacId, orderIdBinary, unpaiduserId, unpaidTotalPrice, unpaidIndicator, unpaidStatus);
+
+                        return "Order not paid";
                     }
 
-                    // Proceed with further processing once the status is "paid"
-                    string orderIdBinary = orderId.ToLower();
                     double ingredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
                     double addonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
                     double totalPrice = ingredientPrice + addonPrice;
@@ -227,7 +255,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     Debug.WriteLine("Price value: " + price);
 
                     string option;
-                    double updatedAmount;
 
                     // Check the option value and modify the amount accordingly
                     if (indicator == totalPrice)
@@ -240,7 +267,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     }
                     else
                     {
-                        return BadRequest("Price/amount is incorrect");
+                        return "Price/amount is incorrect";
                     }
 
                     // Check if the order exists
@@ -248,7 +275,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     if (!orderExists)
                     {
                         Debug.Write(orderIdBinary);
-                        return NotFound("Order not found");
+                        return "Order not found";
                     }
 
                     Debug.WriteLine("Option: " + option);
@@ -270,7 +297,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             int rowsAffected = await updateCommand.ExecuteNonQueryAsync();
                             if (rowsAffected == 0)
                             {
-                                return NotFound("Order not found");
+                                return "Order not found";
                             }
                         }
                     }
@@ -279,7 +306,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     List<string> suborderIds = await GetSuborderId(orderIdBinary);
                     if (suborderIds == null || suborderIds.Count == 0)
                     {
-                        return NotFound("No suborder ID found for the given order ID.");
+                        return "No suborder ID found for the given order ID.";
                     }
 
                     // Update each suborder status
@@ -294,19 +321,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                     if (customerId != null && customerId.Length > 0)
                     {
-                        
                         string userId = customerId.ToLower();
-
                         Debug.Write("Customer ID: " + userId);
 
                         // Construct the message
-                        string message = (" your order has been paid; assigning artist");
+                        string message = ("your order has been paid; assigning artist");
 
-                        Guid not = new Guid();
-                        string notifId = not.ToString().ToLower();
+                        Guid notId = Guid.NewGuid();
+                        string notifId = notId.ToString().ToLower();
 
                         // Send the notification
                         await NotifyAsync(notifId, userId, message);
+
+                        string transacId = payMongoResponse.data[0].id.ToLower();
+
+                        string transactionStatus = (indicator == totalPrice) ? "paid" : "half paid";
+
+                        await InsertTransaction(transacId, orderIdBinary, userId, totalPrice, indicator, transactionStatus);
                     }
                     else
                     {
@@ -314,25 +345,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         Debug.Write("Customer not found for the given order.");
                     }
 
-                    // Return the content directly
-                    return Ok(response.Content); // You can choose to return the raw content as needed
+                    return response.Content;
                 }
                 else
                 {
                     // Log an error if the request fails
                     _logger.LogError("Failed to retrieve payment link: {Content}", response.Content);
-                    return NotFound("Payment link not found.");
+                    return "Payment link not found.";
                 }
             }
             catch (Exception ex)
             {
                 // Log the error
                 _logger.LogError(ex, "Error processing order");
-
-                // Return a 500 Internal Server Error response
-                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while processing the order.");
+                return "An error occurred while processing the order.";
             }
         }
+
 
         [HttpPost("debug")]
         [ProducesResponseType(typeof(GetResponse), StatusCodes.Status200OK)]
@@ -711,7 +740,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
         */
 
-        private async Task NotifyAsync(string notif, string userId, string message)
+        private async Task NotifyAsync(string notifId, string userId, string message)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -719,12 +748,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 string sql = @"
             INSERT INTO notification (notif_id, user_id, message, date_created, is_read) 
-            VALUES (@notif, @userId, @message, NOW(), 0)";
+            VALUES (@notifId, @userId, @message, NOW(), 0)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     // Add parameters for userId and message
-                    command.Parameters.AddWithValue("@notif", notif);
+                    command.Parameters.AddWithValue("@notifId", notifId);
                     command.Parameters.AddWithValue("@userId", userId);
                     command.Parameters.AddWithValue("@message", message);
 
@@ -752,7 +781,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             string customerId = reader["customer_id"].ToString();
                             string customerName = reader.GetString("customer_name");
 
-                            return (customerId, customerName);  // Return customerId as byte[] and customerName as string
+                            return (customerId, customerName); 
                         }
                         else
                         {
@@ -873,6 +902,33 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
             }
         }
+
+        private async Task InsertTransaction(string newId, string orderIdBinary, string userId, double totalAmount, double totalPaid, string status)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // SQL INSERT query with placeholders for each value
+                string sqlInsert = "INSERT INTO transactions (id, order_id, user_id, total_amount, total_paid, date, status) " +
+                                   "VALUES(@id, @orderId, @userId, @totalAmount, @totalPaid, NOW(), @status)";
+
+                using (var command = new MySqlCommand(sqlInsert, connection))
+                {
+                    command.Parameters.AddWithValue("@id", newId);
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+                    command.Parameters.AddWithValue("@userId", userId);
+                    command.Parameters.AddWithValue("@totalAmount", totalAmount);
+                    command.Parameters.AddWithValue("@totalPaid", totalPaid);
+                    command.Parameters.AddWithValue("@status", status);
+
+                    // Execute the query asynchronously
+                    await command.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+
         private async Task UpdateCustomorderStatus(byte[] orderIdBinary)
         {
             using (var connection = new MySqlConnection(connectionstring))

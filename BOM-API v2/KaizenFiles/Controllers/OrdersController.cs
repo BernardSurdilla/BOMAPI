@@ -155,7 +155,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Send notification to user
                 string userId = customerId.ToLower();
                 string message = $"{order.designName ?? "Design"} has been added to your 'to pay' list.";
-                await NotifyAsync(notifId , userId, message);
+                //await NotifyAsync(notifId , userId, message);
 
                 // Prepare the suborder response
                 var suborderResponse = new SuborderResponse
@@ -558,7 +558,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Send notification to the user
                 string userId = customerId.ToLower();
                 string message = $"{order.designName ?? "Design"} is added to your cart";
-                await NotifyAsync(notifId, userId, message);
+                //await NotifyAsync(notifId, userId, message);
 
                 // Retrieve add_ons_id for the newly created suborder
                 List<int> addOnIds = await GetAddOnIdsBySuborderIdAsync(suborderIdBinary);
@@ -772,7 +772,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 string message = ((customerUsername ?? "Unknown") + " your cart has been added to your to pay");
 
-                await NotifyAsync(notifId, userId, message);
+                //await NotifyAsync(notifId, userId, message);
 
                 return Ok($"Order for {checkOutRequest.suborderIds.Count} suborder(s) has been successfully created with order ID '{orderIdBinary}'.");
             }
@@ -4335,7 +4335,7 @@ FROM suborders WHERE order_id = @orderId";
                     {
 
                         // Construct the message for 'send' action
-                        string message = ((customerName ?? "Unknown") + " your order is ready for pick up");
+                        string message = ("your order is ready for pick up");
 
                         // Send the notification
                         await NotifyAsync(notifId, userId, message);
@@ -4343,7 +4343,7 @@ FROM suborders WHERE order_id = @orderId";
                     else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
                     {
                         // Construct the message for 'done' action
-                        string message = ((customerName ?? "Unknown") + " order received");
+                        string message = ("order received");
 
                         // Send the notification
                         await NotifyAsync(notifId, userId, message);
