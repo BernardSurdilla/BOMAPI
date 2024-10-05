@@ -1,4 +1,4 @@
-﻿using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
+using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
 using BOM_API_v2.KaizenFiles.Models;

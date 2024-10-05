@@ -23,26 +23,39 @@ namespace LiveChat
         {
             ClaimsPrincipal? currentUser = Context.User;
 
-            MessageFormat formattedMessage = CreateFormattedMessage(accountId, message, currentUser);
+            ConnectionInfo? currentConnectionInfo = _connectionManager.GetAllCustomerConnections().FirstOrDefault(x => x.ConnectionId == Context.ConnectionId);
+
+            MessageFormat formattedMessage;
+            if (currentConnectionInfo != null)
+            {
+                formattedMessage = CreateFormattedMessage(accountId, message, currentUser, currentConnectionInfo.AccountId);
+            }
+            else
+            {
+                formattedMessage = CreateFormattedMessage(accountId, message, currentUser);
+            }
 
             if (currentUser != null)
             {
-                List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
-
-                if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
-                //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
-
-                APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
-                APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
-
-                IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
-
-                if (recieverUserAccountRoles.Contains(UserRoles.Admin)
-                    || recieverUserAccountRoles.Contains(UserRoles.Manager))
+                if (currentUser.Identity.IsAuthenticated == true)
                 {
-                    await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
+                    List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
+
+                    if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
+                    //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
+
+                    APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
+                    APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
+
+                    IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
+
+                    if (recieverUserAccountRoles.Contains(UserRoles.Admin)
+                        || recieverUserAccountRoles.Contains(UserRoles.Manager))
+                    {
+                        await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
+                    }
                 }
-            }
+            } 
 
             ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
             if (messageRecipientConnectionInfo == null)
@@ -169,18 +182,25 @@ namespace LiveChat
         {
             ClaimsPrincipal? currentUser = Context.User;
 
-            if (currentUser == null) { _connectionManager.AddConnection(Context.ConnectionId); }
+            if (currentUser != null)
+            {
+                if (currentUser.Identity.IsAuthenticated == false) { _connectionManager.AddConnection(Context.ConnectionId); }
+                else
+                {
+                    List<Claim> allRoles = currentUser.FindAll(ClaimTypes.Role).ToList();
+                    List<string> allRolesParsed = new List<string>();
+                    foreach (Claim claim in allRoles) { allRolesParsed.Add(claim.Value); }
+
+                    _connectionManager.AddConnection(new ConnectionInfo(
+                    Context.ConnectionId,
+                    currentUser.FindFirstValue(ClaimTypes.NameIdentifier),
+                    currentUser.FindFirstValue(ClaimTypes.Name),
+                    allRolesParsed));
+                }
+            }
             else
             {
-                List<Claim> allRoles = currentUser.FindAll(ClaimTypes.Role).ToList();
-                List<string> allRolesParsed = new List<string>();
-                foreach (Claim claim in allRoles) { allRolesParsed.Add(claim.Value); }
-
-                _connectionManager.AddConnection(new ConnectionInfo(
-                Context.ConnectionId,
-                currentUser.FindFirstValue(ClaimTypes.NameIdentifier),
-                currentUser.FindFirstValue(ClaimTypes.Name),
-                allRolesParsed));
+                _connectionManager.AddConnection(Context.ConnectionId);
             }
 
             return base.OnConnectedAsync();
@@ -201,10 +221,40 @@ namespace LiveChat
                 senderMessageTimeSent = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"))
             };
 
+            if (senderAccount != null)
+            {
+                if (senderAccount.Identity.IsAuthenticated == false)
+                {
+                    response.senderName = "Anonymous";
+                    response.senderAccountId = "N/A";
+                }
+                else
+                {
+                    Claim? nameClaim = senderAccount.FindFirst(ClaimTypes.Name);
+                    Claim? idClaim = senderAccount.FindFirst(ClaimTypes.NameIdentifier);
+
+                    response.senderName = nameClaim == null ? "N/A" : nameClaim.Value;
+                    response.senderAccountId = idClaim == null ? "N/A" : idClaim.Value;
+
+                }
+
+            }
+
+            return response;
+        }
+        public static MessageFormat CreateFormattedMessage(string connectionId, string message, ClaimsPrincipal? senderAccount, string senderAccountId)
+        {
+            MessageFormat response = new MessageFormat
+            {
+                senderConnectionId = connectionId,
+                senderMessage = message,
+                senderMessageTimeSent = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"))
+            };
+
             if (senderAccount == null)
             {
                 response.senderName = "Anonymous";
-                response.senderAccountId = "N/A";
+                response.senderAccountId = senderAccountId;
             }
             else
             {

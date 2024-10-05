@@ -131,7 +131,7 @@ namespace BOM_API_v2.Controllers
                     connection_id = connectionInfo.ConnectionId,
                     account_id = connectionInfo.AccountId,
                     name = connectionInfo.Name,
-                    role = connectionInfo.Claims == null ? "Anonymous" : connectionInfo.Claims.FirstOrDefault()
+                    role = connectionInfo.Claims == null ? "Customer" : connectionInfo.Claims.FirstOrDefault()
                 });
             }
 
@@ -154,7 +154,7 @@ namespace BOM_API_v2.Controllers
                     connection_id = connectionInfo.ConnectionId,
                     account_id = connectionInfo.AccountId,
                     name = connectionInfo.Name,
-                    role = connectionInfo.Claims == null || connectionInfo.Claims.IsNullOrEmpty() ? "Anonymous" : connectionInfo.Claims.FirstOrDefault()
+                    role = connectionInfo.Claims == null || connectionInfo.Claims.IsNullOrEmpty() ? "Customer" : connectionInfo.Claims.FirstOrDefault()
                 });
             }
 
