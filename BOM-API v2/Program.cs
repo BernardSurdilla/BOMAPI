@@ -1,7 +1,9 @@
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Services;
 using BOM_API_v2.Bridge;
+using BOM_API_v2.Data;
 using BOM_API_v2.Helpers;
+using BOM_API_v2.KaizenFiles;
 using BOM_API_v2.Services;
 using JWTAuthentication.Authentication;
 using LiveChat;
@@ -15,6 +17,7 @@ using Swashbuckle.AspNetCore.Filters;
 using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
+using static BOM_API_v2.Services.NotificationService;
 
 
 const string API_VERSION = "v1";
@@ -138,6 +141,9 @@ builder.Services.AddSignalR();
 //Custom Services
 //NOTE: Services can also be dependency injected
 //E.G: Using a DBContext in the constructor to get a database context
+
+builder.Services.AddScoped<IDataAccess, DataAccess>();
+builder.Services.AddScoped<NotificationService>();
 
 builder.Services.AddScoped<IActionLogger, AccountManager>(); //Logging service
 builder.Services.AddTransient<IEmailService, EmailService>(); //Email Sending Service

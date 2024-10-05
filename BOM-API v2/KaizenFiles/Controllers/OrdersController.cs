@@ -2954,7 +2954,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                 await connection.OpenAsync();
 
                 string sql = @" SELECT suborder_id, order_id, status, design_id, design_name 
-                FROM suborders WHERE status IN ('to review') AND customer_id = @customer_id";
+                FROM suborders WHERE status IN ('to review' , 'for approval') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2987,7 +2987,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                             // If the order ID is valid, fetch the picture data
                             if (!string.IsNullOrEmpty(order.designId))
                             {
-                                byte[] pictureData = await GetPictureDataByDesignId(order.designId);
+                                byte[]? pictureData = await GetPictureDataByDesignId(order.designId);
                                 if (pictureData != null)
                                 {
                                     // Convert the picture data to a base64 string
