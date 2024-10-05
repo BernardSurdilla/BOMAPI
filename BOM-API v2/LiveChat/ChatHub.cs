@@ -42,7 +42,7 @@ namespace LiveChat
 
                 authorizationHeaderBearerToken = authorizationHeaderToken;
             }
-            if (authorizationHeaderBearerToken != null)
+            if (authorizationHeaderBearerToken != null && authorizationHeaderBearerToken != "")
             {
                 var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
                 currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
@@ -101,6 +101,7 @@ namespace LiveChat
             if (currentUser == null) return;
 
 
+
             var requestHttpContext = Context.GetHttpContext();
             string? authorizationHeaderBearerToken = null;
 
@@ -115,7 +116,7 @@ namespace LiveChat
 
                 authorizationHeaderBearerToken = authorizationHeaderToken;
             }
-            if (authorizationHeaderBearerToken != null)
+            if (authorizationHeaderBearerToken != null && authorizationHeaderBearerToken != "")
             {
                 var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
                 currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
@@ -160,6 +161,7 @@ namespace LiveChat
             if (currentUser == null) return;
 
 
+
             var requestHttpContext = Context.GetHttpContext();
             string? authorizationHeaderBearerToken = null;
 
@@ -174,7 +176,7 @@ namespace LiveChat
 
                 authorizationHeaderBearerToken = authorizationHeaderToken;
             }
-            if (authorizationHeaderBearerToken != null)
+            if (authorizationHeaderBearerToken != null && authorizationHeaderBearerToken != "")
             {
                 var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
                 currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
@@ -235,7 +237,7 @@ namespace LiveChat
 
                 authorizationHeaderBearerToken = authorizationHeaderToken;
             }
-            if (authorizationHeaderBearerToken != null)
+            if (authorizationHeaderBearerToken != null && authorizationHeaderBearerToken != "")
             {
                 var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
                 currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
@@ -287,7 +289,7 @@ namespace LiveChat
 
                 authorizationHeaderBearerToken = authorizationHeaderToken;
             }
-            if (authorizationHeaderBearerToken != null)
+            if (authorizationHeaderBearerToken != null && authorizationHeaderBearerToken != "")
             {
                 var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
                 currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));

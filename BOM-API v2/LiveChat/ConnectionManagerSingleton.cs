@@ -31,8 +31,8 @@ namespace LiveChat
         public ConnectionInfo(string connectionId, string? accountId, string? name, List<string>? claims)
         {
             ConnectionId = connectionId;
-            AccountId = accountId;
-            Name = name;
+            AccountId = accountId == null ? Guid.NewGuid().ToString() : accountId;
+            Name = name == null ? "Anonymous" : name;
             Claims = claims;
         }
     }
