@@ -2,6 +2,10 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Primitives;
+using System.Diagnostics;
 
 namespace LiveChat
 {
@@ -23,6 +27,28 @@ namespace LiveChat
         {
             ClaimsPrincipal? currentUser = Context.User;
 
+
+            var requestHttpContext = Context.GetHttpContext();
+            string? authorizationHeaderBearerToken = null;
+
+            if (requestHttpContext != null)
+            {
+                StringValues authorizationHeader = requestHttpContext.Request.Query["access_token"]; ;
+
+                string authorizationHeaderToken = authorizationHeader.ToString();
+
+                authorizationHeaderToken = authorizationHeaderToken.Split(',')[0];
+                authorizationHeaderToken = authorizationHeaderToken.Replace("Bearer ", "");
+
+                authorizationHeaderBearerToken = authorizationHeaderToken;
+            }
+            if (authorizationHeaderBearerToken != null)
+            {
+                var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
+                currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
+
+            }
+
             ConnectionInfo? currentConnectionInfo = _connectionManager.GetAllCustomerConnections().FirstOrDefault(x => x.ConnectionId == Context.ConnectionId);
 
             MessageFormat formattedMessage;
@@ -37,24 +63,22 @@ namespace LiveChat
 
             if (currentUser != null)
             {
-                if (currentUser.Identity.IsAuthenticated == true)
+                List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
+
+                if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
+                //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
+
+                APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
+                APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
+
+                IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
+
+                if (recieverUserAccountRoles.Contains(UserRoles.Admin)
+                    || recieverUserAccountRoles.Contains(UserRoles.Manager))
                 {
-                    List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
-
-                    if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
-                    //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
-
-                    APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
-                    APIUsers? recieverUserAccount = await _userManager.FindByIdAsync(accountId);
-
-                    IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
-
-                    if (recieverUserAccountRoles.Contains(UserRoles.Admin)
-                        || recieverUserAccountRoles.Contains(UserRoles.Manager))
-                    {
-                        await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
-                    }
+                    await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
                 }
+                
             } 
 
             ConnectionInfo? messageRecipientConnectionInfo = _connectionManager.GetAllAdminConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
@@ -75,6 +99,28 @@ namespace LiveChat
         {
             ClaimsPrincipal? currentUser = Context.User;
             if (currentUser == null) return;
+
+
+            var requestHttpContext = Context.GetHttpContext();
+            string? authorizationHeaderBearerToken = null;
+
+            if (requestHttpContext != null)
+            {
+                StringValues authorizationHeader = requestHttpContext.Request.Query["access_token"]; ;
+
+                string authorizationHeaderToken = authorizationHeader.ToString();
+
+                authorizationHeaderToken = authorizationHeaderToken.Split(',')[0];
+                authorizationHeaderToken = authorizationHeaderToken.Replace("Bearer ", "");
+
+                authorizationHeaderBearerToken = authorizationHeaderToken;
+            }
+            if (authorizationHeaderBearerToken != null)
+            {
+                var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
+                currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
+
+            }
 
             List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
             if (roles.Count == 0) return;
@@ -113,6 +159,28 @@ namespace LiveChat
             ClaimsPrincipal? currentUser = Context.User;
             if (currentUser == null) return;
 
+
+            var requestHttpContext = Context.GetHttpContext();
+            string? authorizationHeaderBearerToken = null;
+
+            if (requestHttpContext != null)
+            {
+                StringValues authorizationHeader = requestHttpContext.Request.Query["access_token"]; ;
+
+                string authorizationHeaderToken = authorizationHeader.ToString();
+
+                authorizationHeaderToken = authorizationHeaderToken.Split(',')[0];
+                authorizationHeaderToken = authorizationHeaderToken.Replace("Bearer ", "");
+
+                authorizationHeaderBearerToken = authorizationHeaderToken;
+            }
+            if (authorizationHeaderBearerToken != null)
+            {
+                var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
+                currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
+
+            }
+
             List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
             if (roles.Count == 0) return;
             if (roles.Where(x => x.Value == UserRoles.Artist).FirstOrDefault() == null) return;
@@ -148,8 +216,31 @@ namespace LiveChat
         [HubMethodName("admin-send-message")]
         public async Task AdminSendMessage(string message, string accountId)
         {
+
             ClaimsPrincipal? currentUser = Context.User;
             if (currentUser == null) return;
+
+
+            var requestHttpContext = Context.GetHttpContext();
+            string? authorizationHeaderBearerToken = null;
+
+            if (requestHttpContext != null)
+            {
+                StringValues authorizationHeader = requestHttpContext.Request.Query["access_token"]; ;
+
+                string authorizationHeaderToken = authorizationHeader.ToString();
+
+                authorizationHeaderToken = authorizationHeaderToken.Split(',')[0];
+                authorizationHeaderToken = authorizationHeaderToken.Replace("Bearer ", "");
+
+                authorizationHeaderBearerToken = authorizationHeaderToken;
+            }
+            if (authorizationHeaderBearerToken != null)
+            {
+                var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
+                currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
+
+            }
 
             List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
             if (roles.Count == 0) return;
@@ -182,21 +273,38 @@ namespace LiveChat
         {
             ClaimsPrincipal? currentUser = Context.User;
 
+            var requestHttpContext = Context.GetHttpContext();
+            string? authorizationHeaderBearerToken = null;
+
+            if (requestHttpContext != null)
+            {
+                StringValues authorizationHeader = requestHttpContext.Request.Query["access_token"]; ;
+                
+                string authorizationHeaderToken = authorizationHeader.ToString();
+
+                authorizationHeaderToken = authorizationHeaderToken.Split(',')[0];
+                authorizationHeaderToken = authorizationHeaderToken.Replace("Bearer ", "");
+
+                authorizationHeaderBearerToken = authorizationHeaderToken;
+            }
+            if (authorizationHeaderBearerToken != null)
+            {
+                var decrypt = new JwtSecurityTokenHandler().ReadJwtToken(authorizationHeaderBearerToken);
+                currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
+                
+            }
+            
             if (currentUser != null)
             {
-                if (currentUser.Identity.IsAuthenticated == false) { _connectionManager.AddConnection(Context.ConnectionId); }
-                else
-                {
-                    List<Claim> allRoles = currentUser.FindAll(ClaimTypes.Role).ToList();
-                    List<string> allRolesParsed = new List<string>();
-                    foreach (Claim claim in allRoles) { allRolesParsed.Add(claim.Value); }
+                List<Claim> allRoles = currentUser.FindAll(ClaimTypes.Role).ToList();
+                List<string> allRolesParsed = new List<string>();
+                foreach (Claim claim in allRoles) { allRolesParsed.Add(claim.Value); }
 
-                    _connectionManager.AddConnection(new ConnectionInfo(
-                    Context.ConnectionId,
-                    currentUser.FindFirstValue(ClaimTypes.NameIdentifier),
-                    currentUser.FindFirstValue(ClaimTypes.Name),
-                    allRolesParsed));
-                }
+                _connectionManager.AddConnection(new ConnectionInfo(
+                Context.ConnectionId,
+                currentUser.FindFirstValue(ClaimTypes.NameIdentifier),
+                currentUser.FindFirstValue(ClaimTypes.Name),
+                allRolesParsed));
             }
             else
             {
