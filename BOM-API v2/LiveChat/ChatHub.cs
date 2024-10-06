@@ -27,7 +27,6 @@ namespace LiveChat
         {
             ClaimsPrincipal? currentUser = Context.User;
 
-
             var requestHttpContext = Context.GetHttpContext();
             string? authorizationHeaderBearerToken = null;
 
@@ -333,21 +332,17 @@ namespace LiveChat
 
             if (senderAccount != null)
             {
-                if (senderAccount.Identity.IsAuthenticated == false)
-                {
-                    response.senderName = "Anonymous";
-                    response.senderAccountId = "N/A";
-                }
-                else
-                {
-                    Claim? nameClaim = senderAccount.FindFirst(ClaimTypes.Name);
-                    Claim? idClaim = senderAccount.FindFirst(ClaimTypes.NameIdentifier);
+                Claim? nameClaim = senderAccount.FindFirst(ClaimTypes.Name);
+                Claim? idClaim = senderAccount.FindFirst(ClaimTypes.NameIdentifier);
 
-                    response.senderName = nameClaim == null ? "N/A" : nameClaim.Value;
-                    response.senderAccountId = idClaim == null ? "N/A" : idClaim.Value;
+                response.senderName = nameClaim == null ? "Anonymous" : nameClaim.Value;
+                response.senderAccountId = idClaim == null ? "N/A" : idClaim.Value;
+            }
+            else
+            {
 
-                }
-
+                response.senderName = "Anonymous";
+                response.senderAccountId = "N/A";
             }
 
             return response;

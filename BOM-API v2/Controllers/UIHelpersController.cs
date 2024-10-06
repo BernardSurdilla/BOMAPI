@@ -124,8 +124,9 @@ namespace BOM_API_v2.Controllers
 
             connectionInfos.GroupBy(x => x.ConnectionId).Select(g => g.First()).ToList();
 
-            foreach (LiveChat.ConnectionInfo connectionInfo in connectionInfos)
+            foreach (LiveChat.ConnectionInfo? connectionInfo in connectionInfos)
             {
+                if (connectionInfo == null) continue;
                 response.Add(new ChatConnection
                 {
                     connection_id = connectionInfo.ConnectionId,
