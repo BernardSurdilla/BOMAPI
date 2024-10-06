@@ -34,7 +34,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpGet("/culo-api/v1/current-user/notifications")]
         [ProducesResponseType(typeof(Notif), StatusCodes.Status200OK)]
-        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
         public async Task<IActionResult> GetNotifications()
         {
             List<Notif> notifications = new List<Notif>();
@@ -51,11 +51,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                 // Retrieve userId from the username
                 string userId = await GetUserIdByAllUsername(username);
-                string user = userId.ToLower();
+                string user;
 
-                if (userId == null || userId.Length == 0)
+                if (string.IsNullOrEmpty(userId))
                 {
-                    return BadRequest("Customer not found.");
+                    user = await GetUserIdByUsername(username);
+
+                }else
+                {
+                    user = userId;
                 }
 
                 using (var connection = new MySqlConnection(connectionstring))
@@ -296,6 +300,40 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             string binary16String = BitConverter.ToString(guidBytes).Replace("-", "");
 
             return binary16String;
+        }
+
+        private async Task<string> GetUserIdByUsername(string username)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT UserId FROM users WHERE Username = @username AND Type IN (2, 3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@username", username);
+                    var result = await command.ExecuteScalarAsync();
+
+                    if (result != null && result != DBNull.Value)
+                    {
+                        // Cast the result to byte array
+                        byte[] userIdBytes = (byte[])result;
+
+                        // Convert byte array to hexadecimal string
+                        string userIdHex = BitConverter.ToString(userIdBytes).Replace("-", "").ToLower();
+
+                        // Debug.WriteLine to display the value of userIdHex
+                        Debug.WriteLine($"UserId hex for username '{username}': {userIdHex}");
+
+                        return userIdHex; // Return the hex string
+                    }
+                    else
+                    {
+                        return null; // Employee not found or not of type 2 or 3
+                    }
+                }
+            }
         }
 
         private async Task<string> GetUserIdByAllUsername(string username)

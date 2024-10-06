@@ -804,6 +804,37 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        private async Task<List<string>> GetAdmins()
+        {
+            List<string> userIds = new List<string>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT UserId FROM users WHERE Type IN (2, 3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        // Cast the result to byte array
+                        byte[] userIdBytes = (byte[])reader["UserId"];
+
+                        // Convert byte array to hexadecimal string
+                        string userIdHex = BitConverter.ToString(userIdBytes).Replace("-", "").ToLower();
+
+                        // Add the userId to the list
+                        userIds.Add(userIdHex);
+                    }
+                }
+            }
+
+            return userIds;
+        }
+
+
 
         [HttpPost("/culo-api/v1/current-user/cart/checkout")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
@@ -864,16 +895,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     // Update the suborder with the new orderId
                     await UpdateSuborderWithOrderId(suborderIdBinary, orderIdBinary);
                 }
-
-                Guid notId = Guid.NewGuid();
-
-                string notifId = notId.ToString().ToLower();
-
-                string userId = customerId.ToLower();
-
-                string message = ((customerUsername ?? "Unknown") + " your cart has been added to your to pay");
-
-                //await NotifyAsync(notifId, userId, message);
 
                 return Ok($"Order for {checkOutRequest.suborderIds.Count} suborder(s) has been successfully created with order ID '{orderIdBinary}'.");
             }
@@ -1586,7 +1607,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT Id FROM aspnetusers WHERE Username = @username AND EmailConfirmed = 1";
+                string sql = "SELECT Id FROM aspnetusers WHERE Username = @username";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2508,14 +2529,13 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
             return isCustomOrder;
         }
 
-
         [HttpGet("/culo-api/v1/current-user/cart/")]
         [ProducesResponseType(typeof(Cart), StatusCodes.Status200OK)]
         //[Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
-            
+
             if (string.IsNullOrEmpty(customerUsername))
             {
                 return Unauthorized("User is not authorized");

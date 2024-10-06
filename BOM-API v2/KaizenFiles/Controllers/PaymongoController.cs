@@ -374,6 +374,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         // Send the notification
                         await NotifyAsync(notifId, userId, message);
 
+                        await SendNotificationsForAdminsAsync();
+
                         string transacId = payMongoResponse.data[0].id.ToLower();
 
                         string transactionStatus = (indicator == totalPrice) ? "paid" : "half paid";
@@ -406,6 +408,56 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 _logger.LogError(ex, "Error processing order");
                 return "An error occurred while processing the order.";
             }
+        }
+
+        private async Task SendNotificationsForAdminsAsync()
+        {
+            // Get list of all users with type 2, 3, 4
+            List<string> userIds = await GetAdmins();
+
+            // Notification message
+            string message = "New order has been added to approve";
+
+            // Loop through each user and send a notification
+            foreach (string userId in userIds)
+            {
+                // Create a new GUID for the notification ID
+                Guid notId = Guid.NewGuid();
+                string notifId = notId.ToString().ToLower();
+
+                await NotifyAsync(notifId, userId, message);
+            }
+        }
+
+
+        private async Task<List<string>> GetAdmins()
+        {
+            List<string> userIds = new List<string>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT UserId FROM users WHERE Type IN (3, 4)";
+
+                using (var command = new MySqlCommand(sql, connection))
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        // Cast the result to byte array
+                        byte[] userIdBytes = (byte[])reader["UserId"];
+
+                        // Convert byte array to hexadecimal string
+                        string userIdHex = BitConverter.ToString(userIdBytes).Replace("-", "").ToLower();
+
+                        // Add the userId to the list
+                        userIds.Add(userIdHex);
+                    }
+                }
+            }
+
+            return userIds;
         }
 
         private async Task CheckAndSchedulePickupNotification(string orderIdBinary, string userId)
