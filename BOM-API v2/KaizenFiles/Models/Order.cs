@@ -246,7 +246,6 @@ namespace CRUDFI.Models
         public string? designName { get; set; }
         public Prices price { get; set; }
         public DateTime? pickup { get; set; }
-        public string pictureData { get; set; }
     }
 
     public class CustomInitial
