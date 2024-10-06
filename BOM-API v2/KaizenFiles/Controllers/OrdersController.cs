@@ -2516,7 +2516,7 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
 
         [HttpGet("/culo-api/v1/current-user/cart/")]
         [ProducesResponseType(typeof(Cart), StatusCodes.Status200OK)]
-        //[Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -2544,12 +2544,19 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
                     // First, fetch all the suborders
                     string sql = @"
 SELECT 
-    suborder_id, order_id, customer_id, employee_id, created_at, status, 
-    design_id, design_name, price, quantity, 
-    last_updated_by, last_updated_at, is_active, description, 
-    flavor, size, customer_name, employee_name, shape, color, pastry_id 
-FROM suborders 
-WHERE customer_id = @customerId AND status IN('cart')";
+    s.suborder_id, s.order_id, s.customer_id, s.employee_id, s.created_at, 
+    s.status, s.design_id, s.design_name, s.price, s.quantity, 
+    s.last_updated_by, s.last_updated_at, s.is_active, s.description, 
+    s.flavor, s.size, s.customer_name, s.employee_name, s.shape, s.color, 
+    s.pastry_id, c.cover -- Retrieving the 'cover' column from customorders
+FROM 
+    suborders s
+LEFT JOIN 
+    customorders c ON s.suborder_id = c.suborder_id -- Joining with customorders on suborder_id
+WHERE 
+    s.customer_id = @customerId 
+    AND s.status IN ('cart');
+";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -2581,6 +2588,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                     description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
                                     flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                     size = reader.GetString(reader.GetOrdinal("size")),
+                                    cover = reader.IsDBNull(reader.GetOrdinal("cover")) ? null : reader.GetString(reader.GetOrdinal("cover")),
                                 });
                             }
                         }
@@ -2703,7 +2711,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                 await connection.OpenAsync();
 
                 string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
-                        FROM orders WHERE status IN ('to pay','for approval') AND customer_id = @customer_id";
+                        FROM orders WHERE status IN ('to pay') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2838,6 +2846,123 @@ WHERE customer_id = @customerId AND status IN('cart')";
             return addonTotal;
         }
 
+        [HttpGet("/culo-api/v1/current-user/to-approve")]
+        [ProducesResponseType(typeof(CustomerInitial), StatusCodes.Status200OK)]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToApproveInitialOrdersByCustomerIds()
+        {
+            try
+            {
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the customer's ID using the extracted username
+                string customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                // Fetch all orders (no search or filtering logic)
+                List<CustomerInitial> orders = await FetchInitialToApproveCustomerOrdersAsync(customerId);
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}. Stack Trace: {ex.StackTrace}");
+
+            }
+        }
+
+        private async Task<List<CustomerInitial>> FetchInitialToApproveCustomerOrdersAsync(string customerid)
+        {
+            List<CustomerInitial> orders = new List<CustomerInitial>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
+                        FROM orders WHERE status IN ('for approval') AND customer_id = @customer_id";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customer_id", customerid);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string orderId = reader["order_id"].ToString();
+
+                            // Initialize a CustomerInitial object with order details
+                            CustomerInitial order = new CustomerInitial
+                            {
+                                orderId = orderId,
+                                type = !reader.IsDBNull(reader.GetOrdinal("type"))
+                                        ? reader.GetString(reader.GetOrdinal("type"))
+                                        : null,
+                                pickup = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
+                                         ? (DateTime?)null
+                                         : reader.GetDateTime(reader.GetOrdinal("pickup_date")),
+                                payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
+                                           ? reader.GetString(reader.GetOrdinal("payment"))
+                                           : null,
+                                status = !reader.IsDBNull(reader.GetOrdinal("status"))
+                                         ? reader.GetString(reader.GetOrdinal("status"))
+                                         : null,
+                                price = new Prices() // Initialize the price list
+                            };
+
+                            // If the order ID is valid, fetch the total price and design details
+                            if (!string.IsNullOrEmpty(orderId))
+                            {
+                                // Convert order ID to string and pass to CalculateTotalPriceForOrderAsync
+                                string orderIdString = order.orderId.ToLower();
+                                double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
+
+                                // Calculate half price
+                                double halfPrice = totalPrice / 2;
+
+                                // Add the total price to the Prices list in the CustomerInitial object
+                                order.price = new Prices
+                                {
+                                    full = totalPrice,  // Assign the total price to the full property
+                                    half = halfPrice    // Assign the half price to the half property
+                                };
+
+                                // Fetch design details (similar to before)
+                                List<CustomerInitial> designDetails = await FetchDesignToPayCustomerAsync(orderIdString);
+                                if (designDetails.Any())
+                                {
+                                    order.designId = designDetails.First().designId;
+                                    order.designName = designDetails.First().designName;
+                                }
+
+                                //var (tier, cover) = await FetchTierAndCoverBySuborderIdAsync(order.suborderId);
+                                //order.tier = tier;
+                                //order.cover = cover;
+
+                            }
+
+                            orders.Add(order); // Add the order with design details to the list
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
 
 
         [HttpGet("/culo-api/v1/current-user/for-approval")]
@@ -2887,7 +3012,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                 await connection.OpenAsync();
 
                 string sql = @" SELECT suborder_id, order_id, status, design_id, design_name 
-                FROM suborders WHERE status IN ('to review' , 'for approval') AND customer_id = @customer_id";
+                FROM suborders WHERE status IN ('for approval') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2937,7 +3062,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
             return orders;
         }
 
-        private async Task<(string tier, string cover)> FetchTierAndCoverBySuborderIdAsync(string suborderId)
+        private async Task<(int? tier, string cover)> FetchTierAndCoverBySuborderIdAsync(string suborderId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -2953,9 +3078,9 @@ WHERE customer_id = @customerId AND status IN('cart')";
                     {
                         if (await reader.ReadAsync())
                         {
-                            string tier = reader.IsDBNull(reader.GetOrdinal("tier"))
-                                ? null
-                                : reader.GetString(reader.GetOrdinal("tier"));
+                            int? tier = reader.IsDBNull(reader.GetOrdinal("tier"))
+    ? (int?)null
+    : reader.GetInt32(reader.GetOrdinal("tier"));
 
                             string cover = reader.IsDBNull(reader.GetOrdinal("cover"))
                                 ? null

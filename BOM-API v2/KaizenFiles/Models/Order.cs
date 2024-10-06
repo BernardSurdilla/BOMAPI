@@ -240,6 +240,8 @@ namespace CRUDFI.Models
         public string status { get; set; }
         public string type { get; set; }
         public string? designName { get; set; }
+        public string cover { get; set; }
+        public int? tier { get; set; }
         public Prices price { get; set; }
         public DateTime? pickup { get; set; }
     }
@@ -252,7 +254,7 @@ namespace CRUDFI.Models
         public string status { get; set; }
         public string? designName { get; set; }
         public string cover { get; set; }
-        public string tier { get; set; }
+        public int? tier { get; set; }
         public string pictureData { get; set; }
     }
 
@@ -324,7 +326,7 @@ namespace CRUDFI.Models
         public string designId { get; set; }
         public string? pastryId { get; set; }
         public string status { get; set; }
-        public string designName { get; set; }
+        public string? designName { get; set; }
         public string color { get; set; } = string.Empty;
         public string shape { get; set; } = string.Empty;
         public double price { get; set; }
@@ -332,6 +334,7 @@ namespace CRUDFI.Models
         public string? description { get; set; }
         public string flavor { get; set; }
         public string size { get; set; }
+        public string? cover { get; set; }
     }
 
     public class Artist
