@@ -21,25 +21,35 @@ namespace BOM_API_v2.Controllers
 
         [Authorize(Roles = UserRoles.Admin)]
         [HttpGet("valid-measurement-values")]
-        public async Task<Dictionary<string, List<string>>> ValidMeasurementValues()
+        public Dictionary<string, List<string>> ValidMeasurementValues()
         {
             return ValidUnits.ValidMeasurementUnits();
         }
         [Authorize(Roles = UserRoles.Admin)]
         [HttpGet("valid-item-types")]
-        public async Task<string[]> ValidItemTypes()
+        public string[] ValidItemTypes()
         {
-            return ["INV"];
+            return ValidFormInput.PastryMaterialIngredientTypes() ;
         }
         [Authorize(Roles = UserRoles.Admin)]
         [HttpGet("valid-ingredient-importance-values")]
-        public async Task<Dictionary<string, int>> ValidIngredientImportanceValues()
+        public Dictionary<string, int> ValidIngredientImportanceValues()
         {
             Dictionary<string, int> response = PastryMaterialIngredientImportanceCode.ValidIngredientImportanceCodes();
 
             return response;
-
         }
+        [HttpGet("valid-design-shapes")]
+        public string[] ValidDesignShapes()
+        {
+            return ValidFormInput.DesignShapes();
+        }
+        [HttpGet("valid-design-flavors")]
+        public string[] ValidDesignFlavors()
+        {
+            return ValidFormInput.DesignFlavors();
+        }
+
         [HttpGet("get-design-info/{designId}")]
         public async Task<GetDesignInfo> GetDesignInfo([FromRoute] Guid designId)
         {

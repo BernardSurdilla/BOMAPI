@@ -309,6 +309,31 @@ namespace BillOfMaterialsAPI.Helpers
             return "";
         }
     }
+    public class ValidFormInput
+    {
+        public static string[] PastryMaterialIngredientTypes()
+        {
+            string[] response = ["INV"];
+            return response;
+        }
+        public static string[] DesignFlavors()
+        {
+            string[] response = ["Dark Chocolate",
+                "Funfetti (vanilla with sprinkles)",
+                "Vanilla Caramel",
+                "Mocha",
+                "Red Velvet",
+                "Banana"];
+            return response;
+        }
+        public static string[] DesignShapes()
+        {
+            string[] response = ["Round",
+                "Heart",
+                "Rectangle"];
+            return response;
+        }
+    }
     public class DataVerification
     {
         public static async Task<bool> PastryMaterialExistsAsync(string pastry_material_id, DatabaseContext context)
