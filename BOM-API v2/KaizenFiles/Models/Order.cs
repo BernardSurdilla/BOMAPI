@@ -240,6 +240,8 @@ namespace CRUDFI.Models
         public string status { get; set; }
         public string type { get; set; }
         public string? designName { get; set; }
+        public string cover { get; set; }
+        public int? tier { get; set; }
         public Prices price { get; set; }
         public DateTime? pickup { get; set; }
     }

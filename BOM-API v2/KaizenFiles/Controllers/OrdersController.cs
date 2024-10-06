@@ -2711,7 +2711,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
-                        FROM orders WHERE status IN ('to pay','for approval') AND customer_id = @customer_id";
+                        FROM orders WHERE status IN ('to pay') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2846,6 +2846,123 @@ WHERE
             return addonTotal;
         }
 
+        [HttpGet("/culo-api/v1/current-user/to-approve")]
+        [ProducesResponseType(typeof(CustomerInitial), StatusCodes.Status200OK)]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToApproveInitialOrdersByCustomerIds()
+        {
+            try
+            {
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the customer's ID using the extracted username
+                string customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                // Fetch all orders (no search or filtering logic)
+                List<CustomerInitial> orders = await FetchInitialToApproveCustomerOrdersAsync(customerId);
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}. Stack Trace: {ex.StackTrace}");
+
+            }
+        }
+
+        private async Task<List<CustomerInitial>> FetchInitialToApproveCustomerOrdersAsync(string customerid)
+        {
+            List<CustomerInitial> orders = new List<CustomerInitial>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
+                        FROM orders WHERE status IN ('for approval') AND customer_id = @customer_id";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customer_id", customerid);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string orderId = reader["order_id"].ToString();
+
+                            // Initialize a CustomerInitial object with order details
+                            CustomerInitial order = new CustomerInitial
+                            {
+                                orderId = orderId,
+                                type = !reader.IsDBNull(reader.GetOrdinal("type"))
+                                        ? reader.GetString(reader.GetOrdinal("type"))
+                                        : null,
+                                pickup = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
+                                         ? (DateTime?)null
+                                         : reader.GetDateTime(reader.GetOrdinal("pickup_date")),
+                                payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
+                                           ? reader.GetString(reader.GetOrdinal("payment"))
+                                           : null,
+                                status = !reader.IsDBNull(reader.GetOrdinal("status"))
+                                         ? reader.GetString(reader.GetOrdinal("status"))
+                                         : null,
+                                price = new Prices() // Initialize the price list
+                            };
+
+                            // If the order ID is valid, fetch the total price and design details
+                            if (!string.IsNullOrEmpty(orderId))
+                            {
+                                // Convert order ID to string and pass to CalculateTotalPriceForOrderAsync
+                                string orderIdString = order.orderId.ToLower();
+                                double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
+
+                                // Calculate half price
+                                double halfPrice = totalPrice / 2;
+
+                                // Add the total price to the Prices list in the CustomerInitial object
+                                order.price = new Prices
+                                {
+                                    full = totalPrice,  // Assign the total price to the full property
+                                    half = halfPrice    // Assign the half price to the half property
+                                };
+
+                                // Fetch design details (similar to before)
+                                List<CustomerInitial> designDetails = await FetchDesignToPayCustomerAsync(orderIdString);
+                                if (designDetails.Any())
+                                {
+                                    order.designId = designDetails.First().designId;
+                                    order.designName = designDetails.First().designName;
+                                }
+
+                                //var (tier, cover) = await FetchTierAndCoverBySuborderIdAsync(order.suborderId);
+                                //order.tier = tier;
+                                //order.cover = cover;
+
+                            }
+
+                            orders.Add(order); // Add the order with design details to the list
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
 
 
         [HttpGet("/culo-api/v1/current-user/for-approval")]
@@ -2895,7 +3012,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT suborder_id, order_id, status, design_id, design_name 
-                FROM suborders WHERE status IN ('to review' , 'for approval') AND customer_id = @customer_id";
+                FROM suborders WHERE status IN ('for approval') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
