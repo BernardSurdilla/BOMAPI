@@ -1729,7 +1729,9 @@ namespace BillOfMaterialsAPI.Helpers
                             try
                             { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentBaseIngredient.item_id, kaizenTables); }
                             catch (FormatException e) { throw new FormatException("The pastry ingredient with the type of " + IngredientType.InventoryItem + " and the ingredient id " + currentBaseIngredient.ingredient_id + " cannot be parsed as an integer"); }
-                            catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The pastry ingredient with the type of " + IngredientType.InventoryItem + " and the item id " + currentBaseIngredient.item_id + " does not exist in the inventory"); }
+                            catch (NotFoundInDatabaseException e) {
+                                continue;
+                            }
 
                             string currentItemMeasurement = currentBaseIngredient.amount_measurement;
                             double currentItemAmount = currentBaseIngredient.amount;
@@ -1787,7 +1789,8 @@ namespace BillOfMaterialsAPI.Helpers
                                 try
                                 { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentMaterialIngredient.item_id, kaizenTables); }
                                 catch (FormatException e) { throw new FormatException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ", failed to parse its item id " + currentMaterialIngredient.item_id + " as an integer"); }
-                                catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ",  its item id " + currentMaterialIngredient.item_id + " does not refer to any active inventory record"); }
+                                catch (NotFoundInDatabaseException e)
+                                { continue; }
 
                                 string currentItemMeasurement = currentMaterialIngredient.amount_measurement;
                                 double currentItemAmount = currentMaterialIngredient.amount;
@@ -1852,7 +1855,7 @@ namespace BillOfMaterialsAPI.Helpers
                                 try
                                 { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentSubVariantIngredient.item_id, kaizenTables); }
                                 catch (FormatException e) { throw new FormatException("The pastry sub variant ingredient with the type of " + IngredientType.InventoryItem + " and the ingredient id " + currentSubVariantIngredient.pastry_material_sub_variant_ingredient_id + " cannot be parsed as an integer"); }
-                                catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The pastry sub variant ingredient with the type of " + IngredientType.InventoryItem + " and the item id " + currentSubVariantIngredient.item_id + " does not exist in the inventory"); }
+                                catch (NotFoundInDatabaseException e) { continue; }
 
                                 string currentItemMeasurement = currentSubVariantIngredient.amount_measurement;
                                 double currentItemAmount = currentSubVariantIngredient.amount;
@@ -1910,7 +1913,7 @@ namespace BillOfMaterialsAPI.Helpers
                                     try
                                     { currentRefInvItem = await DataRetrieval.GetInventoryItemAsync(currentMaterialIngredient.item_id, kaizenTables); }
                                     catch (FormatException e) { throw new FormatException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ", failed to parse its item id " + currentMaterialIngredient.item_id + " as an integer"); }
-                                    catch (NotFoundInDatabaseException e) { throw new NotFoundInDatabaseException("The material ingredient for " + currentMaterialIngredient.material_id + " with the id " + currentMaterialIngredient.material_ingredient_id + ",  its item id " + currentMaterialIngredient.item_id + " does not refer to any active inventory record"); }
+                                    catch (NotFoundInDatabaseException e) { continue; }
 
                                     string currentItemMeasurement = currentMaterialIngredient.amount_measurement;
                                     double currentItemAmount = currentMaterialIngredient.amount;
