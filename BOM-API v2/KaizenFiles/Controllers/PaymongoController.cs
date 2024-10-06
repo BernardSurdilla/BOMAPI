@@ -416,7 +416,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             List<string> userIds = await GetAdmins();
 
             // Notification message
-            string message = "New order has been added to approve";
+            string message = "New order has been added to be assigned";
 
             // Loop through each user and send a notification
             foreach (string userId in userIds)
