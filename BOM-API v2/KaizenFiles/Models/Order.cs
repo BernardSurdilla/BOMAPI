@@ -124,17 +124,13 @@ namespace CRUDFI.Models
     {
         public string color { get; set; } = string.Empty;
         public string shape { get; set; } = string.Empty;
-        public string tier { get; set; } = string.Empty;
+        public int tier { get; set; }
         public int quantity { get; set; }
         public string cover { get; set; } = "";
         public string description { get; set; }
         public string size { get; set; }
         public string flavor { get; set; }
-        public string type { get; set; }
-        public string payment { get; set; }
         public string pictureBase64 { get; set; } = "";
-        public string pickupDate { get; set; } = "yyyy-mm-dd";
-        public string pickupTime { get; set; } = "hh:mm AM/PM";
     }
 
     public class CustomOrderPictureResponse

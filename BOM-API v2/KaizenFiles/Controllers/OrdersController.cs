@@ -338,16 +338,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return BadRequest("Customer not found");
                 }
 
-                // Validate pickup date and time formats
-                if (!DateTime.TryParseExact(customOrder.pickupDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate) ||
-                    !DateTime.TryParseExact(customOrder.pickupTime, "h:mm tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedTime))
-                {
-                    return BadRequest("Invalid pickup date or time format. Use 'yyyy-MM-dd' for date and 'h:mm tt' for time.");
-                }
-
-                // Combine the parsed date and time into a single DateTime object
-                DateTime pickupDateTime = new DateTime(parsedDate.Year, parsedDate.Month, parsedDate.Day, parsedTime.Hour, parsedTime.Minute, 0);
-
                 // Process the uploaded image from base64 string
                 byte[] pictureBinary = null;
                 if (!string.IsNullOrEmpty(customOrder.pictureBase64))
@@ -365,27 +355,24 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     customerName = customerUsername,
                     color = customOrder.color,
                     shape = customOrder.shape,
-                    tier = customOrder.tier,
                     description = customOrder.description,
                     cover = customOrder.cover,
-                    type = customOrder.type,
-                    status = "to review",
                     price = 0,
                     isActive = false,
                 };
 
                 // Insert the order and related data into the database
-                Guid orders = Guid.NewGuid();
                 Guid sub = Guid.NewGuid();
                 Guid design = Guid.NewGuid();
-                string orderIdBinary = orders.ToString().ToLower();
+                Guid custom = Guid.NewGuid();
                 string suborderIdBinary = sub.ToString().ToLower();
                 string designIdBinary = design.ToString().ToLower();
+                string customIdBinary = custom.ToString().ToLower();
 
-                await InsertToOrderWithOrderId(orderIdBinary, customerUsername, customerId, pickupDateTime, customOrder.type, customOrder.payment);
-                await InsertsCustomToOrder(order, orderIdBinary, suborderIdBinary, designIdBinary, order.flavor, order.size, customerId, order.color, order.shape);
+
+                await InsertsCustomToOrder(order,suborderIdBinary, designIdBinary, order.flavor, order.size, customerId, order.color, order.shape);
                 await InsertsCustomImage(pictureBinary, designIdBinary);
-                await InsertCustomOrder(orderIdBinary, customerId, designIdBinary, customOrder.tier, customOrder.cover, suborderIdBinary);
+                await InsertCustomOrder(customIdBinary, designIdBinary, customOrder.tier, customOrder.cover, suborderIdBinary);
 
                 // Notify the user about the order approval
                 string notifId = Guid.NewGuid().ToString().ToLower();
@@ -421,7 +408,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        private async Task InsertsCustomToOrder(Custom order, string orderId, string suborderId, string designId, string flavor, string size, string customerId, string color, string shape)
+        private async Task InsertsCustomToOrder(Custom order, string suborderId, string designId, string flavor, string size, string customerId, string color, string shape)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -431,17 +418,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string sql = @"INSERT INTO suborders (
             suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
-            VALUES (@suborderid, @orderid, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
+            VALUES (@suborderid, NULL, @customerId, @CustomerName, NULL, NOW(), 'cart', @designId, @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, NULL , NULL)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@suborderid", suborderId);
-                    command.Parameters.AddWithValue("@orderid", orderId);
                     command.Parameters.AddWithValue("@customerId", customerId);
                     command.Parameters.AddWithValue("@CustomerName", order.customerName);
                     command.Parameters.AddWithValue("@designId", designId);
-                    command.Parameters.AddWithValue("@status", order.status);
                     command.Parameters.AddWithValue("@price", order.price);
                     command.Parameters.AddWithValue("@quantity", order.quantity);
                     command.Parameters.AddWithValue("@isActive", order.isActive);
@@ -456,7 +441,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task InsertCustomOrder(string orderId,string customId, string designId, string tier, string cover, string suborderId)
+        private async Task InsertCustomOrder(string customId, string designId, int tier, string cover, string suborderId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
