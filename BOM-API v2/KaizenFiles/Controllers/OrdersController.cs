@@ -2516,7 +2516,7 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
 
         [HttpGet("/culo-api/v1/current-user/cart/")]
         [ProducesResponseType(typeof(Cart), StatusCodes.Status200OK)]
-        //[Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -2544,12 +2544,19 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
                     // First, fetch all the suborders
                     string sql = @"
 SELECT 
-    suborder_id, order_id, customer_id, employee_id, created_at, status, 
-    design_id, design_name, price, quantity, 
-    last_updated_by, last_updated_at, is_active, description, 
-    flavor, size, customer_name, employee_name, shape, color, pastry_id 
-FROM suborders 
-WHERE customer_id = @customerId AND status IN('cart')";
+    s.suborder_id, s.order_id, s.customer_id, s.employee_id, s.created_at, 
+    s.status, s.design_id, s.design_name, s.price, s.quantity, 
+    s.last_updated_by, s.last_updated_at, s.is_active, s.description, 
+    s.flavor, s.size, s.customer_name, s.employee_name, s.shape, s.color, 
+    s.pastry_id, c.cover -- Retrieving the 'cover' column from customorders
+FROM 
+    suborders s
+LEFT JOIN 
+    customorders c ON s.suborder_id = c.suborder_id -- Joining with customorders on suborder_id
+WHERE 
+    s.customer_id = @customerId 
+    AND s.status IN ('cart');
+";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
@@ -2581,6 +2588,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
                                     description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
                                     flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                     size = reader.GetString(reader.GetOrdinal("size")),
+                                    cover = reader.IsDBNull(reader.GetOrdinal("cover")) ? null : reader.GetString(reader.GetOrdinal("cover")),
                                 });
                             }
                         }
@@ -2937,7 +2945,7 @@ WHERE customer_id = @customerId AND status IN('cart')";
             return orders;
         }
 
-        private async Task<(string tier, string cover)> FetchTierAndCoverBySuborderIdAsync(string suborderId)
+        private async Task<(int? tier, string cover)> FetchTierAndCoverBySuborderIdAsync(string suborderId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -2953,9 +2961,9 @@ WHERE customer_id = @customerId AND status IN('cart')";
                     {
                         if (await reader.ReadAsync())
                         {
-                            string tier = reader.IsDBNull(reader.GetOrdinal("tier"))
-                                ? null
-                                : reader.GetString(reader.GetOrdinal("tier"));
+                            int? tier = reader.IsDBNull(reader.GetOrdinal("tier"))
+    ? (int?)null
+    : reader.GetInt32(reader.GetOrdinal("tier"));
 
                             string cover = reader.IsDBNull(reader.GetOrdinal("cover"))
                                 ? null
