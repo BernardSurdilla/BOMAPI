@@ -235,15 +235,13 @@ namespace CRUDFI.Models
     public class CustomerInitial
     {
         public string orderId { get; set; }
-        public string designId { get; set; }
         public string? payment { get; set; }
-        public string status { get; set; }
         public string type { get; set; }
-        public string? designName { get; set; }
-        public string cover { get; set; }
-        public int? tier { get; set; }
         public Prices price { get; set; }
         public DateTime? pickup { get; set; }
+
+        public List<OrderItem> orderItems { get; set; } = new List<OrderItem>();
+        public List<CustomItem> customItems { get; set; } = new List<CustomItem>();
     }
 
     public class CustomInitial
@@ -373,31 +371,43 @@ namespace CRUDFI.Models
 
         // List to hold all suborders
         public List<OrderItem> orderItems { get; set; } = new List<OrderItem>();
+        public List<CustomItem> customItems { get; set; } = new List<CustomItem>();
+    }
+
+    public class CustomItem
+    {
+        public string suborderId { get; set; }
+        public string orderId { get; set; }
+        public string color { get; set; }
+        public string shape { get; set; }
+        public string designId { get; set; }
+        public string? designName { get; set; }
+        public double price { get; set; }
+        public int quantity { get; set; }
+        public string description { get; set; }
+        public string flavor { get; set; }
+        public string size { get; set; }
+        public double customTotal { get; set; }
+        public string cover { get; set; }
+        public int? tier { get; set; }
+        public byte[] pictureDate { get; set; }
+        public List<OrderAddon1> orderAddons { get; set; } = new List<OrderAddon1>();
     }
 
     public class OrderItem
     {
         public string suborderId { get; set; }
         public string orderId { get; set; }
-        public string customerId { get; set; }
-        public string employeeId { get; set; }
-        public string employeeName { get; set; }
-        public DateTime createdAt { get; set; }
-        public string status { get; set; }
         public string pastryId { get; set; }
         public string color { get; set; }
         public string shape { get; set; }
         public string designId { get; set; }
         public string designName { get; set; }
-        public double price { get; set; }
+        public double? price { get; set; }
         public int quantity { get; set; }
-        public string lastUpdatedBy { get; set; }
-        public DateTime? lastUpdatedAt { get; set; }
-        public bool isActive { get; set; }
         public string description { get; set; }
         public string flavor { get; set; }
         public string size { get; set; }
-        public string customerName { get; set; }
         public double subOrderTotal { get; set; }
 
         // List to hold all add-ons for the order item
@@ -413,7 +423,7 @@ namespace CRUDFI.Models
         public int id { get; set; }
         public string name { get; set; }
         public int quantity { get; set; }
-        public double price { get; set; }
+        public double? price { get; set; }
         public double addOnTotal { get; set; }
     }
 

@@ -250,9 +250,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
                 string sql = @"INSERT INTO suborders (
-            suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
+            suborder_id, custom_id,  order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
-            VALUES (@suborderid, @orderid, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
+            VALUES (@suborderid, NULL, @orderid, @customerId, @CustomerName, NULL, NOW(), @status, @designId, @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, @DesignName, @PastryId)";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -370,7 +370,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string customIdBinary = custom.ToString().ToLower();
 
 
-                await InsertsCustomToOrder(order,suborderIdBinary, designIdBinary, order.flavor, order.size, customerId, order.color, order.shape);
+                await InsertsCustomToOrder(order,suborderIdBinary, customIdBinary, designIdBinary, order.flavor, order.size, customerId, order.color, order.shape);
                 await InsertsCustomImage(pictureBinary, designIdBinary);
                 await InsertCustomOrder(customIdBinary, designIdBinary, customOrder.tier, customOrder.cover, suborderIdBinary);
 
@@ -408,7 +408,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        private async Task InsertsCustomToOrder(Custom order, string suborderId, string designId, string flavor, string size, string customerId, string color, string shape)
+        private async Task InsertsCustomToOrder(Custom order, string suborderId, string customId, string designId, string flavor, string size, string customerId, string color, string shape)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -416,14 +416,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
                 string sql = @"INSERT INTO suborders (
-            suborder_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
+            suborder_id, custom_id, order_id, customer_id, customer_name, employee_id, created_at, status, design_id, price, quantity, 
             last_updated_by, last_updated_at, is_active, description, flavor, size, color, shape, design_name, pastry_id) 
-            VALUES (@suborderid, NULL, @customerId, @CustomerName, NULL, NOW(), 'cart', @designId, @price, 
+            VALUES (@suborderid, @customId, NULL, @customerId, @CustomerName, NULL, NOW(), 'cart', @designId, @price, 
             @quantity, NULL, NOW(), @isActive, @Description, @Flavor, @Size, @color, @shape, NULL , NULL)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@suborderid", suborderId);
+                    command.Parameters.AddWithValue("@customId", customId);
                     command.Parameters.AddWithValue("@customerId", customerId);
                     command.Parameters.AddWithValue("@CustomerName", order.customerName);
                     command.Parameters.AddWithValue("@designId", designId);
@@ -2467,10 +2468,10 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
 
                             // Calculate the total for this suborder
                             double addOnsTotal = suborder.orderAddons.Sum(addon => addon.addOnTotal);
-                            suborder.subOrderTotal = (suborder.price * suborder.quantity) + addOnsTotal;
+                            suborder.subOrderTotal = (suborder.price ?? 0) * suborder.quantity + addOnsTotal;
 
-                            // Add to the overall total
-                            totalSum += suborder.subOrderTotal;
+                        // Add to the overall total
+                        totalSum += suborder.subOrderTotal;
                         }
 
                         // Set the total in CheckOutDetails
@@ -2736,17 +2737,15 @@ WHERE
                                 payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
                                            ? reader.GetString(reader.GetOrdinal("payment"))
                                            : null,
-                                status = !reader.IsDBNull(reader.GetOrdinal("status"))
-                                         ? reader.GetString(reader.GetOrdinal("status"))
-                                         : null,
                                 price = new Prices() // Initialize the price list
                             };
+
+                            string orderIdString = orderId.ToLower();
 
                             // If the order ID is valid, fetch the total price and design details
                             if (!string.IsNullOrEmpty(orderId))
                             {
-                                // Convert order ID to string and pass to CalculateTotalPriceForOrderAsync
-                                string orderIdString = order.orderId.ToLower();
+
                                 double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
 
                                 // Calculate half price
@@ -2759,14 +2758,13 @@ WHERE
                                     half = halfPrice    // Assign the half price to the half property
                                 };
 
-                                // Fetch design details (similar to before)
-                                List<CustomerInitial> designDetails = await FetchDesignToPayCustomerAsync(orderIdString);
-                                if (designDetails.Any())
-                                {
-                                    order.designId = designDetails.First().designId;
-                                    order.designName = designDetails.First().designName;
-                                }
+                                CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
+                                order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
+
                             }
+
+                            CustomerInitial customOrderDetails = await GetCustomOrderDetailsByCustomerAsync(order.orderId);
+                            order.customItems = customOrderDetails.customItems;
 
                             orders.Add(order); // Add the order with design details to the list
                         }
@@ -2846,7 +2844,7 @@ WHERE
             return addonTotal;
         }
 
-        [HttpGet("/culo-api/v1/current-user/to-approve")]
+        [HttpGet("/culo-api/v1/current-user/for-approval")]
         [ProducesResponseType(typeof(CustomerInitial), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToApproveInitialOrdersByCustomerIds()
@@ -2880,6 +2878,27 @@ WHERE
             {
                 return StatusCode(500, $"An error occurred: {ex.Message}. Stack Trace: {ex.StackTrace}");
 
+            }
+        }
+
+        private async Task<bool> IsCustomIdNull(string suborderId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = "SELECT custom_id FROM suborders WHERE order_id = @suborder_id";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@suborder_id", suborderId);
+
+                    // Execute the command and retrieve the custom_id
+                    object result = await command.ExecuteScalarAsync();
+
+                    // Check if the custom_id is null or not
+                    return result == DBNull.Value || result == null;
+                }
             }
         }
 
@@ -2917,17 +2936,18 @@ WHERE
                                 payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
                                            ? reader.GetString(reader.GetOrdinal("payment"))
                                            : null,
-                                status = !reader.IsDBNull(reader.GetOrdinal("status"))
-                                         ? reader.GetString(reader.GetOrdinal("status"))
-                                         : null,
                                 price = new Prices() // Initialize the price list
                             };
+
+                            // Convert order ID to string and pass to CalculateTotalPriceForOrderAsync
+                            string orderIdString = order.orderId.ToLower();
+
+                            bool isNull = await IsCustomIdNull(orderIdString);
 
                             // If the order ID is valid, fetch the total price and design details
                             if (!string.IsNullOrEmpty(orderId))
                             {
-                                // Convert order ID to string and pass to CalculateTotalPriceForOrderAsync
-                                string orderIdString = order.orderId.ToLower();
+                                
                                 double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
 
                                 // Calculate half price
@@ -2940,19 +2960,14 @@ WHERE
                                     half = halfPrice    // Assign the half price to the half property
                                 };
 
-                                // Fetch design details (similar to before)
-                                List<CustomerInitial> designDetails = await FetchDesignToPayCustomerAsync(orderIdString);
-                                if (designDetails.Any())
-                                {
-                                    order.designId = designDetails.First().designId;
-                                    order.designName = designDetails.First().designName;
-                                }
-
-                                //var (tier, cover) = await FetchTierAndCoverBySuborderIdAsync(order.suborderId);
-                                //order.tier = tier;
-                                //order.cover = cover;
+                                CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
+                                order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
 
                             }
+
+                            CustomerInitial customOrderDetails = await GetCustomOrderDetailsByCustomerAsync(order.orderId);
+                            order.customItems = customOrderDetails.customItems;
+
 
                             orders.Add(order); // Add the order with design details to the list
                         }
@@ -2965,7 +2980,7 @@ WHERE
 
 
 
-        [HttpGet("/culo-api/v1/current-user/for-approval")]
+        /*[HttpGet("/culo-api/v1/current-user/for-approval")]
         [ProducesResponseType(typeof(CustomInitial), StatusCodes.Status200OK)]
         //[Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetForApprovalInitialOrdersByCustomerIds()
@@ -3000,23 +3015,23 @@ WHERE
                 return StatusCode(500, $"An error occurred: {ex.Message}. Stack Trace: {ex.StackTrace}");
 
             }
-        }
+        }*/
 
 
-        private async Task<List<CustomInitial>> FetchInitialForApprovalCustomerOrdersAsync(string customerid)
+        private async Task<List<CustomItem>> FetchCustomItemsForSuborderAsync(string suborderId)
         {
-            List<CustomInitial> orders = new List<CustomInitial>();
+            List<CustomItem> orders = new List<CustomItem>();
 
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @" SELECT suborder_id, order_id, status, design_id, design_name 
-                FROM suborders WHERE status IN ('for approval') AND customer_id = @customer_id";
+                string sql = @" SELECT suborder_id, order_id, status, design_id, design_name, price, quantity, description, flavor, size, color, SUM(quantity * price) AS Total, shape
+                FROM suborders WHERE status IN ('for approval') AND suborder_id = @suborderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    command.Parameters.AddWithValue("@customer_id", customerid);
+                    command.Parameters.AddWithValue("@suborderId", suborderId);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
@@ -3025,16 +3040,23 @@ WHERE
                             string orderId = reader["order_id"].ToString();
                             string suborderIds = reader["suborder_id"].ToString();
 
-                            // Initialize a CustomInitial object with order details
-                            CustomInitial order = new CustomInitial
+                            // Initialize a CustomItem object with order details
+                            CustomItem order = new CustomItem
                             {
-                                orderId = orderId,
                                 suborderId = suborderIds,
-                                status = reader.GetString(reader.GetOrdinal("status")),
+                                orderId = orderId,
                                 designId = reader["design_id"].ToString(),
                                 designName = !reader.IsDBNull(reader.GetOrdinal("design_name"))
-                                     ? reader.GetString(reader.GetOrdinal("design_name"))
-                                     : null,
+                                    ? reader.GetString(reader.GetOrdinal("design_name"))
+                                    : null,
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                description = reader.GetString(reader.GetOrdinal("description")),
+                                flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                size = reader.GetString(reader.GetOrdinal("size")),
+                                color = reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.GetString(reader.GetOrdinal("shape")),
+                                customTotal = reader.GetDouble(reader.GetOrdinal("Total")),
                             };
 
                             // Fetch tier and cover details from customorders using suborderId
@@ -3042,14 +3064,14 @@ WHERE
                             order.tier = tier;
                             order.cover = cover;
 
-                            // If the order ID is valid, fetch the picture data
+                            // If the design ID is valid, fetch the picture data
                             if (!string.IsNullOrEmpty(order.designId))
                             {
                                 byte[]? pictureData = await GetPictureDataByDesignId(order.designId);
                                 if (pictureData != null)
                                 {
                                     // Convert the picture data to a base64 string
-                                    order.pictureData = Convert.ToBase64String(pictureData);
+                                    order.pictureDate = Convert.FromBase64String(Convert.ToBase64String(pictureData));
                                 }
                             }
 
@@ -3095,91 +3117,133 @@ WHERE
             return (null, null); // Return null values if nothing is found
         }
 
-        private async Task<List<CustomerInitial>> FetchDesignToPayCustomerAsync(string orderId)
+        private async Task<CustomerInitial> GetFullOrderDetailsByCustomerAsync(string orderId)
         {
-            List<CustomerInitial> orders = new List<CustomerInitial>();
+            string orderIdBinary = orderId.ToLower();
+            CustomerInitial customerInitial = new CustomerInitial(); // Initialize CustomerInitial object
 
+            try
+            {
+                // Retrieve the list of suborder IDs associated with the given orderId
+                List<string> suborderIds = await GetSuborderIdsByOrderIdAsync(orderIdBinary);
+
+                // Loop through each suborder ID to get details and populate orderItems
+                foreach (var suborderId in suborderIds)
+                {
+                    // Retrieve suborder details, assuming this returns a List<OrderItem>
+                    List<OrderItem> suborderDetails = await GetSuborderDetails(orderIdBinary);
+
+                    Debug.WriteLine(suborderDetails);
+
+                    // Loop through each OrderItem in the retrieved suborderDetails
+                    foreach (var orderItem in suborderDetails)
+                    {
+                        // Retrieve add-ons for the current orderItem (OrderAddons)
+                        orderItem.orderAddons = await GetOrderAddonsDetails(suborderId); // Populate orderAddons within OrderItem
+
+                        // Add the populated orderItem (including add-ons) to customerInitial orderItems
+                        customerInitial.orderItems.Add(orderItem); // Adding OrderItem to orderItems
+                    }
+                }
+
+                return customerInitial; // Return populated customerInitial with orderItems and customItems
+            }
+            catch (Exception ex)
+            {
+                // Log the exception and return null or throw it to be handled by the calling method
+                throw new Exception($"An error occurred while fetching order details: {ex.Message}");
+            }
+        }
+
+        private async Task<CustomerInitial> GetCustomOrderDetailsByCustomerAsync(string orderId)
+        {
+            string orderIdBinary = orderId.ToLower();
+            CustomerInitial customerInitial = new CustomerInitial(); // Initialize CustomerInitial object
+
+            try
+            {
+                // Retrieve the list of suborder IDs associated with the given orderId
+                List<string> suborderIds = await GetSuborderIdsByOrderIdAsync(orderIdBinary);
+
+                foreach (var suborderID in suborderIds)
+                {
+                    // Check if custom_id is not null
+                    bool isCustomIdNull = await IsCustomIdNullAsync(suborderID);
+                    if (!isCustomIdNull)
+                    {
+                        // Fetch custom items if custom_id is present
+                        List<CustomItem> customItems = await FetchCustomItemsForSuborderAsync(suborderID);
+
+                        // Add each custom item to customerInitial.customItems
+                        foreach (var customItem in customItems)
+                        {
+                            customItem.orderAddons = await GetOrderAddonsDetails(suborderID);
+                            customerInitial.customItems.Add(customItem); // Add individual CustomItem
+                        }
+                    }
+                }
+
+                return customerInitial; // Return populated customerInitial with orderItems and customItems
+            }
+            catch (Exception ex)
+            {
+                // Log the exception and return null or throw it to be handled by the calling method
+                throw new Exception($"An error occurred while fetching order details: {ex.Message}");
+            }
+        }
+
+
+        private async Task<List<string>> GetSuborderIdsByOrderIdAsync(string orderId)
+        {
+            List<string> suborderIds = new List<string>();
+
+            // Database connection logic
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
-                string sql = @"
-SELECT 
-    design_id, design_name 
-FROM suborders WHERE order_id = @orderId";
+                // SQL query to retrieve suborder IDs for the given order ID
+                string sql = "SELECT suborder_id FROM suborders WHERE order_id = @orderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
-                    // Add the status parameter to the SQL command
                     command.Parameters.AddWithValue("@orderId", orderId);
 
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
                         {
-                            string designId = reader["design_id"].ToString();
-
-                            orders.Add(new CustomerInitial
-                            {
-                                designId = designId,
-                                designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
-             ? null
-             : reader.GetString(reader.GetOrdinal("design_name")),
-
-                            });
+                            suborderIds.Add(reader["suborder_id"].ToString());
                         }
                     }
                 }
             }
 
-            return orders;
+            return suborderIds;
         }
 
-        [HttpGet("/culo-api/v1/current-user/orders/{orderId}/full")]
-        [ProducesResponseType(typeof(CheckOutDetails), StatusCodes.Status200OK)]
-        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> GetFullOrderDetailsByCustomer(string orderId)
+
+        private async Task<bool> IsCustomIdNullAsync(string suborderId)
         {
-
-            string orderIdBinary = orderId.ToLower();
-
-            try
+            using (var connection = new MySqlConnection(connectionstring))
             {
-                // Retrieve basic order details
-                var orderDetails = await GetOrderDetailx(orderIdBinary);
+                await connection.OpenAsync();
 
-                if (orderDetails != null)
+                string sql = "SELECT custom_id FROM suborders WHERE suborder_id = @suborder_id";
+
+                using (var command = new MySqlCommand(sql, connection))
                 {
-                    // Retrieve suborders
-                    orderDetails.orderItems = await GetSuborderDetails(orderIdBinary);
+                    command.Parameters.AddWithValue("@suborder_id", suborderId);
 
-                    // Initialize total sum
-                    double totalSum = 0;
+                    // Execute the command and retrieve the custom_id
+                    object result = await command.ExecuteScalarAsync();
 
-                    foreach (var suborder in orderDetails.orderItems)
-                    {
-                        // Retrieve add-ons for each suborder
-                        suborder.orderAddons = await GetOrderAddonsDetails(suborder.suborderId);
-
-                        // Calculate the total for this suborder
-                        double addOnsTotal = suborder.orderAddons.Sum(addon => addon.addOnTotal);
-                        suborder.subOrderTotal = (suborder.price * suborder.quantity) + addOnsTotal;
-
-                        // Add to the overall total
-                        totalSum += suborder.subOrderTotal;
-                    }
-
-                    // Set the total in CheckOutDetails
-                    orderDetails.orderTotal = totalSum;
+                    // Check if the custom_id is null or not
+                    return result == DBNull.Value || result == null;
                 }
-
-                return Ok(orderDetails);
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
 
         [HttpGet("/culo-api/v1/current-user/to-process")]
         [ProducesResponseType(typeof(toPayInitial), StatusCodes.Status200OK)]
@@ -3880,7 +3944,8 @@ FROM suborders WHERE order_id = @orderId";
 
                         // Calculate the total for this suborder
                         double addOnsTotal = suborder.orderAddons.Sum(addon => addon.addOnTotal);
-                        suborder.subOrderTotal = (suborder.price * suborder.quantity) + addOnsTotal;
+                        suborder.subOrderTotal = (suborder.price ?? 0) * suborder.quantity + addOnsTotal;
+
 
                         // Add to the overall total
                         totalSum += suborder.subOrderTotal;
@@ -3964,48 +4029,34 @@ FROM suborders WHERE order_id = @orderId";
                         while (await reader.ReadAsync())
                         {
 
-                            string orderIdFromDb = reader["order_id"].ToString();
-                            string suborderId = reader["suborder_id"].ToString();
-                            string designId = reader["design_id"].ToString();
-                            string customerIdFromDb = reader["customer_id"].ToString();
+                            string? orderIdFromDb = reader.IsDBNull(reader.GetOrdinal("order_id")) ? null : reader["order_id"].ToString();
+                            string? suborderId = reader.IsDBNull(reader.GetOrdinal("suborder_id")) ? null : reader["suborder_id"].ToString();
+                            string? designId = reader.IsDBNull(reader.GetOrdinal("design_id")) ? null : reader["design_id"].ToString();
+                            string? customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id")) ? null : reader["customer_id"].ToString();
                             string? employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id")) ? null : reader["employee_id"].ToString();
 
                             var suborder = new OrderItem
                             {
                                 suborderId = suborderId,
                                 orderId = orderIdFromDb,
-                                customerId = customerIdFromDb,
-                                employeeId = employeeId,
-                                employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
-                                    ? string.Empty
-                                    : reader.GetString(reader.GetOrdinal("employee_name")),
-                                createdAt = reader.GetDateTime(reader.GetOrdinal("created_at")),
-                                status = reader.GetString(reader.GetOrdinal("status")),
                                 pastryId = reader.IsDBNull(reader.GetOrdinal("pastry_id"))
-            ? null
-            : reader.GetString(reader.GetOrdinal("pastry_id")),
-                                color = reader.GetString(reader.GetOrdinal("color")),
-                                shape = reader.GetString(reader.GetOrdinal("shape")),
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("pastry_id")),
+                                color = reader.IsDBNull(reader.GetOrdinal("color")) ? null : reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? null : reader.GetString(reader.GetOrdinal("shape")),
                                 designId = designId,
                                 designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
-             ? null
-             : reader.GetString(reader.GetOrdinal("design_name")),
-
-                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("design_name")),
+                                price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
-                                    ? string.Empty
-                                    : reader.GetString(reader.GetOrdinal("last_updated_by")),
-                                lastUpdatedAt = reader.IsDBNull(reader.GetOrdinal("last_updated_at"))
-                                    ? (DateTime?)null
-                                    : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
-                                isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                                description = reader.GetString(reader.GetOrdinal("description")),
-                                flavor = reader.GetString(reader.GetOrdinal("flavor")),
-                                size = reader.GetString(reader.GetOrdinal("size")),
-                                customerName = reader.GetString(reader.GetOrdinal("customer_name")),
-                                subOrderTotal = reader.GetDouble(reader.GetOrdinal("price")) * reader.GetInt32(reader.GetOrdinal("quantity")) // Calculate Total
+                                description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                                flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? null : reader.GetString(reader.GetOrdinal("flavor")),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? null : reader.GetString(reader.GetOrdinal("size")),
+                                subOrderTotal = (reader.IsDBNull(reader.GetOrdinal("price")) ? 0 : reader.GetDouble(reader.GetOrdinal("price"))) *
+                                                (reader.IsDBNull(reader.GetOrdinal("quantity")) ? 0 : reader.GetInt32(reader.GetOrdinal("quantity"))) // Calculate Total
                             };
+
 
                             suborders.Add(suborder);
                         }
@@ -4019,21 +4070,19 @@ FROM suborders WHERE order_id = @orderId";
         private async Task<List<OrderAddon1>> GetOrderAddonsDetails(string suborderId)
         {
             var addons = new List<OrderAddon1>();
-            string subId = suborderId.ToLower();
 
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
 
                 string addOnsSql = @"
-    SELECT add_ons_id, quantity, total, name, price
-    FROM orderaddons
-    WHERE order_id = @suborderIdBinary";
+            SELECT add_ons_id, quantity, total, name, price
+            FROM orderaddons
+            WHERE order_id = @suborderIdBinary";
 
                 using (var command = new MySqlCommand(addOnsSql, connection))
                 {
-                    command.Parameters.AddWithValue("@suborderIdBinary", subId);
-                    Debug.Write("suborderId: " + subId);
+                    command.Parameters.AddWithValue("@suborderIdBinary", suborderId);
                     using (var reader = await command.ExecuteReaderAsync())
                     {
                         while (await reader.ReadAsync())
@@ -4044,7 +4093,7 @@ FROM suborders WHERE order_id = @orderId";
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 addOnTotal = reader.GetDouble(reader.GetOrdinal("total")),
                                 name = reader.GetString(reader.GetOrdinal("name")),
-                                price = reader.GetDouble(reader.GetOrdinal("price"))
+                                price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price"))
                             });
                         }
                     }
