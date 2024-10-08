@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using System.Data;
+using static BOM_API_v2.KaizenFiles.Models.Adds;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -142,7 +143,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpPatch("{addOnsId}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> UpdateAddOn(int addOnsId, [FromBody] Models.Adds.UpdateAddOnRequest updateRequest)
+        public async Task<IActionResult> UpdateAddOn(int addOnsId, [FromBody] UpdateAddOnRequest? updateRequest)
         {
             try
             {
@@ -150,20 +151,40 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = @"
-                        UPDATE addons 
-                        SET 
-                            name = @AddOnName,  
-                            price = @PricePerUnit, 
-                            last_modified_date = @LastModifiedDate 
-                        WHERE add_ons_id = @AddOnsId";
+                    // Prepare to build the SQL statement and parameters
+                    var setClauses = new List<string>();
+                    var parameters = new List<MySqlParameter>();
+
+                    if (!string.IsNullOrEmpty(updateRequest.name))
+                    {
+                        setClauses.Add("name = @AddOnName");
+                        parameters.Add(new MySqlParameter("@AddOnName", updateRequest.name));
+                    }
+
+                    if (updateRequest.price.HasValue)
+                    {
+                        setClauses.Add("price = @PricePerUnit");
+                        parameters.Add(new MySqlParameter("@PricePerUnit", updateRequest.price.Value));
+                    }
+
+                    if (!setClauses.Any())
+                    {
+                        return BadRequest("No fields to update.");
+                    }
+
+                    // Create the SQL statement
+                    string sql = $@"
+                UPDATE addons 
+                SET {string.Join(", ", setClauses)}, 
+                    last_modified_date = @LastModifiedDate 
+                WHERE add_ons_id = @AddOnsId";
+
+                    parameters.Add(new MySqlParameter("@AddOnsId", addOnsId));
+                    parameters.Add(new MySqlParameter("@LastModifiedDate", DateTime.UtcNow));
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
-                        command.Parameters.AddWithValue("@AddOnsId", addOnsId);
-                        command.Parameters.AddWithValue("@AddOnName", updateRequest.name);
-                        command.Parameters.AddWithValue("@PricePerUnit", updateRequest.price);
-                        command.Parameters.AddWithValue("@LastModifiedDate", DateTime.UtcNow);
+                        command.Parameters.AddRange(parameters.ToArray());
 
                         int rowsAffected = await command.ExecuteNonQueryAsync();
 
@@ -182,6 +203,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request.");
             }
         }
+
         [HttpDelete("{id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> DeactivateAddOn(int id)

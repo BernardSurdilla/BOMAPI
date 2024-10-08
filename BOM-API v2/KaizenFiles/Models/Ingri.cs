@@ -53,11 +53,11 @@ namespace CRUDFI.Models
     public class IngriDTOs
     {
 
-        public string name { get; set; } = "";
-        public double quantity { get; set; }
-        public string measurements { get; set; } = "";
-        public decimal price { get; set; }
-        public string type { get; set; } = "";
+        public string? name { get; set; } = "";
+        public double? quantity { get; set; }
+        public string? measurements { get; set; } = "";
+        public decimal? price { get; set; }
+        public string? type { get; set; } = "";
 
     }
 

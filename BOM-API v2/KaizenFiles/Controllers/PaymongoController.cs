@@ -20,6 +20,7 @@ using System;
 using Microsoft.Extensions.Logging;
 using Azure;
 using BillOfMaterialsAPI.Schemas;
+using BOM_API_v2.Services;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
 {
@@ -30,14 +31,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         private readonly string connectionstring;
         private readonly ILogger<PaymongoController> _logger;
 
+        private readonly EmailService emailService;
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
 
-        public PaymongoController(IConfiguration configuration, ILogger<PaymongoController> logger, DatabaseContext context, KaizenTables kaizenTables)
+        public PaymongoController(IConfiguration configuration, ILogger<PaymongoController> logger, DatabaseContext context, KaizenTables kaizenTables, EmailService email)
         {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
-
+            emailService = email;
             _context = context;
             _kaizenTables = kaizenTables;
 
@@ -59,6 +61,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
             else
             {
+
                 try
                 {
                     // Validate the option and amount
@@ -495,14 +498,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Check if today is 3 days before the pickup date
                 if (pickupDate.Value.Date == DateTime.UtcNow.Date.AddDays(3))
                 {
-                    // Construct the message
-                    string message = "Your order has a remaining balance to be paid.";
-
-                    Guid notId = Guid.NewGuid();
-                    string notifId = notId.ToString().ToLower();
-
-                    // Send the notification
-                    await NotifyAsync(notifId, userId, message);
+                    //await emailService.SendEmailConfirmationEmail(userName, email, redirectAddress);
                 }
             }
         }

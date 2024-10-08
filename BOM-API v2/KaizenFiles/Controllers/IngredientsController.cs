@@ -520,7 +520,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpPatch("{id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
-        public async Task<IActionResult> UpdateIngredient(int id, [FromBody] IngriDTOs updatedIngredient)
+        public async Task<IActionResult> UpdateIngredient(int id, [FromBody] IngriDTOs? updatedIngredient)
         {
             try
             {
@@ -547,31 +547,31 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("Username not found");
                 }
 
-                // Map properties from IngriDTO to Ingri
-                if (!string.IsNullOrEmpty(updatedIngredient.name))
+                // Map properties from IngriDTO to Ingri, only if the updated values are provided
+                if (updatedIngredient != null)
                 {
-                    existingIngredient.name = updatedIngredient.name;
-                }
-                if (updatedIngredient.quantity > 0)
-                {
-                    existingIngredient.quantity = updatedIngredient.quantity;
-                    existingIngredient.isActive = true;
-                }
-                else
-                {
-                    existingIngredient.isActive = false;
-                }
-                if (updatedIngredient.price > 0)
-                {
-                    existingIngredient.price = updatedIngredient.price;
-                }
-                if (!string.IsNullOrEmpty(updatedIngredient.type))
-                {
-                    existingIngredient.type = updatedIngredient.type;
-                }
-                if (!string.IsNullOrEmpty(updatedIngredient.measurements))
-                {
-                    existingIngredient.measurements = updatedIngredient.measurements;
+                    if (!string.IsNullOrEmpty(updatedIngredient.name))
+                    {
+                        existingIngredient.name = updatedIngredient.name;
+                    }
+                    if (updatedIngredient.quantity.HasValue)
+                    {
+                        existingIngredient.quantity = updatedIngredient.quantity.Value;
+                        existingIngredient.isActive = true;  // Set to active when quantity is updated
+                    }
+
+                    if (updatedIngredient.price.HasValue)
+                    {
+                        existingIngredient.price = updatedIngredient.price.Value;
+                    }
+                    if (!string.IsNullOrEmpty(updatedIngredient.type))
+                    {
+                        existingIngredient.type = updatedIngredient.type;
+                    }
+                    if (!string.IsNullOrEmpty(updatedIngredient.measurements))
+                    {
+                        existingIngredient.measurements = updatedIngredient.measurements;
+                    }
                 }
 
                 // Set the last updated fields
@@ -589,6 +589,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 return StatusCode(500, "An error occurred while processing the request");
             }
         }
+
 
         [HttpPatch("threshold/update/{Id}")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
