@@ -56,6 +56,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpPost("/culo-api/v1/current-user/buy-now")]
+        [ProducesResponseType(typeof(SuborderResponse), StatusCodes.Status200OK)]
         public async Task<IActionResult> BuyNow([FromBody] BuyNow buyNowRequest)
         {
             try
@@ -277,6 +278,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
         [HttpPost("/culo-api/v1/current-user/custom-orders")]
+        [ProducesResponseType(typeof(customorderResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateCustomOrder([FromBody] PostCustomOrder customOrder)
         {
@@ -536,6 +538,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
         [HttpPost("/culo-api/v1/current-user/cart")]
+        [ProducesResponseType(typeof(SuborderResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreateOrder([FromBody] OrderDTO orderDto)
         {
