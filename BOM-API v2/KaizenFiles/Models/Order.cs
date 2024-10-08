@@ -209,12 +209,12 @@ namespace CRUDFI.Models
 
     public class UpdateOrderDetailsRequest
     {
-        public string description { get; set; }
-        public int quantity { get; set; }
-        public string size { get; set; }
-        public string flavor { get; set; }
-        public string color { get; set; }
-        public string shape { get; set; }
+        public string? description { get; set; }
+        public int? quantity { get; set; }
+        public string? size { get; set; }
+        public string? flavor { get; set; }
+        public string? color { get; set; }
+        public string? shape { get; set; }
     }
     public class AdminInitial
     {
@@ -468,6 +468,12 @@ namespace CRUDFI.Models
         public string suborderId { get; set; }
         public List<int> addonId { get; set; }
     }
+
+    public class customorderResponse
+    {
+        public string suborderId { get; set; }
+    }
+
     public class TotalOrders
     {
         public int total { get; set; }

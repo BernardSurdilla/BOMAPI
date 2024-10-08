@@ -62,5 +62,74 @@ namespace BOM_API_v2.Services
 
             return response;
         }
+
+        public async Task<int> SendPaymentNoticeToEmail(string recipientName, [EmailAddress] string recipientEmail, DateTime pickupDate)
+        {
+            try
+            {
+                string? senderName = _configuration.GetValue<string>("Email:SenderName");
+                string? senderEmail = _configuration.GetValue<string>("Email:SenderEmail");
+                string? smtpHost = _configuration.GetValue<string>("Email:SMTPServer:Host");
+                int? port = _configuration.GetValue<int>("Email:SMTPServer:Port");
+                string? userName = _configuration.GetValue<string>("Email:SMTPServer:UserName");
+                string? password = _configuration.GetValue<string>("Email:SMTPServer:Password");
+
+                // Calculate the number of days until pickup
+                int daysUntilPickup = (pickupDate - DateTime.Now).Days;
+
+                // Create the email message
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress(senderName, senderEmail));
+                message.To.Add(new MailboxAddress(recipientName, recipientEmail));
+                message.Subject = "Payment Reminder: Action Required";
+
+                // Create the email body content
+                message.Body = new TextPart("html")
+                {
+                    Text = PaymentNoticeEmailFormat(daysUntilPickup)
+                };
+
+                using (var client = new SmtpClient())
+                {
+                    await client.ConnectAsync(smtpHost, port.Value, false);
+                    await client.SendAsync(message);
+                    client.Disconnect(true);
+                }
+                return 0;
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+
+        private string PaymentNoticeEmailFormat(int daysUntilPickup)
+        {
+            string response = $@"<!DOCTYPE html>
+    <html xmlns=""http://www.w3.org/1999/xhtml"">
+    <head>
+        <meta http-equiv=""Content-Type"" content=""text/html; charset=utf-8"">
+        <title>Payment Reminder</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            .content {{ max-width: 600px; margin: auto; padding: 20px; }}
+            .button {{ background-color: #0092FF; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; }}
+        </style>
+    </head>
+    <body>
+        <div class=""content"">
+            <h1>Payment Reminder</h1>
+            <p>Dear customer,</p>
+            <p>You are {daysUntilPickup} days before pickup time. You need to pay the remaining balance, or the order will be considered cancelled.</p>
+            <p>The owner will not be responsible if the order is cancelled, and a refund will not be possible due to ingredients not being extracted once used.</p>
+            <p>Thank you for your understanding!</p>
+            <p><a href=""#"" class=""button"">Pay Now</a></p> <!-- You can replace '#' with a payment link if available -->
+        </div>
+    </body>
+    </html>";
+
+            return response;
+        }
+
     }
 }

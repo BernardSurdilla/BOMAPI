@@ -60,6 +60,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+                if (buyNowRequest.quantity < 1 || buyNowRequest.quantity > 3)
+                {
+                    return BadRequest("Quantity is too many. It must be between 1 and 3.");
+                }
+
                 // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -149,15 +154,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         await ManageAddOnsByPastryMaterialId(pastryMaterialId, suborderIdBinary, addon.id, addon.quantity);
                     }
                 }
-
-                Guid notId = Guid.NewGuid();
-
-                string notifId = notId.ToString().ToLower();
-
-                // Send notification to user
-                string userId = customerId.ToLower();
-                string message = $"{order.designName ?? "Design"} has been added to your 'to pay' list.";
-                //await NotifyAsync(notifId , userId, message);
 
                 // Prepare the suborder response
                 var suborderResponse = new SuborderResponse
@@ -279,38 +275,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("/debuggingshits")]
-        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> debug([FromBody] debugshit shit)
-        {
-            try
-            {
-
-                // Process the uploaded image from base64 string
-                byte[] pictureBinary = null;
-                if (!string.IsNullOrEmpty(shit.pictureBase64))
-                {
-                    // Decode the base64 string
-                    pictureBinary = Convert.FromBase64String(shit.pictureBase64);
-                }
-
-                Guid design = Guid.NewGuid();
-                string designIdBinary = design.ToString().ToLower();
-
-                await InsertsCustomImage(pictureBinary, designIdBinary);
-               
-
-                return Ok(); // Return 200 OK if the order is successfully created
-            }
-            catch (Exception ex)
-            {
-                // Log and return an error message if an exception occurs
-                _logger.LogError(ex, "An error occurred while creating the custom order");
-                return StatusCode(500, "An error occurred while processing the request"); // Return 500 Internal Server Error
-            }
-        }
-
-
 
         [HttpPost("/culo-api/v1/current-user/custom-orders")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
@@ -318,6 +282,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+                if (customOrder.quantity < 1 || customOrder.quantity > 3)
+                {
+                    return BadRequest("Quantity is too many. It must be between 1 and 3.");
+                }
+
                 // Validate the customOrder object
                 if (customOrder == null)
                 {
@@ -379,7 +348,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 string message = "Your order is added for approval";
                 await NotifyAsync(notifId, customerId.ToLower(), message);
 
-                return Ok(); // Return 200 OK if the order is successfully created
+                var suborderResponse = new customorderResponse
+                {
+                    suborderId = suborderIdBinary
+                };
+
+                return Ok(suborderResponse);
+
             }
             catch (Exception ex)
             {
@@ -566,6 +541,12 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+
+                if (orderDto.quantity < 1 || orderDto.quantity > 3)
+                {
+                    return BadRequest("Quantity is too many. It must be between 1 and 3.");
+                }
+
                 // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
@@ -1328,6 +1309,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+                if (request.Quantity < 1 || request.Quantity > 3)
+                {
+                    return BadRequest("Quantity is too many. It must be between 1 and 3.");
+                }
+
                 _logger.LogInformation($"Starting AddNewAddOnToOrder for orderId: {suborderId}");
 
                 // Convert orderId to binary(16) format without '0x' prefix
@@ -4761,6 +4747,15 @@ WHERE
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> ManageAddOnsByAddOnId(string suborderId, [FromBody] List<AddOn> manageAddOns)
         {
+
+            foreach (var addOn in manageAddOns)
+            {
+                if (addOn.quantity < 1 || addOn.quantity > 3)
+                {
+                    return BadRequest($"Quantity must be between 1 and 3.");
+                }
+            }
+
             // Convert suborderId to binary format
             string suborderIdBinary = suborderId.ToLower();
 
@@ -5140,9 +5135,9 @@ WHERE
         }
 
 
-        [HttpPatch("/culo-api/v1/current-user/{suborderId}/suborders")]//done 
+        [HttpPatch("/culo-api/v1/current-user/{suborderId}/suborders")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest request)
+        public async Task<IActionResult> UpdateOrderDetails(string suborderId, [FromBody] UpdateOrderDetailsRequest? request)
         {
             try
             {
@@ -5159,8 +5154,11 @@ WHERE
                     {
                         try
                         {
-                            // Update order details in the orders table
-                            await UpdateOrderDetailsInDatabase(connection, transaction, suborderIdBinary, request);
+                            // Update order details in the orders table if request has data
+                            if (request != null)
+                            {
+                                await UpdateOrderDetailsInDatabase(connection, transaction, suborderIdBinary, request);
+                            }
 
                             await transaction.CommitAsync();
                         }
@@ -5184,32 +5182,57 @@ WHERE
 
         private async Task UpdateOrderDetailsInDatabase(MySqlConnection connection, MySqlTransaction transaction, string orderIdBinary, UpdateOrderDetailsRequest request)
         {
+            var updateParts = new List<string>();
+            var parameters = new List<MySqlParameter>();
 
-            // Prepare SQL statement for updating orders table
-            string updateSql = @"UPDATE suborders 
-                         SET description = @description, 
-                             quantity = @quantity,
-                             size = @size,
-                             flavor = @flavor,
-                             color = @color, shape = @shape
-                         WHERE suborder_id = @suborderId";
-
-            using (var command = new MySqlCommand(updateSql, connection, transaction))
+            // Dynamically build the update SQL statement based on which fields are provided
+            if (request.description != null)
             {
-                command.Parameters.AddWithValue("@description", request.description);
-                command.Parameters.AddWithValue("@quantity", request.quantity);
-                command.Parameters.AddWithValue("@size", request.size);
-                command.Parameters.AddWithValue("@flavor", request.flavor);
-                command.Parameters.AddWithValue("@color", request.color);
-                command.Parameters.AddWithValue("@shape", request.shape);
-                command.Parameters.AddWithValue("@suborderId", orderIdBinary);
+                updateParts.Add("description = @description");
+                parameters.Add(new MySqlParameter("@description", request.description));
+            }
+            if (request.quantity.HasValue)
+            {
+                updateParts.Add("quantity = @quantity");
+                parameters.Add(new MySqlParameter("@quantity", request.quantity));
+            }
+            if (request.size != null)
+            {
+                updateParts.Add("size = @size");
+                parameters.Add(new MySqlParameter("@size", request.size));
+            }
+            if (request.flavor != null)
+            {
+                updateParts.Add("flavor = @flavor");
+                parameters.Add(new MySqlParameter("@flavor", request.flavor));
+            }
+            if (request.color != null)
+            {
+                updateParts.Add("color = @color");
+                parameters.Add(new MySqlParameter("@color", request.color));
+            }
+            if (request.shape != null)
+            {
+                updateParts.Add("shape = @shape");
+                parameters.Add(new MySqlParameter("@shape", request.shape));
+            }
 
+            if (updateParts.Any())
+            {
+                // Only update if there are fields to update
+                string updateSql = $"UPDATE suborders SET {string.Join(", ", updateParts)} WHERE suborder_id = @suborderId";
+                parameters.Add(new MySqlParameter("@suborderId", orderIdBinary));
 
-                await command.ExecuteNonQueryAsync();
+                using (var command = new MySqlCommand(updateSql, connection, transaction))
+                {
+                    command.Parameters.AddRange(parameters.ToArray());
 
-                _logger.LogInformation($"Updated order details in orders table for order with ID '{orderIdBinary}'");
+                    await command.ExecuteNonQueryAsync();
+                    _logger.LogInformation($"Updated order details in orders table for order with ID '{orderIdBinary}'");
+                }
             }
         }
+
 
         [HttpPatch("custom-orders/{suborderId}/set-price")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
