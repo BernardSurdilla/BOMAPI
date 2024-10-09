@@ -1970,6 +1970,34 @@ namespace BillOfMaterialsAPI.Helpers
             return response;
         }
 
+        public static async Task<GetIngredientSubtractionHistory> CreateIngredientSubtractionHistoryResponseFromDBRow(IngredientSubtractionHistory data, DatabaseContext context)
+        {
+            GetIngredientSubtractionHistory response = new GetIngredientSubtractionHistory();
+            response.ingredientSubtractionHistoryId = data.ingredient_subtraction_history_id;
+            response.dateSubtracted = data.date_subtracted;
+            response.itemSubtractionInfo = new List<GetItemSubtractionInfo>();
+
+            foreach (ItemSubtractionInfo itemSubtractionInfo in data.item_subtraction_info)
+            {
+                GetItemSubtractionInfo newResponseItemSubtractionInfoRow = new GetItemSubtractionInfo
+                {
+                    itemId = itemSubtractionInfo.item_id,
+                    itemName = itemSubtractionInfo.item_name,
+
+                    inventoryQuantity = itemSubtractionInfo.inventory_quantity,
+                    inventoryAmountUnit = itemSubtractionInfo.inventory_amount_unit,
+                    inventoryPrice = itemSubtractionInfo.inventory_price,
+
+                    amountQuantityType = itemSubtractionInfo.amount_quantity_type,
+                    amountUnit = itemSubtractionInfo.amount_unit,
+                    amount = itemSubtractionInfo.amount
+                };
+                response.itemSubtractionInfo.Add(newResponseItemSubtractionInfoRow);
+            }
+
+            return response;
+        }
+
     }
     public class PriceCalculator
     {

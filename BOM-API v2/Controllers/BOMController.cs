@@ -517,6 +517,76 @@ namespace API_TEST.Controllers
             await _actionLogger.LogAction(User, "GET", "Tag occurence");
             return response;
         }
+
+        [HttpGet("ingredient-subtraction-history")]
+        public async Task<List<GetIngredientSubtractionHistory>> GetIngredientSubtractionHistories(int? page, int? record_per_page, string? sortBy, string? sortOrder)
+        {
+            List<IngredientSubtractionHistory> ingredientSubtractionHistories;
+            List<GetIngredientSubtractionHistory> response = new List<GetIngredientSubtractionHistory>();
+
+            IQueryable<IngredientSubtractionHistory> ingredientSubtractionHistoryQuery = _context.IngredientSubtractionHistory;
+            //Row sorting algorithm
+            if (sortBy != null)
+            {
+                sortOrder = sortOrder == null ? "ASC" : sortOrder.ToUpper() != "ASC" && sortOrder.ToUpper() != "DESC" ? "ASC" : sortOrder.ToUpper();
+
+                switch (sortBy)
+                {
+                    case "date_subtracted":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                ingredientSubtractionHistoryQuery = ingredientSubtractionHistoryQuery.OrderByDescending(x => x.date_subtracted);
+                                break;
+                            default:
+                                ingredientSubtractionHistoryQuery = ingredientSubtractionHistoryQuery.OrderBy(x => x.date_subtracted);
+                                break;
+                        }
+                        break;
+                    case "ingredient_subtraction_history_id":
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                ingredientSubtractionHistoryQuery = ingredientSubtractionHistoryQuery.OrderByDescending(x => x.ingredient_subtraction_history_id);
+                                break;
+                            default:
+                                ingredientSubtractionHistoryQuery = ingredientSubtractionHistoryQuery.OrderBy(x => x.ingredient_subtraction_history_id);
+                                break;
+                        }
+                        break;
+                    default:
+                        switch (sortOrder)
+                        {
+                            case "DESC":
+                                ingredientSubtractionHistoryQuery = ingredientSubtractionHistoryQuery.OrderByDescending(x => x.date_subtracted);
+                                break;
+                            default:
+                                ingredientSubtractionHistoryQuery = ingredientSubtractionHistoryQuery.OrderBy(x => x.date_subtracted);
+                                break;
+                        }
+                        break;
+                }
+            }
+            //Paging algorithm
+            if (page == null) { ingredientSubtractionHistories = await ingredientSubtractionHistoryQuery.ToListAsync(); }
+            else
+            {
+                int record_limit = record_per_page == null || record_per_page.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : record_per_page.Value;
+                int current_page = page.Value < Page.DefaultStartingPageNumber ? Page.DefaultStartingPageNumber : page.Value;
+
+                int num_of_record_to_skip = (current_page * record_limit) - record_limit;
+
+                ingredientSubtractionHistories = await ingredientSubtractionHistoryQuery.Skip(num_of_record_to_skip).Take(record_limit).ToListAsync();
+            }
+
+            foreach(IngredientSubtractionHistory currentIngredientSubtractionHistoryRow in  ingredientSubtractionHistories)
+            {
+                GetIngredientSubtractionHistory newResponseRow = await DataParser.CreateIngredientSubtractionHistoryResponseFromDBRow(currentIngredientSubtractionHistoryRow, _context);
+                response.Add(newResponseRow);
+            }
+
+            return response;
+        }
     }
     [ApiController]
     public class BOMDataManipulationController : ControllerBase
@@ -599,6 +669,11 @@ namespace API_TEST.Controllers
                 {
                     item_id = Convert.ToString(referencedInventoryItem.id),
                     item_name = referencedInventoryItem.item_name,
+
+                    inventory_amount_unit = referencedInventoryItem.measurements,
+                    inventory_price = referencedInventoryItem.price,
+                    inventory_quantity = referencedInventoryItem.quantity,
+
                     amount_quantity_type = inventoryItemQuantityUnit,
                     amount_unit = referencedInventoryItem.measurements,
                     amount = amountToBeSubtracted
@@ -697,6 +772,11 @@ namespace API_TEST.Controllers
                 {
                     item_id = Convert.ToString(referencedInventoryItem.id),
                     item_name = referencedInventoryItem.item_name,
+
+                    inventory_amount_unit = referencedInventoryItem.measurements,
+                    inventory_price = referencedInventoryItem.price,
+                    inventory_quantity = referencedInventoryItem.quantity,
+
                     amount_quantity_type = inventoryItemQuantityUnit,
                     amount_unit = referencedInventoryItem.measurements,
                     amount = amountToBeSubtracted
@@ -752,6 +832,11 @@ namespace API_TEST.Controllers
                 {
                     item_id = currentIngredient.itemId,
                     item_name = referencedInventoryItem.item_name,
+
+                    inventory_amount_unit = referencedInventoryItem.measurements,
+                    inventory_price = referencedInventoryItem.price,
+                    inventory_quantity = referencedInventoryItem.quantity,
+
                     amount_quantity_type = ValidUnits.UnitQuantityMeasurement(referencedInventoryItem.measurements),
                     amount_unit = currentIngredient.amountMeasurement,
                     amount = currentIngredient.amount

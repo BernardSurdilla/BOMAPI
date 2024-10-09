@@ -272,6 +272,25 @@ namespace BillOfMaterialsAPI.Schemas
         public double occurrenceCount { get; set; }
         public double ratio { get; set; }
     }
+    public class GetIngredientSubtractionHistory
+    {
+        public Guid ingredientSubtractionHistoryId { get; set; }
+        public List<GetItemSubtractionInfo> itemSubtractionInfo { get; set;}
+        public DateTime dateSubtracted { get; set; }
+    }
+    public class GetItemSubtractionInfo
+    {
+        public string itemId { get; set; }
+        public string itemName { get; set; }
+
+        public double inventoryPrice { get; set; }
+        public double inventoryQuantity { get; set; }
+        public string inventoryAmountUnit { get; set; }
+
+        public string amountQuantityType { get; set; }
+        public string amountUnit { get; set; }
+        public double amount { get; set; }
+    }
 
     //Design Related
     public class GetDesign

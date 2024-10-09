@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using Microsoft.IdentityModel.Tokens;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -137,8 +138,14 @@ namespace JWTAuthentication.Controllers
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
             var user = await userManager.FindByEmailAsync(model.Email);
+
             if (user != null && await userManager.CheckPasswordAsync(user, model.Password))
             {
+                if (user.EmailConfirmed == false)
+                {
+                    return Unauthorized(new {message = "Please confirm your email first"});
+                }
+
                 var userRoles = await userManager.GetRolesAsync(user);
 
                 var authClaims = new List<Claim>
@@ -171,7 +178,7 @@ namespace JWTAuthentication.Controllers
                     expiration = token.ValidTo
                 });
             }
-            return Unauthorized();
+            return Unauthorized(new { message = "Incorrect username or password" });
         }
         [HttpPost("register-customer/")]
         public async Task<IActionResult> RegisterCustomer([FromBody] RegisterModel model)
@@ -203,6 +210,9 @@ namespace JWTAuthentication.Controllers
             {
                 await userManager.AddToRoleAsync(user, UserRoles.Customer);
             }
+
+            var createdAccount = await userManager.FindByEmailAsync(model.Email);
+            await SendConfirmationEmail(createdAccount.Id);
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
@@ -238,6 +248,9 @@ namespace JWTAuthentication.Controllers
                 await userManager.AddToRoleAsync(user, UserRoles.Artist);
             }
 
+            var createdAccount = await userManager.FindByEmailAsync(model.Email);
+            await SendConfirmationEmail(createdAccount.Id);
+
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
         [HttpPost("register-manager/")]
@@ -270,6 +283,9 @@ namespace JWTAuthentication.Controllers
             {
                 await userManager.AddToRoleAsync(user, UserRoles.Manager);
             }
+
+            var createdAccount = await userManager.FindByEmailAsync(model.Email);
+            await SendConfirmationEmail(createdAccount.Id);
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
@@ -307,6 +323,9 @@ namespace JWTAuthentication.Controllers
             {
                 await userManager.AddToRoleAsync(user, UserRoles.Admin);
             }
+
+            var createdAccount = await userManager.FindByEmailAsync(model.Email);
+            await SendConfirmationEmail(createdAccount.Id);
 
             return Ok(new Response { Status = "Success", Message = "User created successfully!" });
         }
@@ -525,6 +544,54 @@ namespace JWTAuthentication.Controllers
 
             await _actionLogger.LogAction(User, "PATCH", "Update image for " + currentUser.Id);
             return Ok(new { message = "Image uploaded for " + currentUser.Id });
+        }
+
+        private async Task<int> SendConfirmationEmail(string accountId)
+        {
+            var currentUser = await userManager.FindByIdAsync(accountId.ToString());
+            if (currentUser == null) { return 0; }
+            if (currentUser.EmailConfirmed == true) { return 0; }
+
+            string currentEmailConfirmationKey = Regex.Replace(Convert.ToBase64String(new HMACSHA256().Key), @"[^a-zA-Z0-9]", "");
+
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
+            EmailConfirmationKeys? currentUserKey = null;
+
+            try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            catch { }
+
+            if (currentUserKey != null)
+            {
+                _auth.EmailConfirmationKeys.Update(currentUserKey);
+                currentUserKey.ConfirmationKey = currentEmailConfirmationKey;
+                currentUserKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:Validation:EmailValidationKeyValidityDays"));
+            }
+            else
+            {
+                EmailConfirmationKeys newEmailConfirmationKey = new EmailConfirmationKeys();
+                newEmailConfirmationKey.Id = currentUser.Id;
+                newEmailConfirmationKey.ConfirmationKey = currentEmailConfirmationKey;
+                newEmailConfirmationKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:Validation:EmailValidationKeyValidityDays"));
+
+                _auth.EmailConfirmationKeys.Add(newEmailConfirmationKey);
+            }
+
+            await _auth.SaveChangesAsync();
+
+            string? userName = currentUser.UserName;
+            string? email = currentUser.Email;
+            string? redirectAddress = _configuration.GetValue<string>("Email:Validation:RedirectAddress") + currentEmailConfirmationKey; //Link here to verify the current user, insert key here
+
+
+            int result = await _emailService.SendEmailConfirmationEmail(userName, email, redirectAddress);
+            if (result == 0)
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
         }
     }
 }

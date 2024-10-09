@@ -99,7 +99,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class PostDesign
     {
         [MaxLength(50)] public string displayName { get; set; }
-        [MaxLength(50)] public string displayPictureUrl { get; set; }
+        [MaxLength(50)] public string? displayPictureUrl { get; set; }
         public string cakeDescription { get; set; }
         public List<Guid>? designTagIds { get; set; }
         public List<string>? designShapeNames { get; set; }
@@ -117,7 +117,6 @@ namespace BillOfMaterialsAPI.Schemas
     public class PostDesignAddOns
     {
         [Required] public int addOnsId { get; set; }
-        [Required][MaxLength(50)] public string addOnName { get; set; }
         [Required] public int quantity { get; set; }
         [Required] public double price { get; set; }
     }

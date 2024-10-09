@@ -150,9 +150,13 @@ namespace BillOfMaterialsAPI.Schemas
         public string item_id { get; set; }
         public string item_name { get; set; }
 
-        public string amount_quantity_type;
-        public string amount_unit;
-        public double amount;
+        public double inventory_price { get; set; }
+        public double inventory_quantity { get; set; }
+        public string inventory_amount_unit { get; set; }
+
+        public string amount_quantity_type { get; set; }
+        public string amount_unit { get; set; }
+        public double amount { get; set; }
     }
     [PrimaryKey("pastry_material_ingredient_importance_id")]
     public class PastryMaterialIngredientImportance
