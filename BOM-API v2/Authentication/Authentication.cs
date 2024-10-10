@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion.Internal;
 using Microsoft.IdentityModel.Tokens;
+using MimeKit.Encodings;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.IdentityModel.Tokens.Jwt;
@@ -30,8 +31,8 @@ namespace JWTAuthentication.Authentication
 
         }
         public DbSet<EmailConfirmationKeys> EmailConfirmationKeys { get; set; } //Table for storing user confirmation keys
+        public DbSet<ForgotPasswordKeys> ForgotPasswordKeys { get; set; }
         public DbSet<ProfileImages> ProfileImages { get; set; } //Table for storing user profile images
-
     }
     public class APIUsers : IdentityUser
     {
@@ -42,8 +43,14 @@ namespace JWTAuthentication.Authentication
         [Required][ForeignKey("APIUsers")] public string Id { get; set; }
         [Required] public string ConfirmationKey { get; set; }
         [Required] public DateTime ValidUntil { get; set; }
-
     }
+    public class ForgotPasswordKeys
+    {
+        [Required][ForeignKey("APIUsers")] public string Id { get; set; }
+        [Required] public string ForgotPasswordKey { get; set; }
+        [Required] public DateTime ValidUntil { get; set; }
+    }
+
     public class ProfileImages
     {
         [Required][ForeignKey("APIUsers")] public string Id { get; set; }
@@ -101,6 +108,11 @@ namespace JWTAuthentication.Authentication
         public string username { get; set; }
         public string phoneNumber { get; set; }
     }
+    public class ResetPassword
+    {
+        public string resetPasswordToken { get; set; }
+        public string newPassword { get; set; }
+    }
 }
 
 
@@ -138,7 +150,7 @@ namespace JWTAuthentication.Controllers
         public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
             var user = await userManager.FindByEmailAsync(model.Email);
-
+            
             if (user != null && await userManager.CheckPasswordAsync(user, model.Password))
             {
                 if (user.EmailConfirmed == false)
@@ -370,6 +382,7 @@ namespace JWTAuthentication.Controllers
             return response;
         }
 
+
         [Authorize]
         [HttpGet("/culo-api/v1/current-user")]
         public async Task<GetUser> CurrentUser()
@@ -390,6 +403,7 @@ namespace JWTAuthentication.Controllers
             //await _actionLogger.LogAction(User, "GET", "User Information " + currentUser.Id);
             return response;
         }
+
         [Authorize]
         [HttpPost("/culo-api/v1/current-user/send-confirmation-email/")]
         public async Task<IActionResult> SendEmailConfirmationEmail()
@@ -398,45 +412,15 @@ namespace JWTAuthentication.Controllers
             if (currentUser == null) { return NotFound(new { message = "User not found." }); }
             if (currentUser.EmailConfirmed == true) { return BadRequest(new { message = "User's email is already confirmed." }); }
 
-            string currentEmailConfirmationKey = Regex.Replace(Convert.ToBase64String(new HMACSHA256().Key), @"[^a-zA-Z0-9]", "");
 
-            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
-            EmailConfirmationKeys? currentUserKey = null;
-
-            try { currentUserKey = await _auth.EmailConfirmationKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
-            catch { }
-
-            if (currentUserKey != null)
-            {
-                _auth.EmailConfirmationKeys.Update(currentUserKey);
-                currentUserKey.ConfirmationKey = currentEmailConfirmationKey;
-                currentUserKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:Validation:EmailValidationKeyValidityDays"));
-            }
-            else
-            {
-                EmailConfirmationKeys newEmailConfirmationKey = new EmailConfirmationKeys();
-                newEmailConfirmationKey.Id = currentUser.Id;
-                newEmailConfirmationKey.ConfirmationKey = currentEmailConfirmationKey;
-                newEmailConfirmationKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:Validation:EmailValidationKeyValidityDays"));
-
-                _auth.EmailConfirmationKeys.Add(newEmailConfirmationKey);
-            }
-
-            await _auth.SaveChangesAsync();
-
-            string? userName = currentUser.UserName;
-            string? email = currentUser.Email;
-            string? redirectAddress = _configuration.GetValue<string>("Email:Validation:RedirectAddress") + currentEmailConfirmationKey; //Link here to verify the current user, insert key here
-
-
-            int result = await _emailService.SendEmailConfirmationEmail(userName, email, redirectAddress);
+            int result = await SendConfirmationEmail(currentUser.Id);
             if (result == 0)
             {
-                return Ok(new { message = "Email sent to " + email });
+                return Ok(new { message = "Email sent to " + currentUser.Email });
             }
             else
             {
-                return StatusCode(500, new { message = "Email failed to send to " + email });
+                return StatusCode(500, new { message = "Email failed to send to " + currentUser.Email });
             }
         }
         [HttpPost("/culo-api/v1/current-user/confirm-email/")]
@@ -473,6 +457,50 @@ namespace JWTAuthentication.Controllers
             await _auth.SaveChangesAsync();
 
             return Ok(new { message = "Email confirmed successfully" });
+        }
+
+
+        [HttpPost("send-forgot-password-email")]
+        public async Task<IActionResult> SendForgotPasswordEmailToEmail([FromBody] string email)
+        {
+            var user = await userManager.FindByEmailAsync(email);
+
+            if (user != null)
+            {
+                await SendForgotPasswordEmail(user.Id);
+            }
+
+            return Ok(new { message = "Email is sent to the email address if an account with the specified email exists" });
+        }
+        [HttpPost("/culo-api/v1/current-user/reset-password/")]
+        public async Task<IActionResult> ResetUserPassword([FromBody] ResetPassword data)
+        {
+            ForgotPasswordKeys? currentKey = await _auth.ForgotPasswordKeys.Where(x => x.ForgotPasswordKey == data.resetPasswordToken).FirstOrDefaultAsync();
+
+            if (currentKey == null) { return Unauthorized(new { message = "Invalid Reset Token" }); }
+
+            var currentUser = await userManager.FindByIdAsync(currentKey.Id);
+            if (currentUser == null) { return Unauthorized(new { message = "Invalid internal data" }); }
+
+            try
+            {
+                IdentityResult result = await userManager.ResetPasswordAsync(currentUser, data.resetPasswordToken, data.newPassword);
+
+                if (result.Succeeded)
+                {
+                    _auth.ForgotPasswordKeys.Remove(currentKey);
+                    await _auth.SaveChangesAsync();
+                    return Ok(new { message = "Password updated successfully!" });
+                }
+                else
+                {
+                    return BadRequest(new {message = "Invalid data! Please try again."});
+                }
+            }
+            catch
+            {
+                return BadRequest(new { messaage = "Change password failed!" });
+            }
         }
 
         [Authorize]
@@ -584,6 +612,52 @@ namespace JWTAuthentication.Controllers
 
 
             int result = await _emailService.SendEmailConfirmationEmail(userName, email, redirectAddress);
+            if (result == 0)
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        private async Task<int> SendForgotPasswordEmail(string accountId)
+        {
+            var currentUser = await userManager.FindByIdAsync(accountId.ToString());
+            if (currentUser == null) { return 0; }
+
+            string currentForgotPasswordKey = await userManager.GeneratePasswordResetTokenAsync(currentUser);
+
+            DateTime currentTime = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time"));
+            ForgotPasswordKeys? currentUserKey = null;
+
+            try { currentUserKey = await _auth.ForgotPasswordKeys.Where(x => x.Id == currentUser.Id).FirstAsync(); }
+            catch { }
+
+            if (currentUserKey != null)
+            {
+                _auth.ForgotPasswordKeys.Update(currentUserKey);
+                currentUserKey.ForgotPasswordKey = currentForgotPasswordKey;
+                currentUserKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:ForgotPassword:ForgotPasswordKeyValidityDays"));
+            }
+            else
+            {
+                ForgotPasswordKeys newForgotPasswordnKey = new ForgotPasswordKeys();
+                newForgotPasswordnKey.Id = currentUser.Id;
+                newForgotPasswordnKey.ForgotPasswordKey = currentForgotPasswordKey;
+                newForgotPasswordnKey.ValidUntil = currentTime.AddDays(_configuration.GetValue<int>("Email:ForgotPassword:ForgotPasswordKeyValidityDays"));
+
+                _auth.ForgotPasswordKeys.Add(newForgotPasswordnKey);
+            }
+
+            await _auth.SaveChangesAsync();
+
+            string? userName = currentUser.UserName;
+            string? email = currentUser.Email;
+            string? redirectAddress = _configuration.GetValue<string>("Email:ForgotPassword:RedirectAddress") + currentForgotPasswordKey; //Link here to verify the current user, insert key here
+
+
+            int result = await _emailService.SendForgotPasswordEmail(userName, email, redirectAddress);
             if (result == 0)
             {
                 return 1;

@@ -14,6 +14,7 @@ namespace BOM_API_v2.Services
     public interface IEmailService
     {
         Task<int> SendEmailConfirmationEmail(string recepientName, [EmailAddress] string recepientEmail, [Url] string confirmEmailLink);
+        Task<int> SendForgotPasswordEmail(string recepientName, [EmailAddress] string recepientEmail, [Url] string confirmEmailLink);
     }
 
     //Tightly Connected
