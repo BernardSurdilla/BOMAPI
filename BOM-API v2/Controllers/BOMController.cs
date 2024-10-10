@@ -89,7 +89,7 @@ namespace API_TEST.Controllers
                         case IngredientType.InventoryItem:
                             //!!!UNTESTED!!!
                             Item? searchResultI = null;
-                            try { searchResultI = activeInventoryItems.Find(x => x.id == Convert.ToInt32(ingItemEnum.Current.item_id)); }
+                            try { searchResultI = activeInventoryItems.Find(x => x.id == ingItemEnum.Current.item_id); }
                             catch { continue; }
                             if (searchResultI == null) { continue; }
 
@@ -140,7 +140,7 @@ namespace API_TEST.Controllers
                         case IngredientType.InventoryItem:
                             //!!!UNTESTED!!!
                             Item? searchResultI = null;
-                            try { searchResultI = activeInventoryItems.Find(x => x.id == Convert.ToInt32(matIngItemEnum.Current.item_id)); }
+                            try { searchResultI = activeInventoryItems.Find(x => x.id == matIngItemEnum.Current.item_id); }
                             catch { continue; }
                             if (searchResultI == null) { continue; }
 
@@ -344,7 +344,7 @@ namespace API_TEST.Controllers
 
                                     //!!!UNTESTED!!!
                                     Item? currentInventoryItem = null;
-                                    try { currentInventoryItem = allInventoryItems.Find(x => x.id == Convert.ToInt32(i.item_id)); }
+                                    try { currentInventoryItem = allInventoryItems.Find(x => x.id == i.item_id); }
                                     catch { continue; }
                                     if (currentInventoryItem == null) { continue; }
 
@@ -394,7 +394,7 @@ namespace API_TEST.Controllers
                                     {
                                         //!!!UNTESTED!!!
                                         Item? currentInventoryItem = null;
-                                        try { currentInventoryItem = allInventoryItems.Find(x => x.id == Convert.ToInt32(currentMaterialIngredient.item_id)); }
+                                        try { currentInventoryItem = allInventoryItems.Find(x => x.id == currentMaterialIngredient.item_id); }
                                         catch { continue; }
 
                                         if (currentInventoryItem == null) continue;

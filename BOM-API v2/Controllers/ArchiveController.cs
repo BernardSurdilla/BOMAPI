@@ -180,7 +180,7 @@ namespace BillOfMaterialsAPI.Controllers
                     case IngredientType.InventoryItem:
                         //!!!UNTESTED!!!
                         Item? currentInventoryItemI = null;
-                        try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(i.item_id)).FirstAsync(); }
+                        try { currentInventoryItemI = await _kaizenTables.Item.Where(x => x.is_active == true && x.id == i.item_id).FirstAsync(); }
                         catch (Exception e) { }
 
                         if (currentInventoryItemI == null) { continue; }

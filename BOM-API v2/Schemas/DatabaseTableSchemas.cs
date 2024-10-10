@@ -292,7 +292,7 @@ namespace BillOfMaterialsAPI.Schemas
     [Table("Item")]
     public class Item
     {
-        [Required][Key] public int id { get; set; }
+        [Required][Key] public string id { get; set; }
         [MaxLength(50)] public string item_name { get; set; }
         public double quantity { get; set; }
         public double price { get; set; }

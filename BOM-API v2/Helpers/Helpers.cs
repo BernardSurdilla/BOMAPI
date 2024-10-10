@@ -392,7 +392,7 @@ namespace BillOfMaterialsAPI.Helpers
             Item? currentInventoryItem;
             try
             {
-                currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(id)).FirstAsync();
+                currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == id).FirstAsync();
                 return true;
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
@@ -958,7 +958,7 @@ namespace BillOfMaterialsAPI.Helpers
 
             try
             {
-                currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(id)).FirstAsync();
+                currentInventoryItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == id).FirstAsync();
                 return currentInventoryItem;
             }
             catch (FormatException exF) { throw new FormatException("Invalid id format for " + id + ", must be a value that can be parsed as an integer."); }
@@ -2073,7 +2073,7 @@ namespace BillOfMaterialsAPI.Helpers
                 {
                     case IngredientType.InventoryItem:
                         Item? currentMatIngRefItem = null;
-                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == materialIngredients.item_id).FirstAsync(); }
                         catch { continue; }
 
                         bool isInventoryItemMeasurementValid = ValidUnits.IsUnitValid(currentMatIngRefItem.measurements);
@@ -2118,7 +2118,7 @@ namespace BillOfMaterialsAPI.Helpers
                 {
                     case IngredientType.InventoryItem:
                         Item? currentMatIngRefItem = null;
-                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == Convert.ToInt32(materialIngredients.item_id)).FirstAsync(); }
+                        try { currentMatIngRefItem = await kaizenTables.Item.Where(x => x.is_active == true && x.id == materialIngredients.item_id).FirstAsync(); }
                         catch { continue; }
 
                         bool isInventoryItemMeasurementValid = ValidUnits.IsUnitValid(currentMatIngRefItem.measurements);
