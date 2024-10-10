@@ -4,7 +4,7 @@ namespace CRUDFI.Models
 {
     public class Ingri
     {
-        public int id { get; set; }
+        public string id { get; set; }
 
         public string name { get; set; } = "";
 
@@ -69,7 +69,7 @@ namespace CRUDFI.Models
 
     public class IngriDTP
     {
-        public int id { get; set; }
+        public string id { get; set; }
 
         public string name { get; set; } = "";
 
