@@ -143,6 +143,7 @@ namespace BillOfMaterialsAPI.Schemas
     {
         public Guid pastryMaterialAdditionalCostId { get; set; }
         public double additionalCost { get; set; }
+        public double? ingredientCostMultiplier { get; set; }
     }
     public class GetPastryMaterialIngredients
     {
@@ -284,12 +285,42 @@ namespace BillOfMaterialsAPI.Schemas
         public string itemName { get; set; }
 
         public double inventoryPrice { get; set; }
+        public string amountQuantityType { get; set; }
+
         public double inventoryQuantity { get; set; }
         public string inventoryAmountUnit { get; set; }
 
-        public string amountQuantityType { get; set; }
-        public string amountUnit { get; set; }
         public double amount { get; set; }
+        public string amountUnit { get; set; }
+    }
+    public class GetBOMReceipt
+    {
+        public double totalIngredientPrice { get; set; }
+        public double totalIngredientPriceWithOtherCostIncluded { get; set; }
+        public double totalIngredientPriceWithOtherCostIncludedRounded { get; set; }
+        public List<GetIngredientCostBreakdown>? ingredientCostBreakdown { get; set; }
+        public GetOtherCostBreakdown otherCostBreakdown { get; set; }
+    }
+    public class GetIngredientCostBreakdown
+    {
+        public string itemId { get; set; }
+        public string itemName { get; set; }
+
+        public double inventoryPrice { get; set; }
+        public double inventoryQuantity { get; set; }
+        public string inventoryAmountUnit { get; set; }
+
+
+        public string amountQuantityType { get; set; }
+        public double amount { get; set; }
+        public string amountUnit { get; set; }
+
+        public double calculatedPrice { get; set; }
+    }
+    public class GetOtherCostBreakdown
+    {
+        public double additionalCost { get; set; }
+        public double ingredientCostMultiplier { get; set; }
     }
 
     //Design Related

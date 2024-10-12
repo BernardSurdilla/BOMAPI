@@ -72,9 +72,9 @@ namespace BillOfMaterialsAPI.Schemas
         [Required][ForeignKey("PastryMaterials")] public string pastry_material_id { get; set; }
 
         public double additional_cost { get; set; }
+        public double? ingredient_cost_multiplier { get; set; }
         
         public PastryMaterials PastryMaterials { get; set; }
-
     }
 
 
@@ -129,15 +129,6 @@ namespace BillOfMaterialsAPI.Schemas
         public PastryMaterialSubVariants PastryMaterialSubVariants { get; set; }
     }
 
-    [PrimaryKey("order_ingredient_subtraction_log_id")]
-    public class OrderIngredientSubtractionLog
-    {
-        [Required][Key] public Guid order_ingredient_subtraction_log_id { get; set; }
-        [Required][Column(TypeName = "binary(16)")] public byte[] order_id { get; set; }
-        [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
-
-        public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
-    }
     [PrimaryKey("ingredient_subtraction_history_id")]
     public class IngredientSubtractionHistory
     {
@@ -158,6 +149,29 @@ namespace BillOfMaterialsAPI.Schemas
         public string amount_unit { get; set; }
         public double amount { get; set; }
     }
+    [PrimaryKey("order_ingredient_subtraction_log_id")]
+    public class OrderIngredientSubtractionLog
+    {
+        [Required][Key] public Guid order_ingredient_subtraction_log_id { get; set; }
+        [Required][Column(TypeName = "varchar(255)")] public string order_id { get; set; }
+        [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
+
+        public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
+    }
+    public class OtherCostForIngredientSubtractionHistory
+    {
+        [Required][Key] public Guid other_cost_for_ingredient_subtraction_history_id { get; set; }
+        [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
+        [Required][Column(TypeName = "json")] public OtherCostHistoryInfo other_cost_info { get; set; }
+
+        public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
+    }
+    public class OtherCostHistoryInfo
+    {
+        public double additional_cost { get; set; }
+        public double? ingredient_cost_multiplier { get; set; }
+    }
+
     [PrimaryKey("pastry_material_ingredient_importance_id")]
     public class PastryMaterialIngredientImportance
     {
@@ -274,7 +288,7 @@ namespace BillOfMaterialsAPI.Schemas
     [Table("orders")]
     public class Orders
     {
-        [Required][Key] public byte[] order_id { get; set; }
+        [Required][Key] public string order_id { get; set; }
         [Required] public Guid customer_id { get; set; }
         [Required] public Guid? employee_id { get; set; }
         public string pastry_id { get; set; }

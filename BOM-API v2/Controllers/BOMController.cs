@@ -587,6 +587,92 @@ namespace API_TEST.Controllers
 
             return response;
         }
+
+        [HttpGet("ingredient-cost-breakdown/by-pastry-material{variant_id}")]
+        public async Task<GetBOMReceipt> GetIngredientCostBreakdownByVariantId(string variant_id)
+        {
+            GetBOMReceipt response = new GetBOMReceipt();
+
+            PastryMaterials? selectedPastryMaterial = null;
+            PastryMaterialSubVariants? selectedPastryMaterialSubVariant = null;
+
+            try { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(variant_id, _context); }
+            catch { }
+            try { selectedPastryMaterialSubVariant = await DataRetrieval.GetPastryMaterialSubVariantAsync(variant_id, _context); }
+            catch { }
+            if (selectedPastryMaterial == null && selectedPastryMaterialSubVariant != null) { selectedPastryMaterial = await DataRetrieval.GetPastryMaterialAsync(selectedPastryMaterialSubVariant.pastry_material_id, _context); }
+            if (selectedPastryMaterial == null) return response;
+
+            response.ingredientCostBreakdown = new List<GetIngredientCostBreakdown>();
+            Dictionary<string, InventorySubtractorInfo> currentVariantIngredients = await DataParser.GetTotalIngredientAmountList(variant_id, _context, _kaizenTables);
+
+            foreach(string itemId in currentVariantIngredients.Keys)
+            {
+                InventorySubtractorInfo currentIngredient = currentVariantIngredients[itemId];
+                Item? currentReferencedInventoryItem = null;
+                try
+                {
+                    currentReferencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(itemId, _kaizenTables);
+                }
+                catch { continue; }
+                GetIngredientCostBreakdown newIngredientCostBreakdownRow = new GetIngredientCostBreakdown();
+
+                newIngredientCostBreakdownRow.itemId = itemId;
+                newIngredientCostBreakdownRow.amount = currentIngredient.Amount;
+                newIngredientCostBreakdownRow.amountUnit = currentIngredient.AmountUnit;
+                newIngredientCostBreakdownRow.amountQuantityType = currentIngredient.AmountQuantityType;
+
+                newIngredientCostBreakdownRow.itemName = currentReferencedInventoryItem.item_name;
+                newIngredientCostBreakdownRow.inventoryQuantity = currentReferencedInventoryItem.quantity;
+                newIngredientCostBreakdownRow.inventoryPrice = currentReferencedInventoryItem.price;
+                newIngredientCostBreakdownRow.inventoryAmountUnit = currentReferencedInventoryItem.measurements;
+
+                try
+                {
+                    newIngredientCostBreakdownRow.calculatedPrice = currentReferencedInventoryItem.price * UnitConverter.ConvertByName(currentIngredient.Amount, currentIngredient.AmountQuantityType, currentIngredient.AmountUnit, currentReferencedInventoryItem.measurements);
+
+                }
+                catch
+                {
+                    newIngredientCostBreakdownRow.calculatedPrice = currentIngredient.Amount * currentReferencedInventoryItem.price;
+                }
+
+                response.totalIngredientPrice += newIngredientCostBreakdownRow.calculatedPrice;
+                response.ingredientCostBreakdown.Add(newIngredientCostBreakdownRow);
+            }
+
+            PastryMaterialOtherCost? otherCost = null;
+            try
+            {
+                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(selectedPastryMaterial.pastry_material_id, _context);
+            }
+            catch { }
+
+            response.otherCostBreakdown = new GetOtherCostBreakdown
+            {
+                additionalCost = otherCost == null ? 0 : otherCost.additional_cost,
+                ingredientCostMultiplier = otherCost == null ? 1 : otherCost.ingredient_cost_multiplier == null ? 1 : otherCost.ingredient_cost_multiplier.Value
+            };
+
+            response.totalIngredientPriceWithOtherCostIncluded = (response.totalIngredientPrice * response.otherCostBreakdown.ingredientCostMultiplier) + response.otherCostBreakdown.additionalCost;
+            response.totalIngredientPriceWithOtherCostIncludedRounded = PriceCalculator.PriceRounder(response.totalIngredientPriceWithOtherCostIncluded);
+
+            return response;
+        }
+        [HttpGet("ingredient-cost-breakdown/by-ingredient-subtraction-history{ingredient_subtraction_history_id}")]
+        public async Task<GetBOMReceipt> GetIngredientCostBreakdownByIngredientSubtractionHistory(Guid ingredient_subtraction_history_id)
+        {
+            return await DataParser.ParseBOMReceiptFromIngredientSubtractionHistory(ingredient_subtraction_history_id, _context);
+        }
+        [HttpGet("ingredient-cost-breakdown/by-order-id{order_id}")]
+        public async Task<GetBOMReceipt> GetIngredientCostBreakdownByOrderId(string order_id)
+        {
+            OrderIngredientSubtractionLog? selectedRecord = await _context.OrderIngredientSubtractionLog.Where(x => x.order_id == order_id).FirstOrDefaultAsync();
+
+            if (selectedRecord == null) return new GetBOMReceipt();
+            else return await DataParser.ParseBOMReceiptFromIngredientSubtractionHistory(selectedRecord.ingredient_subtraction_history_id, _context);
+
+        }
     }
     [ApiController]
     public class BOMDataManipulationController : ControllerBase
@@ -691,6 +777,23 @@ namespace API_TEST.Controllers
             };
             await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
 
+            PastryMaterialOtherCost? otherCost = null;
+            try
+            {
+                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(pastry_material_id, _context);
+            }
+            catch (Exception ex) { }
+            OtherCostForIngredientSubtractionHistory newOtherCostHistory = new OtherCostForIngredientSubtractionHistory
+            {
+                other_cost_for_ingredient_subtraction_history_id = Guid.NewGuid(),
+                other_cost_info = new OtherCostHistoryInfo
+                {
+                    additional_cost = otherCost == null ? 0 : otherCost.additional_cost,
+                    ingredient_cost_multiplier = otherCost == null ? 1 : otherCost.ingredient_cost_multiplier
+                }
+            };
+            await _context.OtherCostForIngredientSubtractionHistory.AddAsync(newOtherCostHistory);
+
             await _kaizenTables.SaveChangesAsync();
             await _context.SaveChangesAsync();
 
@@ -702,16 +805,8 @@ namespace API_TEST.Controllers
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string order_id)
         {
-            string decodedId = order_id;
-            byte[]? byteArrEncodedId = null;
-            try
-            {
-                Guid orderId = new Guid(order_id);
-                byteArrEncodedId = orderId.ToByteArray();
-            }
-            catch { return BadRequest(new { message = "Invalid order id format on route" }); }
 
-            Orders? selectedOrder = await _kaizenTables.Orders.Where(x => x.is_active == true && x.order_id.SequenceEqual(byteArrEncodedId)).FirstOrDefaultAsync();
+            Orders? selectedOrder = await _kaizenTables.Orders.Where(x => x.is_active == true && x.order_id == order_id).FirstOrDefaultAsync();
             if (selectedOrder == null) { return NotFound(new { message = "No order with the specified id found" }); }
             OrderIngredientSubtractionLog? recordOfSubtraction = await _context.OrderIngredientSubtractionLog.Where(x => x.order_id.SequenceEqual(x.order_id)).FirstOrDefaultAsync();
             if (recordOfSubtraction != null) { return BadRequest(new { message = "Order " + order_id + " is already subtracted in the inventory" }); }
@@ -799,10 +894,28 @@ namespace API_TEST.Controllers
             OrderIngredientSubtractionLog newOrderSubtractionHistory = new OrderIngredientSubtractionLog
             {
                 order_ingredient_subtraction_log_id = Guid.NewGuid(),
-                order_id = byteArrEncodedId,
+                order_id = selectedOrder.order_id,
                 ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId
             };
             await _context.OrderIngredientSubtractionLog.AddAsync(newOrderSubtractionHistory);
+
+            PastryMaterialOtherCost? otherCost = null;
+            try
+            {
+                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(selectedOrder.pastry_id, _context);
+            }
+            catch (Exception ex) { }
+            OtherCostForIngredientSubtractionHistory newOtherCostHistory = new OtherCostForIngredientSubtractionHistory
+            {
+                other_cost_for_ingredient_subtraction_history_id = Guid.NewGuid(),
+                other_cost_info = new OtherCostHistoryInfo
+                {
+                    additional_cost = otherCost == null ? 0 : otherCost.additional_cost,
+                    ingredient_cost_multiplier = otherCost == null ? 1 : otherCost.ingredient_cost_multiplier
+                }
+            };
+            await _context.OtherCostForIngredientSubtractionHistory.AddAsync(newOtherCostHistory);
+
             await _context.SaveChangesAsync();
 
             await _kaizenTables.SaveChangesAsync();

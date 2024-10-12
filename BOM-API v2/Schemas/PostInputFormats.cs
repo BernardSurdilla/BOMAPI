@@ -54,6 +54,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class PostPastryMaterialOtherCost
     {
         public double additionalCost { get; set; }
+        public double? ingredientCostMultiplier { get; set; }
     }
     public class PostIngredients
     {

@@ -481,6 +481,7 @@ namespace BOM_API_v2.Controllers
 
             _context.PastryMaterialOtherCosts.Update(currentPastryMaterialOtherCost);
             currentPastryMaterialOtherCost.additional_cost = entry.additionalCost;
+            currentPastryMaterialOtherCost.ingredient_cost_multiplier = entry.ingredientCostMultiplier;
             await _context.SaveChangesAsync();
 
             await _actionLogger.LogAction(User, "PATCH", "Update Pastry Material Other Cost " + pastry_material_id);
