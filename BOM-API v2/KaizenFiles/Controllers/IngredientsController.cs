@@ -32,11 +32,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
-                // Validate the model state
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(ModelState); // Return validation errors
-                }
 
                 // Extract the username from the token
                 var username = User.FindFirst(ClaimTypes.Name)?.Value;
@@ -95,30 +90,74 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task InsertIngredientAsync(IngriDTO ingredientDto, string lastUpdatedBy, string status, string id)
         {
-            string sqlInsert = "INSERT INTO item(Id, item_name, quantity, price, status, type, created_at, last_updated_by, last_updated_at, measurements) " +
-                               "VALUES(@id, @item_name, @quantity, @price, @status, @type, @createdAt, @last_updated_by, @last_updated_at, @measurements)";
+        using (var connection = new MySqlConnection(connectionstring))
+        {
+        await connection.OpenAsync(); // Open the connection asynchronously
 
-            using (var connection = new MySqlConnection(connectionstring))
+        // Step 1: Check if item_name exists in the item table
+        string sqlSelect = "SELECT Id FROM item WHERE item_name = @item_name";
+        string existingId = null;
+
+        using (var selectCommand = new MySqlCommand(sqlSelect, connection))
+        {
+            selectCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
+
+            using (var reader = await selectCommand.ExecuteReaderAsync())
             {
-                await connection.OpenAsync(); // Open the connection asynchronously
-
-                using (var insertCommand = new MySqlCommand(sqlInsert, connection))
+                if (await reader.ReadAsync())
                 {
-                    insertCommand.Parameters.AddWithValue("@id", id);
-                    insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
-                    insertCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
-                    insertCommand.Parameters.AddWithValue("@price", ingredientDto.price);
-                    insertCommand.Parameters.AddWithValue("@status", status); // Use the calculated status
-                    insertCommand.Parameters.AddWithValue("@type", ingredientDto.type);
-                    insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow); // Assuming the current date time for createdAt
-                    insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
-                    insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
-                    insertCommand.Parameters.AddWithValue("@measurements", ingredientDto.measurements);
-
-                    await insertCommand.ExecuteNonQueryAsync();
+                    existingId = reader["Id"].ToString();
                 }
             }
         }
+
+        // Step 2: If item_name exists, update the Id and other fields (except quantity and price)
+        if (!string.IsNullOrEmpty(existingId))
+        {
+            string sqlUpdate = "UPDATE item SET Id = @id, status = @status, type = @type, " +
+                               "last_updated_by = @last_updated_by, last_updated_at = @last_updated_at, " +
+                               "measurements = @measurements WHERE item_name = @item_name";
+
+            using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+            {
+                updateCommand.Parameters.AddWithValue("@id", id); // Update the Id
+                updateCommand.Parameters.AddWithValue("@status", status);
+                updateCommand.Parameters.AddWithValue("@type", ingredientDto.type);
+                updateCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                updateCommand.Parameters.AddWithValue("@measurements", ingredientDto.measurements);
+                updateCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
+
+                await updateCommand.ExecuteNonQueryAsync(); // Execute the update command
+            }
+        }
+        // Step 3: If item_name does not exist, insert new data
+        else
+        {
+            string sqlInsert = "INSERT INTO item(Id, item_name, quantity, price, status, type, created_at, " +
+                               "last_updated_by, last_updated_at, measurements) " +
+                               "VALUES(@id, @item_name, @quantity, @price, @status, @type, @createdAt, " +
+                               "@last_updated_by, @last_updated_at, @measurements)";
+
+            using (var insertCommand = new MySqlCommand(sqlInsert, connection))
+            {
+                insertCommand.Parameters.AddWithValue("@id", id);
+                insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
+                insertCommand.Parameters.AddWithValue("@quantity", ingredientDto.quantity);
+                insertCommand.Parameters.AddWithValue("@price", ingredientDto.price);
+                insertCommand.Parameters.AddWithValue("@status", status); // Use the calculated status
+                insertCommand.Parameters.AddWithValue("@type", ingredientDto.type);
+                insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow); // Assuming the current date time for createdAt
+                insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                insertCommand.Parameters.AddWithValue("@measurements", ingredientDto.measurements);
+
+                await insertCommand.ExecuteNonQueryAsync(); // Execute the insert command
+                }
+            }
+            }
+            }
+
 
 
         private async Task InsertOrUpdateIngredientAsync(IngriDTO ingredientDto, string lastUpdatedBy, string id, string itemId)
@@ -296,7 +335,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         await UpdateItemFromBatchesAsync(item);
                     }
                 }
-               
+
+                List<string> items = await GetItemIdAsync();
+
+                if (items != null)
+                {
+                    foreach (string itemid in items)
+                    {
+                        await UpdateItemFromBatchesAsync(itemid);
+                    }
+                }
+
+
                 List<Ingri> activeIngredients = GetActiveIngredientsFromDatabase();
 
                 if (activeIngredients == null || !activeIngredients.Any())
@@ -335,6 +385,37 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 _logger.LogError(ex, "An error occurred while fetching active ingredients");
                 return StatusCode(500, "An error occurred while processing the request");
             }
+        }
+
+        private async Task<List<string>> GetItemIdAsync()
+        {
+            var itemIds = new List<string>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sqlSelectIds = @"
+            SELECT i.Id 
+            FROM item i 
+            INNER JOIN batches b ON i.Id = b.item_id 
+            WHERE i.quantity IS NULL AND i.price IS NULL";
+
+                using (var command = new MySqlCommand(sqlSelectIds, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            // Assuming the Id is stored as a string
+                            string id = reader.GetString("Id");
+                            itemIds.Add(id);
+                        }
+                    }
+                }
+            }
+
+            return itemIds;
         }
 
         private async Task<List<string>> GetItemIdsAsync()
@@ -452,7 +533,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 connection.Open();
 
-                string sql = "SELECT * FROM Item WHERE is_active = @isActive";
+                string sql = "SELECT * FROM Item WHERE is_active = @isActive AND quantity IS NOT NULL AND price IS NOT NULL";
                 using (var command = new MySqlCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@isActive", true);
@@ -816,7 +897,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPatch]
+        [HttpPost]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> ReactivateIngredient([FromQuery] string restore)
         {
