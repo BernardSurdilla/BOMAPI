@@ -109,7 +109,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sql = "SELECT name, price, add_ons_id, measurement, size, date_added, last_modified_date FROM addons WHERE is_active = 1";
+                string sql = "SELECT name, price, add_ons_id, measurement, size, date_added, last_modified_date FROM addons";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
