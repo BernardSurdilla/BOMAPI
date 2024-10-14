@@ -47,7 +47,6 @@ namespace LiveChat
                 currentUser = new ClaimsPrincipal(new ClaimsIdentity(decrypt.Claims));
 
             }
-
             ConnectionInfo? currentConnectionInfo = _connectionManager.GetAllCustomerConnections().FirstOrDefault(x => x.ConnectionId == Context.ConnectionId);
 
             MessageFormat formattedMessage;
@@ -64,7 +63,7 @@ namespace LiveChat
             {
                 List<Claim> roles = currentUser.FindAll(ClaimTypes.Role).ToList();
 
-                if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
+                //if (roles.Where(x => x.Value == UserRoles.Customer).FirstOrDefault() == null) return;
                 //if (currentUser.HasClaim(x => x.ValueType == ClaimTypes.NameIdentifier) == false) return;
 
                 APIUsers? currentUserAccount = await _userManager.FindByIdAsync(currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
@@ -72,8 +71,8 @@ namespace LiveChat
 
                 IList<string> recieverUserAccountRoles = await _userManager.GetRolesAsync(recieverUserAccount);
 
-                if (recieverUserAccountRoles.Contains(UserRoles.Admin)
-                    || recieverUserAccountRoles.Contains(UserRoles.Manager))
+                if ((recieverUserAccountRoles.Contains(UserRoles.Admin)
+                    || recieverUserAccountRoles.Contains(UserRoles.Manager)) && currentUserAccount != null)
                 {
                     await LogMessageToDB(formattedMessage, currentUserAccount, recieverUserAccount);
                 }
@@ -87,10 +86,7 @@ namespace LiveChat
             }
             if (messageRecipientConnectionInfo == null) { return; }
 
-            ISingleClientProxy callerClientProxy = Clients.Caller;
-            ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
-
-            await SendMessageToSenderAndRecepientClients(callerClientProxy, recepientClientProxy, formattedMessage);
+            await SendMessageToSenderAndRecepientClientsNew(currentConnectionInfo.AccountId, messageRecipientConnectionInfo.AccountId, formattedMessage);
         }
 
         [HubMethodName("artist-send-message")]
@@ -148,10 +144,7 @@ namespace LiveChat
             if (messageRecipientConnectionInfo == null) messageRecipientConnectionInfo = _connectionManager.GetAllManagerConnections().Where(x => x.AccountId == accountId).FirstOrDefault();
             if (messageRecipientConnectionInfo == null) { return; }
 
-            ISingleClientProxy callerClientProxy = Clients.Caller;
-            ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
-
-            await SendMessageToSenderAndRecepientClients(callerClientProxy, recepientClientProxy, formattedMessage);
+            await SendMessageToSenderAndRecepientClientsNew(currentUserAccount.Id, messageRecipientConnectionInfo.AccountId, formattedMessage);
         }
         [HubMethodName("manager-send-message")]
         public async Task ManagerSendMessage(string message, string accountId)
@@ -209,10 +202,7 @@ namespace LiveChat
             if (messageRecipientConnectionInfo == null) { return; }
 
 
-            ISingleClientProxy callerClientProxy = Clients.Caller;
-            ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
-
-            await SendMessageToSenderAndRecepientClients(callerClientProxy, recepientClientProxy, formattedMessage);
+            await SendMessageToSenderAndRecepientClientsNew(currentUserAccount.Id, messageRecipientConnectionInfo.AccountId, formattedMessage);
         }
         [HubMethodName("admin-send-message")]
         public async Task AdminSendMessage(string message, string accountId)
@@ -263,11 +253,7 @@ namespace LiveChat
             {
                 return;
             }
-
-            ISingleClientProxy callerClientProxy = Clients.Caller;
-            ISingleClientProxy recepientClientProxy = Clients.Client(messageRecipientConnectionInfo.ConnectionId);
-
-            await SendMessageToSenderAndRecepientClients(callerClientProxy, recepientClientProxy, formattedMessage);
+            await SendMessageToSenderAndRecepientClientsNew(currentUserAccount.Id, messageRecipientConnectionInfo.AccountId, formattedMessage);
         }
 
         public override Task OnConnectedAsync()
@@ -295,7 +281,7 @@ namespace LiveChat
                 
             }
             
-            if (currentUser != null)
+            if (currentUser != null && currentUser.FindFirstValue(ClaimTypes.NameIdentifier) != null)
             {
                 List<Claim> allRoles = currentUser.FindAll(ClaimTypes.Role).ToList();
                 List<string> allRolesParsed = new List<string>();
@@ -306,10 +292,13 @@ namespace LiveChat
                 currentUser.FindFirstValue(ClaimTypes.NameIdentifier),
                 currentUser.FindFirstValue(ClaimTypes.Name),
                 allRolesParsed));
+
+                Groups.AddToGroupAsync(Context.ConnectionId, currentUser.FindFirstValue(ClaimTypes.NameIdentifier));
             }
             else
             {
-                _connectionManager.AddConnection(Context.ConnectionId);
+                string idResult = _connectionManager.AddConnection(Context.ConnectionId);
+                Groups.AddToGroupAsync(Context.ConnectionId, idResult);
             }
 
             return base.OnConnectedAsync();
@@ -373,10 +362,21 @@ namespace LiveChat
 
             return response;
         }
+
+        //Old
         public async Task<int> SendMessageToSenderAndRecepientClients(ISingleClientProxy sender, ISingleClientProxy recepient, MessageFormat message)
         {
             await recepient.SendAsync(CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME, message);
             await sender.SendAsync(CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME, message);
+
+            return 1;
+        }
+        //New
+        //Doesnt support overloading, appended new
+        public async Task<int> SendMessageToSenderAndRecepientClientsNew(string senderId, string recepientId, MessageFormat message)
+        {
+            await Clients.Group(senderId).SendAsync(CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME, message);
+            await Clients.Group(recepientId).SendAsync(CLIENT_RECIEVE_MESSAGE_FUNCTION_NAME, message);
 
             return 1;
         }

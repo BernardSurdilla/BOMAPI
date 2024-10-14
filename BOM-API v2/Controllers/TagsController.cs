@@ -73,6 +73,7 @@ namespace BOM_API_v2.Controllers
                 newResponseEntry.designTagName = currentDesignTag.design_tag_name;
                 response.Add(newResponseEntry);
             }
+            await Page.AddTotalNumberOfPagesToResponseHeader<DesignTags>(_databaseContext.DesignTags, Response.Headers, record_per_page);
 
             await _actionLogger.LogAction(User, "GET", "All Design tags");
             return response;

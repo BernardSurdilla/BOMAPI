@@ -146,6 +146,7 @@ namespace BOM_API_v2.Controllers
                 });
             }
 
+            response = response.GroupBy(x => x.account_id).Select(x => x.First()).ToList();
             return response;
         }
         [HttpGet("live-chat/online-users")]
@@ -168,7 +169,7 @@ namespace BOM_API_v2.Controllers
                     role = connectionInfo.Claims == null || connectionInfo.Claims.IsNullOrEmpty() ? "Customer" : connectionInfo.Claims.FirstOrDefault()
                 });
             }
-
+            response = response.GroupBy(x => x.account_id).Select(x => x.First()).ToList();
             return response;
         }
     }

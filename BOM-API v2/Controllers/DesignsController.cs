@@ -85,6 +85,8 @@ namespace BOM_API_v2.Controllers
                 response.Add(newResponseEntry);
             }
 
+            await Page.AddTotalNumberOfPagesToResponseHeader<Designs>(_databaseContext.Designs, Response.Headers, record_per_page);
+
             await _actionLogger.LogAction(User, "GET", "All Design");
             return response;
         }
@@ -128,6 +130,21 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "GET", "Design " + design_id);
             return response;
         }
+        [HttpGet("{design_id}/display-picture-data")]
+        public async Task<GetDesignImage> GetDesignImage([FromRoute] Guid design_id)
+        {
+            DesignImage currentImage;
+            GetDesignImage response = new GetDesignImage();
+            try { currentImage = await DataRetrieval.GetDesignImageByDesignIdAsync(design_id, _databaseContext); }
+            catch { return response; }
+
+            response.designPictureId = currentImage.design_picture_id;
+            response.displayPictureData = currentImage.picture_data;
+
+            return response;
+
+        }
+
         [HttpGet("with-tags/{*tags}")]
         public async Task<List<GetDesign>> GetDesignsWithTag([FromRoute] string tags)
         {

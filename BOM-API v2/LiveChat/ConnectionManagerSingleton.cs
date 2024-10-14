@@ -4,7 +4,7 @@ namespace LiveChat
     public interface ILiveChatConnectionManager
     {
         void AddConnection(ConnectionInfo entry);
-        void AddConnection(string connectionString);
+        string AddConnection(string connectionString);
         void RemoveConnection(ConnectionInfo entry);
         void RemoveConnection(string connectionId);
         List<ConnectionInfo> GetAllConnections();
@@ -21,12 +21,12 @@ namespace LiveChat
         public List<string>? Claims { get; set; }
 
         public ConnectionInfo() { }
-        public ConnectionInfo(string connectionId)
+        public ConnectionInfo(string connectionId, string accountId)
         {
             ConnectionId = connectionId;
-            AccountId = Guid.NewGuid().ToString();
+            AccountId = accountId;
             Name = "Anonymous";
-            Claims = null;
+            Claims = new List<string>{"Customer"};
         }
         public ConnectionInfo(string connectionId, string? accountId, string? name, List<string>? claims)
         {
@@ -44,9 +44,11 @@ namespace LiveChat
         {
             ConnectionInfos.Add(entry);
         }
-        public void AddConnection(string connectionId)
+        public string AddConnection(string connectionId)
         {
-            ConnectionInfos.Add(new ConnectionInfo(connectionId));
+            string newConnectionId = Guid.NewGuid().ToString();
+            ConnectionInfos.Add(new ConnectionInfo(connectionId, newConnectionId));
+            return newConnectionId;
         }
         public void RemoveConnection(ConnectionInfo entry)
         {

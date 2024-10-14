@@ -70,6 +70,18 @@ namespace BillOfMaterialsAPI.Helpers
     {
         public static int DefaultStartingPageNumber = 1;
         public static int DefaultNumberOfEntriesPerPage = 10;
+
+        public static async Task<bool> AddTotalNumberOfPagesToResponseHeader<T>(DbSet<T> queryObject, IHeaderDictionary headers, int? recordPerPage) where T : class
+        {
+            //Page counting algo
+            int dbRows = await queryObject.CountAsync();
+            int recordLimit = recordPerPage == null || recordPerPage.Value < Page.DefaultNumberOfEntriesPerPage ? Page.DefaultNumberOfEntriesPerPage : recordPerPage.Value;
+
+            double pagesLeft = (double)dbRows / recordLimit;
+
+            headers.Append("X-Number-Of-Pages", Math.Ceiling(pagesLeft).ToString());
+            return true;
+        }
     }
     public class Iterators
     {
@@ -952,6 +964,17 @@ namespace BillOfMaterialsAPI.Helpers
             throw new NotFoundInDatabaseException("No pastry material sub variant add on with the id " + pastry_material_sub_variant_add_on_id + " for the pastry material sub variant " + pastry_material_sub_variant_id + " of the pastry material with the id " + pastry_material_id + " found in the database.");
         }
 
+        public static async Task<DesignImage> GetDesignImageByDesignIdAsync(Guid design_id, DatabaseContext context)
+        {
+            Designs? currentDesign = await context.Designs.Where(x => x.design_id == design_id).FirstOrDefaultAsync();
+            if (currentDesign == null) throw new NotFoundInDatabaseException("No design with the id " + design_id + " found in the database.");
+
+            DesignImage? currentDesignImage = await context.DesignImage.Where(x => x.design_id == design_id).FirstOrDefaultAsync();
+            if (currentDesignImage == null) throw new NotFoundInDatabaseException("No image found for " + design_id + ".");
+
+            return currentDesignImage;
+        }
+
 
         public static async Task<OtherCostForIngredientSubtractionHistory> GetOtherCostForIngredientSubtractionHistoryAsync(Guid ingredient_subtraction_history_id, DatabaseContext context)
         {
@@ -1688,10 +1711,6 @@ namespace BillOfMaterialsAPI.Helpers
             List<DesignTagsForCakes> cakeTags = await context.DesignTagsForCakes.Include(x => x.DesignTags).Where(x => x.is_active == true && x.design_id == data.design_id && x.DesignTags.is_active == true).ToListAsync();
             List<DesignShapes> cakeShapes = await context.DesignShapes.Where(x => x.is_active == true && x.design_id == data.design_id).ToListAsync();
 
-            DesignImage? image;
-            try { image = await context.DesignImage.Where(x => x.is_active == true && x.design_id == data.design_id).FirstAsync(); }
-            catch { image = null; }
-
             foreach (DesignTagsForCakes currentTag in cakeTags)
             {
                 if (currentTag.DesignTags != null)
@@ -1708,8 +1727,6 @@ namespace BillOfMaterialsAPI.Helpers
                 });
             }
 
-            if (image != null) { response.displayPictureData = image.picture_data; }
-            else { response.displayPictureData = null; };
             return response;
         }
 

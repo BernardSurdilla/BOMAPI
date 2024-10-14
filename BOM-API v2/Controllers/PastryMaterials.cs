@@ -114,6 +114,7 @@ namespace BOM_API_v2.Controllers
                 catch { continue; }
                 response.Add(newRow);
             }
+            await Page.AddTotalNumberOfPagesToResponseHeader<PastryMaterials>(_context.PastryMaterials, Response.Headers, record_per_page);
 
             await _actionLogger.LogAction(User, "GET", "All Pastry Material ");
             return response;

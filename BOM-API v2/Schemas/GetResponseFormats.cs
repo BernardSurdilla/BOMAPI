@@ -331,10 +331,14 @@ namespace BillOfMaterialsAPI.Schemas
         public string? cakeDescription { get; set; }
 
         public string? designPictureUrl { get; set; }
-        public byte[]? displayPictureData { get; set; }
 
         public List<GetDesignTag>? designTags { get; set; }
         public List<GetDesignShape>? designShapes { get; set; }
+    }
+    public class GetDesignImage
+    {
+        public Guid designPictureId { get; set; }
+        public byte[]? displayPictureData { get; set; }
     }
     public class GetDesignWithoutPastryMaterial
     {

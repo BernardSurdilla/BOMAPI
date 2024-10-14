@@ -584,6 +584,7 @@ namespace API_TEST.Controllers
                 GetIngredientSubtractionHistory newResponseRow = await DataParser.CreateIngredientSubtractionHistoryResponseFromDBRow(currentIngredientSubtractionHistoryRow, _context);
                 response.Add(newResponseRow);
             }
+            await Page.AddTotalNumberOfPagesToResponseHeader<IngredientSubtractionHistory>(_context.IngredientSubtractionHistory, Response.Headers, record_per_page);
 
             return response;
         }
