@@ -36,12 +36,8 @@ namespace CRUDFI.Models
     {
         [Required(ErrorMessage = "Name is required.")]
         public string name { get; set; } = "";
-        [Required(ErrorMessage = "Quantity is required.")]
-        public int quantity { get; set; }
         [Required(ErrorMessage = "Measurements is required.")]
         public string measurements { get; set; } = "";
-        [Required(ErrorMessage = "Price is required.")]
-        public double price { get; set; }
         [Required(ErrorMessage = "Type is required.")]
         public string type { get; set; } = "";
         [Required(ErrorMessage = "Good threshold is required.")]
@@ -94,4 +90,21 @@ namespace CRUDFI.Models
         public int goodThreshold { get; set; }
         public int criticalThreshold { get; set; }
     }
+    public class BatchRequest
+    {
+        public double Price { get; set; }
+        public int Quantity { get; set; }
+    }
+    public class BatchDto
+    {
+        public string id { get; set; }
+        public string itemId { get; set; }
+        public decimal price { get; set; }
+        public int quantity { get; set; }
+        public DateTime created { get; set; }
+        public DateTime? lastModified { get; set; }
+        public string lastModifiedBy { get; set; }
+        public bool isActive { get; set; }
+    }
+
 }
