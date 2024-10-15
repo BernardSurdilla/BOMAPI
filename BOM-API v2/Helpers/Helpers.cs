@@ -2094,7 +2094,7 @@ namespace BillOfMaterialsAPI.Helpers
             Dictionary<string, InventorySubtractorInfo>? inventoryItemsAboutToBeSubtracted = null;
 
             try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(selectedOrder.pastry_id, context, kaizenTables); }
-            catch (FormatException e) { throw }
+            catch (FormatException e) { throw; }
             catch (InvalidAmountMeasurementException e) { throw; }
             catch (NotFoundInDatabaseException e) { throw; }
 
