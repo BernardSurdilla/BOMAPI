@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using BOM_API_v2.KaizenFiles.Models;
-using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
+using BillOfMaterialsAPI.Helpers; //may helper naman importy
 using BillOfMaterialsAPI.Models;
 using CRUDFI.Models;
 using JWTAuthentication.Authentication;
@@ -359,6 +359,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         Debug.WriteLine(suborderId);
                         await UpdateSuborderStatus(suborderId);
                     }
+
+                    await DataManipulation.SubtractPastryMaterialIngredientsByOrderId(orderIdBinary, _context,_kaizenTables);
 
                     // Call the method to get customer ID and name
                     var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
