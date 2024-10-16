@@ -322,7 +322,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             List<string> userIds = await GetAdmins();
 
             // Notification message
-            string message = "New order has been added to be assigned";
+            string message = "order is now fully paid";
 
             // Loop through each user and send a notification
             foreach (string userId in userIds)
@@ -498,7 +498,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         Debug.Write("Customer ID: " + userId);
 
                         // Construct the message
-                        string message = ("your order has been paid; assigning artist");
+                        string message = ("your order has been fully paid");
 
                         Guid notId = Guid.NewGuid();
                         string notifId = notId.ToString().ToLower();
