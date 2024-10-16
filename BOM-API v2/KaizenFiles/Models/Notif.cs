@@ -12,9 +12,5 @@
         public int unread { get; set; }
         public List<Notif> notifs { get; set; } = new List<Notif>();
     }
-    public class NotifReq
-    {
-        public string userId { get; set; }
-    }
 }
 

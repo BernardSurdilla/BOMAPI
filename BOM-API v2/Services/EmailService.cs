@@ -109,7 +109,7 @@ namespace BOM_API_v2.Services
             return response;
         }
 
-        public async Task<int> SendPaymentNoticeToEmail(string recipientName, [EmailAddress] string recipientEmail, DateTime pickupDate)
+        public async Task<int> SendPaymentNoticeToEmail(string recipientName, [EmailAddress] string recipientEmail, string checkoutUrl)
         {
             try
             {
@@ -120,24 +120,22 @@ namespace BOM_API_v2.Services
                 string? userName = _configuration.GetValue<string>("Email:SMTPServer:UserName");
                 string? password = _configuration.GetValue<string>("Email:SMTPServer:Password");
 
-                // Calculate the number of days until pickup
-                int daysUntilPickup = (pickupDate - DateTime.Now).Days;
-
                 // Create the email message
                 var message = new MimeMessage();
                 message.From.Add(new MailboxAddress(senderName, senderEmail));
                 message.To.Add(new MailboxAddress(recipientName, recipientEmail));
                 message.Subject = "Payment Reminder: Action Required";
 
-                // Create the email body content
+                // Create the email body content with the checkout URL
                 message.Body = new TextPart("html")
                 {
-                    Text = PaymentNoticeEmailFormat(daysUntilPickup)
+                    Text = PaymentNoticeEmailFormat(checkoutUrl)
                 };
 
                 using (var client = new SmtpClient())
                 {
                     await client.ConnectAsync(smtpHost, port.Value, false);
+                    await client.AuthenticateAsync(userName, password);
                     await client.SendAsync(message);
                     client.Disconnect(true);
                 }
@@ -149,30 +147,31 @@ namespace BOM_API_v2.Services
             }
         }
 
-        private string PaymentNoticeEmailFormat(int daysUntilPickup)
+        // Update the PaymentNoticeEmailFormat to accept the checkout URL
+        private string PaymentNoticeEmailFormat(string checkoutUrl)
         {
             string response = $@"<!DOCTYPE html>
-    <html xmlns=""http://www.w3.org/1999/xhtml"">
-    <head>
-        <meta http-equiv=""Content-Type"" content=""text/html; charset=utf-8"">
-        <title>Payment Reminder</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; }}
-            .content {{ max-width: 600px; margin: auto; padding: 20px; }}
-            .button {{ background-color: #0092FF; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; }}
-        </style>
-    </head>
-    <body>
-        <div class=""content"">
-            <h1>Payment Reminder</h1>
-            <p>Dear customer,</p>
-            <p>You are {daysUntilPickup} days before pickup time. You need to pay the remaining balance, or the order will be considered cancelled.</p>
-            <p>The owner will not be responsible if the order is cancelled, and a refund will not be possible due to ingredients not being extracted once used.</p>
-            <p>Thank you for your understanding!</p>
-            <p><a href=""#"" class=""button"">Pay Now</a></p> <!-- You can replace '#' with a payment link if available -->
-        </div>
-    </body>
-    </html>";
+<html xmlns=""http://www.w3.org/1999/xhtml"">
+<head>
+    <meta http-equiv=""Content-Type"" content=""text/html; charset=utf-8"">
+    <title>Payment Reminder</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; }}
+        .content {{ max-width: 600px; margin: auto; padding: 20px; }}
+        .button {{ background-color: #0092FF; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; }}
+    </style>
+</head>
+<body>
+    <div class=""content"">
+        <h1>Payment Reminder</h1>
+        <p>Dear customer,</p>
+        <p>This is a reminder to complete the payment for your order. Please make the payment at your earliest convenience to ensure your order remains active.</p>
+        <p>If the payment is not completed, the order will be considered cancelled, and a refund will not be possible due to ingredients already used in the preparation process.</p>
+        <p>Thank you for your understanding!</p>
+        <p><a href=""{checkoutUrl}"" class=""button"">Pay Now</a></p>
+    </div>
+</body>
+</html>";
 
             return response;
         }
