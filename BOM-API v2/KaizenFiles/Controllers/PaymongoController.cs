@@ -387,10 +387,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                         await InsertTransaction(transacId, orderIdBinary, userId, totalPrice, indicator, transactionStatus);
 
-                        if(transactionStatus == "half paid")
+                        /*if(transactionStatus == "half paid")
                         {
                             await CheckAndSchedulePickupNotification(orderIdBinary, userId);
-                        }
+                        }*/
                     }
                     else
                     {
