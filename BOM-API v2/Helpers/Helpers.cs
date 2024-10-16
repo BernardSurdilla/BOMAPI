@@ -3,6 +3,7 @@ using BillOfMaterialsAPI.Schemas;
 using BOM_API_v2.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Policy;
 using System.Text.Json;
 using UnitsNet;
 
@@ -2032,7 +2033,7 @@ namespace BillOfMaterialsAPI.Helpers
         public static async Task<GetBOMReceipt> ParseBOMReceiptFromIngredientSubtractionHistory(Guid ingredient_subtraction_history_id, DatabaseContext context)
         {
             GetBOMReceipt response = new GetBOMReceipt();
-            IngredientSubtractionHistory? selectedSubtractionHistoryEntry = await context.IngredientSubtractionHistory.Where(x => x.ingredient_subtraction_history_id == x.ingredient_subtraction_history_id).FirstOrDefaultAsync();
+            IngredientSubtractionHistory? selectedSubtractionHistoryEntry = await context.IngredientSubtractionHistory.Where(x => x.ingredient_subtraction_history_id == ingredient_subtraction_history_id).FirstOrDefaultAsync();
 
             if (selectedSubtractionHistoryEntry == null) return response;
 
@@ -2085,19 +2086,67 @@ namespace BillOfMaterialsAPI.Helpers
     {
         public static async Task<bool> SubtractPastryMaterialIngredientsByOrderId(string order_id, DatabaseContext context, KaizenTables kaizenTables)
         {
-            Orders? selectedOrder = await kaizenTables.Orders.Where(x => x.is_active == true && x.order_id == order_id).FirstOrDefaultAsync();
+            Orders? selectedOrder = await kaizenTables.Orders.Where(x => x.order_id == Guid.Parse(order_id)).FirstOrDefaultAsync();
+
             if (selectedOrder == null) { throw new NotFoundInDatabaseException("No order found for " + order_id); }
-            OrderIngredientSubtractionLog? recordOfSubtraction = await context.OrderIngredientSubtractionLog.Where(x => x.order_id.SequenceEqual(x.order_id)).FirstOrDefaultAsync();
-            if (recordOfSubtraction != null) { throw new Exception("Order subtarcted in db"); }
+            List<SubOrders> selectedOrderSubOrders = await kaizenTables.SubOrders.Where(x => x.order_id == selectedOrder.order_id).ToListAsync();
+
+            foreach (SubOrders currentSubOrder in selectedOrderSubOrders)
+            {
+                try
+                {
+                    await SubtractPastryMaterialIngredientsBySubOrderId(currentSubOrder.suborder_id, context, kaizenTables);
+                }
+                catch { continue; }
+            }
+            return true;
+        }
+        public static async Task<bool> SubtractPastryMaterialIngredientsBySubOrderId(Guid suborder_id, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            SubOrders? selectedSubOrder = await kaizenTables.SubOrders.Where(x => x.suborder_id == suborder_id).FirstOrDefaultAsync();
+            if (selectedSubOrder == null) { throw new NotFoundInDatabaseException("No sub order found for " + suborder_id); }
+            else { if (selectedSubOrder.pastry_id == null) throw new Exception("Sub order found, but no pastry material id is found for the record. Id" + suborder_id); }
+            OrderIngredientSubtractionLog? recordOfSubtraction = await context.OrderIngredientSubtractionLog.Where(x => x.sub_order_id == suborder_id.ToString()).FirstOrDefaultAsync();
+            if (recordOfSubtraction != null) { throw new OrderIngredientsAlreadySubtractedException("Order subtracted in db"); }
+
+            try
+            {
+                Guid subtractionHistoryId = await SubtractPastryMaterialIngredientFromInventory(selectedSubOrder.pastry_id, context, kaizenTables);
+
+                OrderIngredientSubtractionLog orderIngredientSubtractionLog = new OrderIngredientSubtractionLog
+                {
+                    ingredient_subtraction_history_id = subtractionHistoryId,
+                    sub_order_id = suborder_id.ToString(),
+                    order_ingredient_subtraction_log_id = Guid.NewGuid()
+                };
+
+                context.OrderIngredientSubtractionLog.Add(orderIngredientSubtractionLog);
+                await context.SaveChangesAsync();
+            }
+            catch { throw; }
+
+            return true;
+        }
+        public static async Task<Guid> SubtractPastryMaterialIngredientFromInventory(string variant_id, DatabaseContext context, KaizenTables kaizenTables)
+        {
+            PastryMaterials? currentPastryMaterial = await context.PastryMaterials.FindAsync(variant_id);
+            PastryMaterialSubVariants? subVariant = null;
+
+            if (currentPastryMaterial == null)
+            {
+                subVariant = await context.PastryMaterialSubVariants.FindAsync(variant_id);
+                if (subVariant == null) throw new NotFoundInDatabaseException("No pastry material or sub variant found for " + variant_id);
+                else currentPastryMaterial = await context.PastryMaterials.FindAsync(subVariant.pastry_material_id);
+                if (currentPastryMaterial == null) throw new NotFoundInDatabaseException("No pastry material found for sub variant " + variant_id);
+            }
 
             Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
             Dictionary<string, InventorySubtractorInfo>? inventoryItemsAboutToBeSubtracted = null;
 
-            try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(selectedOrder.pastry_id, context, kaizenTables); }
+            try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(variant_id, context, kaizenTables); }
             catch (FormatException e) { throw; }
             catch (InvalidAmountMeasurementException e) { throw; }
             catch (NotFoundInDatabaseException e) { throw; }
-
 
             List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
             foreach (string currentInventoryItemId in inventoryItemsAboutToBeSubtracted.Keys)
@@ -2126,8 +2175,9 @@ namespace BillOfMaterialsAPI.Helpers
                         inventoryItemMeasurement = currentMeasurement;
                     }
                 }
-                if (isInventoryItemMeasurementValid == false) { throw new InvalidAmountMeasurementException("Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" ); }
-                if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { throw new InvalidAmountMeasurementException( "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType ); }
+
+                if (isInventoryItemMeasurementValid == false) { throw new InvalidAmountMeasurementException("Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid"); }
+                if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { throw new InvalidAmountMeasurementException("Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType); }
 
                 double amountToBeSubtracted = 0.0;
                 if (inventoryItemQuantityUnit.Equals("Count"))
@@ -2159,34 +2209,27 @@ namespace BillOfMaterialsAPI.Helpers
                 dataForSubtractionHistory.Add(newIngredientSubtractionInfoEntry);
                 kaizenTables.Item.Update(referencedInventoryItem);
             }
-            Guid ingredientSubtractionHistoryRecordId = Guid.NewGuid();
 
+            Guid ingredientSubtractionHistoryEntryId = Guid.NewGuid();
             IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
             {
-                ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId,
+                ingredient_subtraction_history_id = ingredientSubtractionHistoryEntryId,
                 item_subtraction_info = dataForSubtractionHistory,
                 date_subtracted = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
             };
             await context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
             await context.SaveChangesAsync();
 
-            OrderIngredientSubtractionLog newOrderSubtractionHistory = new OrderIngredientSubtractionLog
-            {
-                order_ingredient_subtraction_log_id = Guid.NewGuid(),
-                order_id = selectedOrder.order_id,
-                ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId
-            };
-            await context.OrderIngredientSubtractionLog.AddAsync(newOrderSubtractionHistory);
-
             PastryMaterialOtherCost? otherCost = null;
             try
             {
-                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(selectedOrder.pastry_id, context);
+                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(currentPastryMaterial.pastry_material_id, context);
             }
             catch (Exception ex) { }
             OtherCostForIngredientSubtractionHistory newOtherCostHistory = new OtherCostForIngredientSubtractionHistory
             {
                 other_cost_for_ingredient_subtraction_history_id = Guid.NewGuid(),
+                ingredient_subtraction_history_id = ingredientSubtractionHistoryEntryId,
                 other_cost_info = new OtherCostHistoryInfo
                 {
                     additional_cost = otherCost == null ? 0 : otherCost.additional_cost,
@@ -2195,12 +2238,10 @@ namespace BillOfMaterialsAPI.Helpers
             };
             await context.OtherCostForIngredientSubtractionHistory.AddAsync(newOtherCostHistory);
 
+            await kaizenTables.SaveChangesAsync();
             await context.SaveChangesAsync();
 
-            await kaizenTables.SaveChangesAsync();
-
-
-            return true;
+            return ingredientSubtractionHistoryEntryId;
         }
     }
     public class PriceCalculator
@@ -2356,4 +2397,5 @@ namespace BillOfMaterialsAPI.Helpers
     public class NotFoundInDatabaseException : Exception { public NotFoundInDatabaseException(string message) : base(message) { } }
     public class InvalidAmountMeasurementException : Exception { public InvalidAmountMeasurementException(string message) : base(message) { } }
     public class InvalidPastryMaterialIngredientTypeException : Exception { public InvalidPastryMaterialIngredientTypeException(string message) : base(message) { } }
+    public class OrderIngredientsAlreadySubtractedException : Exception { public OrderIngredientsAlreadySubtractedException(string message) : base(message) { } }
 }

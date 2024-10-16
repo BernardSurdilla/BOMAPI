@@ -284,7 +284,7 @@ namespace API_TEST.Controllers
         [HttpGet("item-used/seasonal-occurrence")]
         public async Task<List<GetUsedItemsBySeasonalTrends>> GetIngredientTrendsByMonths(string? sortOrder)
         {
-            List<Orders> ordersList = await _kaizenTables.Orders.Where(x => x.is_active == true).ToListAsync();
+            List<SubOrders> ordersList = await _kaizenTables.SubOrders.Where(x => x.is_active == true).ToListAsync();
             if (ordersList.IsNullOrEmpty()) { return new List<GetUsedItemsBySeasonalTrends>(); }
 
             List<PastryMaterials> allPastryMaterials = await _context.PastryMaterials.Where(x => x.is_active == true).ToListAsync();
@@ -300,8 +300,8 @@ namespace API_TEST.Controllers
 
             List<GetUsedItemsBySeasonalTrends> response = new List<GetUsedItemsBySeasonalTrends>(); //List to return
 
-            Orders? oldestRecord = ordersList.MaxBy(x => x.created_at);
-            Orders? newestRecord = ordersList.MinBy(x => x.created_at);
+            SubOrders? oldestRecord = ordersList.MaxBy(x => x.created_at);
+            SubOrders? newestRecord = ordersList.MinBy(x => x.created_at);
 
             Dictionary<string, int> occurenceCount = new Dictionary<string, int>(); //Stores the count of occurence for ingredients in the current loop below
 
@@ -318,10 +318,10 @@ namespace API_TEST.Controllers
 
                 newResponseEntry.itemList = new List<ItemOccurence>();
 
-                List<Orders> ordersForCurrentDate = ordersList.Where(x => x.created_at >= newResponseEntry.dateStart && x.created_at <= newResponseEntry.dateEnd).ToList();
+                List<SubOrders> ordersForCurrentDate = ordersList.Where(x => x.created_at >= newResponseEntry.dateStart && x.created_at <= newResponseEntry.dateEnd).ToList();
 
                 //Add all items in the list of occurence for the current month
-                foreach (Orders currentOrder in ordersForCurrentDate)
+                foreach (SubOrders currentOrder in ordersForCurrentDate)
                 {
                     DateTime currentOrderCreationDate = currentOrder.created_at;
                     Guid currentOrderDesignId = currentOrder.design_id;
@@ -665,10 +665,38 @@ namespace API_TEST.Controllers
         {
             return await DataParser.ParseBOMReceiptFromIngredientSubtractionHistory(ingredient_subtraction_history_id, _context);
         }
+        
         [HttpGet("ingredient-cost-breakdown/by-order-id{order_id}")]
-        public async Task<GetBOMReceipt> GetIngredientCostBreakdownByOrderId(string order_id)
+        public async Task<List<GetBOMReceipt>> GetIngredientCostBreakdownByOrderId(Guid order_id)
         {
-            OrderIngredientSubtractionLog? selectedRecord = await _context.OrderIngredientSubtractionLog.Where(x => x.order_id == order_id).FirstOrDefaultAsync();
+            List<GetBOMReceipt> response = new List<GetBOMReceipt>();
+
+            Orders? selectedOrder = await _kaizenTables.Orders.Where(x => x.order_id == order_id).FirstOrDefaultAsync();
+            if (selectedOrder == null) return response;
+
+            List<SubOrders> selectedOrderSubOrders = await _kaizenTables.SubOrders.Where(x => x.order_id == selectedOrder.order_id).ToListAsync();
+
+            int failedReceiptGenerationCount = 0;
+            foreach (SubOrders currentSubOrder in selectedOrderSubOrders)
+            {
+                OrderIngredientSubtractionLog? selectedRecord = await _context.OrderIngredientSubtractionLog.Where(x => x.sub_order_id == currentSubOrder.suborder_id.ToString()).FirstOrDefaultAsync();
+                if (selectedRecord == null) { failedReceiptGenerationCount += 1; continue; }
+                
+                IngredientSubtractionHistory? currentSubtractionHistory = await _context.IngredientSubtractionHistory.Where(x => x.ingredient_subtraction_history_id == selectedRecord.ingredient_subtraction_history_id).FirstOrDefaultAsync();
+                if (currentSubtractionHistory == null) { failedReceiptGenerationCount += 1; continue; }
+
+                GetBOMReceipt result = await DataParser.ParseBOMReceiptFromIngredientSubtractionHistory(currentSubtractionHistory.ingredient_subtraction_history_id, _context);
+
+                response.Add(result);
+            }
+            Response.Headers.Append("X-Failed-Receipt-Generation-Count", failedReceiptGenerationCount.ToString());
+            return response;
+
+        }
+        [HttpGet("ingredient-cost-breakdown/by-suborder-id{suborder_id}")]
+        public async Task<GetBOMReceipt> GetIngredientCostBreakdownBySubOrderId(string suborder_id)
+        {
+            OrderIngredientSubtractionLog? selectedRecord = await _context.OrderIngredientSubtractionLog.Where(x => x.sub_order_id == suborder_id).FirstOrDefaultAsync();
 
             if (selectedRecord == null) return new GetBOMReceipt();
             else return await DataParser.ParseBOMReceiptFromIngredientSubtractionHistory(selectedRecord.ingredient_subtraction_history_id, _context);
@@ -691,112 +719,12 @@ namespace API_TEST.Controllers
         [Authorize(Roles = UserRoles.Admin)]
         public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string pastry_material_id, string variant_id)
         {
-            PastryMaterials? currentPastryMaterial = await _context.PastryMaterials.FindAsync(pastry_material_id);
-            PastryMaterialSubVariants? sub_variant = null;
-
-            if (currentPastryMaterial == null) { return NotFound(new { message = "No pastry material with the specified id found" }); }
-            if (currentPastryMaterial.pastry_material_id.Equals(variant_id) == false)
-            {
-                try { sub_variant = await _context.PastryMaterialSubVariants.Where(x => x.is_active == true && x.pastry_material_id == currentPastryMaterial.pastry_material_id && x.pastry_material_sub_variant_id.Equals(variant_id)).FirstAsync(); }
-                catch { return NotFound(new { message = "No variant with the id " + variant_id + " exists" }); }
-            }
-
-            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
-            Dictionary<string, InventorySubtractorInfo>? inventoryItemsAboutToBeSubtracted = null;
-
-            try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(variant_id, _context, _kaizenTables); }
-            catch (FormatException e) { return BadRequest(new { message = e.Message }); }
-            catch (InvalidAmountMeasurementException e) { return StatusCode(500, new { message = e.Message }); }
-            catch (NotFoundInDatabaseException e) { return StatusCode(500, new { message = e.Message }); }
-
-            List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
-            foreach (string currentInventoryItemId in inventoryItemsAboutToBeSubtracted.Keys)
-            {
-                InventorySubtractorInfo currentInventorySubtractorInfo = inventoryItemsAboutToBeSubtracted[currentInventoryItemId];
-
-                //No need to check, record already checked earlier
-                Item referencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(currentInventoryItemId, _kaizenTables);
-
-                string? inventoryItemMeasurement = null;
-                string? inventoryItemQuantityUnit = null;
-                bool isInventoryItemMeasurementValid = false;
-
-                //Add code here to check if the unit of the item in the inventory and the recorded total is the same
-                foreach (string unitQuantity in validMeasurementUnits.Keys)
-                {
-                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
-
-                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(referencedInventoryItem.measurements));
-
-                    if (currentMeasurement == null) { continue; }
-                    else
-                    {
-                        isInventoryItemMeasurementValid = true;
-                        inventoryItemQuantityUnit = unitQuantity;
-                        inventoryItemMeasurement = currentMeasurement;
-                    }
-                }
-                if (isInventoryItemMeasurementValid == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" }); }
-                if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType }); }
-
-                double amountToBeSubtracted = 0.0;
-                if (inventoryItemQuantityUnit.Equals("Count"))
-                {
-                    amountToBeSubtracted = currentInventorySubtractorInfo.Amount;
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount;
-                }
-                else
-                {
-                    amountToBeSubtracted = UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - amountToBeSubtracted;
-                }
-
-
-                ItemSubtractionInfo newIngredientSubtractionInfoEntry = new ItemSubtractionInfo
-                {
-                    item_id = Convert.ToString(referencedInventoryItem.id),
-                    item_name = referencedInventoryItem.item_name,
-
-                    inventory_amount_unit = referencedInventoryItem.measurements,
-                    inventory_price = referencedInventoryItem.price,
-                    inventory_quantity = referencedInventoryItem.quantity,
-
-                    amount_quantity_type = inventoryItemQuantityUnit,
-                    amount_unit = referencedInventoryItem.measurements,
-                    amount = amountToBeSubtracted
-                };
-
-                dataForSubtractionHistory.Add(newIngredientSubtractionInfoEntry);
-                _kaizenTables.Item.Update(referencedInventoryItem);
-            }
-
-            IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
-            {
-                ingredient_subtraction_history_id = new Guid(),
-                item_subtraction_info = dataForSubtractionHistory,
-                date_subtracted = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
-            };
-            await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
-
-            PastryMaterialOtherCost? otherCost = null;
             try
             {
-                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(pastry_material_id, _context);
+                await DataManipulation.SubtractPastryMaterialIngredientFromInventory(variant_id, _context, _kaizenTables);
             }
-            catch (Exception ex) { }
-            OtherCostForIngredientSubtractionHistory newOtherCostHistory = new OtherCostForIngredientSubtractionHistory
-            {
-                other_cost_for_ingredient_subtraction_history_id = Guid.NewGuid(),
-                other_cost_info = new OtherCostHistoryInfo
-                {
-                    additional_cost = otherCost == null ? 0 : otherCost.additional_cost,
-                    ingredient_cost_multiplier = otherCost == null ? 1 : otherCost.ingredient_cost_multiplier
-                }
-            };
-            await _context.OtherCostForIngredientSubtractionHistory.AddAsync(newOtherCostHistory);
-
-            await _kaizenTables.SaveChangesAsync();
-            await _context.SaveChangesAsync();
+            catch (NotFoundInDatabaseException e) { return NotFound(new { message = e.Message }); }
+            catch (Exception e) { return StatusCode(500, new { message = e.Message }); }
 
             await _actionLogger.LogAction(User, "POST", "Subtract ingredients of " + pastry_material_id);
             return Ok(new { message = "Ingredients sucessfully deducted." });
@@ -804,122 +732,15 @@ namespace API_TEST.Controllers
 
         [HttpPost("orders/{order_id}/subtract-recipe-ingredients-on-inventory/")]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Customer)]
-        public async Task<IActionResult> SubtractPastryMaterialIngredientsOnInventory(string order_id)
+        public async Task<IActionResult> SubtractOrderIngredientsOnInventory(string order_id)
         {
-
-            Orders? selectedOrder = await _kaizenTables.Orders.Where(x => x.is_active == true && x.order_id == order_id).FirstOrDefaultAsync();
-            if (selectedOrder == null) { return NotFound(new { message = "No order with the specified id found" }); }
-            OrderIngredientSubtractionLog? recordOfSubtraction = await _context.OrderIngredientSubtractionLog.Where(x => x.order_id.SequenceEqual(x.order_id)).FirstOrDefaultAsync();
-            if (recordOfSubtraction != null) { return BadRequest(new { message = "Order " + order_id + " is already subtracted in the inventory" }); }
-
-            Dictionary<string, List<string>> validMeasurementUnits = ValidUnits.ValidMeasurementUnits(); //List all valid units of measurement for the ingredients
-            Dictionary<string, InventorySubtractorInfo>? inventoryItemsAboutToBeSubtracted = null;
-
-            try { inventoryItemsAboutToBeSubtracted = await DataParser.GetTotalIngredientAmountList(selectedOrder.pastry_id, _context, _kaizenTables); }
-            catch (FormatException e) { return BadRequest(new { message = e.Message }); }
-            catch (InvalidAmountMeasurementException e) { return StatusCode(500, new { message = e.Message }); }
-            catch (NotFoundInDatabaseException e) { return StatusCode(500, new { message = e.Message }); }
-
-
-            List<ItemSubtractionInfo> dataForSubtractionHistory = new List<ItemSubtractionInfo>(); //For history of subtractions table
-            foreach (string currentInventoryItemId in inventoryItemsAboutToBeSubtracted.Keys)
-            {
-                InventorySubtractorInfo currentInventorySubtractorInfo = inventoryItemsAboutToBeSubtracted[currentInventoryItemId];
-
-                //No need to check, record already checked earlier
-                Item referencedInventoryItem = await DataRetrieval.GetInventoryItemAsync(currentInventoryItemId, _kaizenTables);
-
-                string? inventoryItemMeasurement = null;
-                string? inventoryItemQuantityUnit = null;
-                bool isInventoryItemMeasurementValid = false;
-
-                //Add code here to check if the unit of the item in the inventory and the recorded total is the same
-                foreach (string unitQuantity in validMeasurementUnits.Keys)
-                {
-                    List<string> currentQuantityUnits = validMeasurementUnits[unitQuantity];
-
-                    string? currentMeasurement = currentQuantityUnits.Find(x => x.Equals(referencedInventoryItem.measurements));
-
-                    if (currentMeasurement == null) { continue; }
-                    else
-                    {
-                        isInventoryItemMeasurementValid = true;
-                        inventoryItemQuantityUnit = unitQuantity;
-                        inventoryItemMeasurement = currentMeasurement;
-                    }
-                }
-                if (isInventoryItemMeasurementValid == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement " + referencedInventoryItem.measurements + " is not valid" }); }
-                if (inventoryItemQuantityUnit.Equals(currentInventorySubtractorInfo.AmountQuantityType) == false) { return StatusCode(500, new { message = "Inventory item with the id " + referencedInventoryItem.id + " measurement unit " + inventoryItemQuantityUnit + " does not match the quantity unit of one of the ingredients of the cake " + currentInventorySubtractorInfo.AmountQuantityType }); }
-
-                double amountToBeSubtracted = 0.0;
-                if (inventoryItemQuantityUnit.Equals("Count"))
-                {
-                    amountToBeSubtracted = currentInventorySubtractorInfo.Amount;
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - currentInventorySubtractorInfo.Amount;
-                }
-                else
-                {
-                    amountToBeSubtracted = UnitConverter.ConvertByName(currentInventorySubtractorInfo.Amount, inventoryItemQuantityUnit, currentInventorySubtractorInfo.AmountUnit, referencedInventoryItem.measurements);
-                    referencedInventoryItem.quantity = referencedInventoryItem.quantity - amountToBeSubtracted;
-                }
-
-
-                ItemSubtractionInfo newIngredientSubtractionInfoEntry = new ItemSubtractionInfo
-                {
-                    item_id = Convert.ToString(referencedInventoryItem.id),
-                    item_name = referencedInventoryItem.item_name,
-
-                    inventory_amount_unit = referencedInventoryItem.measurements,
-                    inventory_price = referencedInventoryItem.price,
-                    inventory_quantity = referencedInventoryItem.quantity,
-
-                    amount_quantity_type = inventoryItemQuantityUnit,
-                    amount_unit = referencedInventoryItem.measurements,
-                    amount = amountToBeSubtracted
-                };
-
-                dataForSubtractionHistory.Add(newIngredientSubtractionInfoEntry);
-                _kaizenTables.Item.Update(referencedInventoryItem);
-            }
-            Guid ingredientSubtractionHistoryRecordId = Guid.NewGuid();
-
-            IngredientSubtractionHistory newIngredientSubtractionHistoryEntry = new IngredientSubtractionHistory
-            {
-                ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId,
-                item_subtraction_info = dataForSubtractionHistory,
-                date_subtracted = TimeZoneInfo.ConvertTime(DateTime.Now, TimeZoneInfo.FindSystemTimeZoneById("China Standard Time")),
-            };
-            await _context.IngredientSubtractionHistory.AddAsync(newIngredientSubtractionHistoryEntry);
-            await _context.SaveChangesAsync();
-
-            OrderIngredientSubtractionLog newOrderSubtractionHistory = new OrderIngredientSubtractionLog
-            {
-                order_ingredient_subtraction_log_id = Guid.NewGuid(),
-                order_id = selectedOrder.order_id,
-                ingredient_subtraction_history_id = ingredientSubtractionHistoryRecordId
-            };
-            await _context.OrderIngredientSubtractionLog.AddAsync(newOrderSubtractionHistory);
-
-            PastryMaterialOtherCost? otherCost = null;
             try
             {
-                otherCost = await DataRetrieval.GetPastryMaterialOtherCostAsync(selectedOrder.pastry_id, _context);
+                await DataManipulation.SubtractPastryMaterialIngredientsByOrderId(order_id, _context, _kaizenTables);
             }
-            catch (Exception ex) { }
-            OtherCostForIngredientSubtractionHistory newOtherCostHistory = new OtherCostForIngredientSubtractionHistory
-            {
-                other_cost_for_ingredient_subtraction_history_id = Guid.NewGuid(),
-                other_cost_info = new OtherCostHistoryInfo
-                {
-                    additional_cost = otherCost == null ? 0 : otherCost.additional_cost,
-                    ingredient_cost_multiplier = otherCost == null ? 1 : otherCost.ingredient_cost_multiplier
-                }
-            };
-            await _context.OtherCostForIngredientSubtractionHistory.AddAsync(newOtherCostHistory);
-
-            await _context.SaveChangesAsync();
-
-            await _kaizenTables.SaveChangesAsync();
+            catch (OrderIngredientsAlreadySubtractedException e) { return BadRequest(new { message = e.Message }); }
+            catch (NotFoundInDatabaseException e) { return NotFound(new { message = e.Message }); }
+            catch (Exception e) { return StatusCode(500, new { message = e.Message }); }
 
             await _actionLogger.LogAction(User, "POST", "Subtract ingredients of order:" + order_id);
 

@@ -153,7 +153,7 @@ namespace BillOfMaterialsAPI.Schemas
     public class OrderIngredientSubtractionLog
     {
         [Required][Key] public Guid order_ingredient_subtraction_log_id { get; set; }
-        [Required][Column(TypeName = "varchar(255)")] public string order_id { get; set; }
+        [Required][Column(TypeName = "varchar(255)")] public string sub_order_id { get; set; }
         [Required][ForeignKey("IngredientSubtractionHistory")] public Guid ingredient_subtraction_history_id { get; set; }
 
         public IngredientSubtractionHistory IngredientSubtractionHistory { get; set; }
@@ -284,22 +284,40 @@ namespace BillOfMaterialsAPI.Schemas
     //
     // Orders table: Kaizen
     //
+    [PrimaryKey("suborder_id")]
+    [Table("suborders")]
+    public class SubOrders
+    {
+        [Required][Key] public Guid suborder_id { get; set; }
+        public string? custom_id { get; set; }
+
+        public Guid? order_id { get; set; }
+        public Guid? customer_id { get; set; }
+        public Guid? employee_id { get; set; }
+
+        public string? pastry_id { get; set; }
+        public Guid design_id { get; set; }
+
+        public DateTime created_at { get; set; }
+        [MaxLength(50)] public string status { get; set; }
+        public double price { get; set; }
+        [MaxLength(50)] public string? last_updated_by { get; set; }
+        public DateTime? last_updated_at { get; set; }
+        public bool? is_active { get; set; }
+    }
     [PrimaryKey("order_id")]
     [Table("orders")]
     public class Orders
     {
-        [Required][Key] public string order_id { get; set; }
-        [Required] public Guid customer_id { get; set; }
-        [Required] public Guid? employee_id { get; set; }
-        public string pastry_id { get; set; }
+        [Required][Key] public Guid order_id { get; set; }
+
+        public Guid? customer_id { get; set; }
 
         public DateTime created_at { get; set; }
         [MaxLength(50)] public string status { get; set; }
-        public Guid design_id { get; set; }
-        public double price { get; set; }
+
         [MaxLength(50)] public string? last_updated_by { get; set; }
         public DateTime? last_updated_at { get; set; }
-        [MaxLength(50)] public string type { get; set; }
         public bool? is_active { get; set; }
     }
     [PrimaryKey("id")]
@@ -332,84 +350,6 @@ namespace BillOfMaterialsAPI.Schemas
         public DateTime date_added { get; set; }
         public DateTime? last_modified_date { get; set; }
     }
-    [PrimaryKey("SubOrderId")]
-    [Table("suborders")]
-    public class SubOrder
-    {
-        [Key]
-        [Column("suborder_id")]
-        [MaxLength(25)]
-        public string SubOrderId { get; set; }
-
-        [Column("OrderId")]
-        public byte[] OrderId { get; set; }
-
-        [Column("PastryId")]
-        [MaxLength(50)]
-        public string PastryId { get; set; }
-
-        [Column("CustomerId")]
-        public byte[]? CustomerId { get; set; }
-
-        [Column("EmployeeId")]
-        public byte[]? EmployeeId { get; set; }
-
-        [Column("CustomerName")]
-        [MaxLength(50)]
-        public string CustomerName { get; set; }
-
-        [Column("EmployeeName")]
-        [MaxLength(50)]
-        public string EmployeeName { get; set; }
-
-        [Column("CreatedAt")]
-        public DateTime CreatedAt { get; set; }
-
-        [Column("Status")]
-        [MaxLength(50)]
-        public string Status { get; set; }
-
-        [Column("DesignId")]
-        public Guid designId { get; set; }
-
-        [Column("DesignName")]
-        [MaxLength(50)]
-        public string DesignName { get; set; }
-
-        [Column("price")]
-        public double Price { get; set; }
-
-        [Column("quantity")]
-        public int Quantity { get; set; }
-
-        [Column("Size")]
-        [MaxLength(50)]
-        public string Size { get; set; }
-
-        [Column("Flavor")]
-        [MaxLength(50)]
-        public string Flavor { get; set; }
-
-        [Column("Description")]
-        public string? Description { get; set; }
-
-        [Column("last_updated_by")]
-        [MaxLength(50)]
-        public string? LastUpdatedBy { get; set; }
-
-        [Column("last_updated_at")]
-        public DateTime? LastUpdatedAt { get; set; }
-
-        [Column("type")]
-        [MaxLength(50)]
-        public string? Type { get; set; }
-
-        [Column("PickupDateTime")]
-        public DateTime? PickupDateTime { get; set; }
-
-        [Column("is_active")]
-        public bool IsActive { get; set; }
-    }
     [PrimaryKey("OrderAddOnId")]
     [Table("orderaddons")]
     public class OrderAddon
@@ -438,7 +378,7 @@ namespace BillOfMaterialsAPI.Schemas
         public double Total { get; set; }
 
         // Navigation properties
-        public Orders Order { get; set; }
+        public SubOrders Order { get; set; }
         public AddOns? AddOn { get; set; }
     }
     [PrimaryKey("Id")] // Assuming your ORM supports this attribute

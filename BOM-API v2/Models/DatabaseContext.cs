@@ -49,9 +49,9 @@ namespace BillOfMaterialsAPI.Models
         public KaizenTables(DbContextOptions<KaizenTables> options) : base(options) { }
 
         public DbSet<Orders> Orders { get; set; }
+        public DbSet<SubOrders> SubOrders { get; set; }
         public DbSet<Item> Item { get; set; }
         public DbSet<AddOns> AddOns { get; set; }
-        public DbSet<SubOrder> SubOrder { get; set; }
         public DbSet<OrderAddon> OrderAddon { get; set; }
         public DbSet<Sale> Sale { get; set; }
         public DbSet<ThresholdConfig> ThresholdConfig { get; set; }
