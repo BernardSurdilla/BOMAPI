@@ -31,15 +31,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         private readonly string connectionstring;
         private readonly ILogger<PaymongoController> _logger;
 
-        private readonly EmailService emailService;
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
 
-        public PaymongoController(IConfiguration configuration, ILogger<PaymongoController> logger, DatabaseContext context, KaizenTables kaizenTables, EmailService email)
+        public PaymongoController(IConfiguration configuration, ILogger<PaymongoController> logger, DatabaseContext context, KaizenTables kaizenTables)
         {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
-            emailService = email;
             _context = context;
             _kaizenTables = kaizenTables;
 
@@ -359,8 +357,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         Debug.WriteLine(suborderId);
                         await UpdateSuborderStatus(suborderId);
                     }
-
-                    await DataManipulation.SubtractPastryMaterialIngredientsByOrderId(orderIdBinary, _context,_kaizenTables);
 
                     // Call the method to get customer ID and name
                     var (customerId, customerName) = await GetCustomerInfo(orderIdBinary);
