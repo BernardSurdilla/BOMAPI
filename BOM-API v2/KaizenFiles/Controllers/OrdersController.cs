@@ -4472,8 +4472,9 @@ WHERE
         {
             try
             {
-                // Convert the orderId from GUID string to binary(16) format without '0x' prefix
                 string orderIdBinary = suborderId.ToLower();
+
+                Debug.WriteLine(orderIdBinary);
 
                 Debug.WriteLine("suborder id: " + orderIdBinary);
 
@@ -4484,6 +4485,8 @@ WHERE
                     await UpdateStatus(orderIdBinary, "for pick up");
                     await UpdateLastUpdatedAt(orderIdBinary);
                     string orderId = await RetrieveOrderIdAsGuidFromSuborders(orderIdBinary);
+
+                    Debug.Write(orderId);
                     await DataManipulation.SubtractPastryMaterialIngredientsByOrderId(orderId, _context, _kaizenTables);
                 }
                 else if (action.Equals("done", StringComparison.OrdinalIgnoreCase))
@@ -4559,7 +4562,6 @@ WHERE
             {
                 await connection.OpenAsync();
 
-                // Step 1: Retrieve the order_id (stored as GUID in varchar(255)) from the suborders table
                 string sqlSubOrder = "SELECT order_id FROM suborders WHERE suborder_id = @subOrderId";
                 using (var command = new MySqlCommand(sqlSubOrder, connection))
                 {
@@ -4569,14 +4571,7 @@ WHERE
                     {
                         if (await reader.ReadAsync())
                         {
-                            // Step 2: Read the order_id as a varchar (assuming it is a GUID string)
                             orderId = reader["order_id"].ToString();
-
-                            // Optional validation: Ensure the order_id is a valid GUID format
-                            if (!Guid.TryParse(orderId, out Guid parsedOrderId))
-                            {
-                                throw new ArgumentException("Retrieved order_id is not in a valid GUID format", nameof(orderId));
-                            }
                         }
                         else
                         {
