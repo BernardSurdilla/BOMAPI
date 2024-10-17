@@ -2954,7 +2954,7 @@ WHERE
 
                             }
 
-                            CustomerInitial customOrderDetails = await GetCustomOrderDetailsByCustomerAsync(order.orderId);
+                            CustomerInitial customOrderDetails = await GetApprovalCustomOrderDetailsByCustomerAsync(order.orderId);
                             order.customItems = customOrderDetails.customItems;
 
 
@@ -3006,6 +3006,71 @@ WHERE
             }
         }*/
 
+        private async Task<List<CustomItem>> FetchforapprovalCustomItemsForSuborderAsync(string suborderId)
+        {
+            List<CustomItem> orders = new List<CustomItem>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @" SELECT suborder_id, order_id, status, design_id, design_name, price, quantity, description, flavor, size, color, SUM(quantity * price) AS Total, shape
+                FROM suborders WHERE status IN ('for approval') AND suborder_id = @suborderId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@suborderId", suborderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string orderId = reader["order_id"].ToString();
+                            string suborderIds = reader["suborder_id"].ToString();
+
+                            // Initialize a CustomItem object with order details
+                            CustomItem order = new CustomItem
+                            {
+                                suborderId = suborderIds,
+                                orderId = orderId,
+                                designId = reader["design_id"].ToString(),
+                                designName = !reader.IsDBNull(reader.GetOrdinal("design_name"))
+                                    ? reader.GetString(reader.GetOrdinal("design_name"))
+                                    : null,
+                                price = reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                description = reader.GetString(reader.GetOrdinal("description")),
+                                flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                size = reader.GetString(reader.GetOrdinal("size")),
+                                color = reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.GetString(reader.GetOrdinal("shape")),
+                                customTotal = reader.GetDouble(reader.GetOrdinal("Total")),
+                            };
+
+                            // Fetch tier and cover details from customorders using suborderId
+                            var (tier, cover) = await FetchTierAndCoverBySuborderIdAsync(order.suborderId);
+                            order.tier = tier;
+                            order.cover = cover;
+
+                            // If the design ID is valid, fetch the picture data
+                            if (!string.IsNullOrEmpty(order.designId))
+                            {
+                                byte[]? pictureData = await GetPictureDataByDesignId(order.designId);
+                                if (pictureData != null)
+                                {
+                                    // Convert the picture data to a base64 string
+                                    order.pictureDate = Convert.FromBase64String(Convert.ToBase64String(pictureData));
+                                }
+                            }
+
+                            orders.Add(order); // Add the order with all details to the list
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
 
         private async Task<List<CustomItem>> FetchCustomItemsForSuborderAsync(string suborderId)
         {
@@ -3016,7 +3081,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT suborder_id, order_id, status, design_id, design_name, price, quantity, description, flavor, size, color, SUM(quantity * price) AS Total, shape
-                FROM suborders WHERE status IN ('for approval') AND suborder_id = @suborderId";
+                FROM suborders WHERE status IN ('to pay') AND suborder_id = @suborderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3144,6 +3209,43 @@ WHERE
             }
         }
 
+        private async Task<CustomerInitial> GetApprovalCustomOrderDetailsByCustomerAsync(string orderId)
+        {
+            string orderIdBinary = orderId.ToLower();
+            CustomerInitial customerInitial = new CustomerInitial(); // Initialize CustomerInitial object
+
+            try
+            {
+                // Retrieve the list of suborder IDs associated with the given orderId
+                List<string> suborderIds = await GetCustomSuborderIdsByOrderIdAsync(orderIdBinary);
+
+                foreach (var suborderID in suborderIds)
+                {
+                    // Check if custom_id is not null
+                    bool isCustomIdNull = await IsCustomIdNullAsync(suborderID);
+                    if (!isCustomIdNull)
+                    {
+                        // Fetch custom items if custom_id is present
+                        List<CustomItem> customItems = await FetchforapprovalCustomItemsForSuborderAsync(suborderID);
+
+                        // Add each custom item to customerInitial.customItems
+                        foreach (var customItem in customItems)
+                        {
+                            customItem.orderAddons = await GetOrderAddonsDetails(suborderID);
+                            customerInitial.customItems.Add(customItem); // Add individual CustomItem
+                        }
+                    }
+                }
+
+                return customerInitial; // Return populated customerInitial with orderItems and customItems
+            }
+            catch (Exception ex)
+            {
+                // Log the exception and return null or throw it to be handled by the calling method
+                throw new Exception($"An error occurred while fetching order details: {ex.Message}");
+            }
+        }
+
         private async Task<CustomerInitial> GetCustomOrderDetailsByCustomerAsync(string orderId)
         {
             string orderIdBinary = orderId.ToLower();
@@ -3152,7 +3254,7 @@ WHERE
             try
             {
                 // Retrieve the list of suborder IDs associated with the given orderId
-                List<string> suborderIds = await GetSuborderIdsByOrderIdAsync(orderIdBinary);
+                List<string> suborderIds = await GetCustomSuborderIdsByOrderIdAsync(orderIdBinary);
 
                 foreach (var suborderID in suborderIds)
                 {
@@ -3192,7 +3294,36 @@ WHERE
                 await connection.OpenAsync();
 
                 // SQL query to retrieve suborder IDs for the given order ID
-                string sql = "SELECT suborder_id FROM suborders WHERE order_id = @orderId";
+                string sql = "SELECT suborder_id FROM suborders WHERE order_id = @orderId AND custom_id IS NULL";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            suborderIds.Add(reader["suborder_id"].ToString());
+                        }
+                    }
+                }
+            }
+
+            return suborderIds;
+        }
+
+        private async Task<List<string>> GetCustomSuborderIdsByOrderIdAsync(string orderId)
+        {
+            List<string> suborderIds = new List<string>();
+
+            // Database connection logic
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // SQL query to retrieve suborder IDs for the given order ID
+                string sql = "SELECT suborder_id FROM suborders WHERE order_id = @orderId AND custom_id IS NOT NULL";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -5616,13 +5747,6 @@ WHERE
                 if (string.IsNullOrEmpty(customerUsername))
                 {
                     return Unauthorized("No valid customer username found.");
-                }
-
-                // Check if the suborders belong to the current user
-                bool isOrderOwnedByUser = await SuborderOwnedByUser(customerUsername);
-                if (!isOrderOwnedByUser)
-                {
-                    return Unauthorized("You do not have permission to delete this order.");
                 }
 
                 // Delete all suborders belonging to the current user
