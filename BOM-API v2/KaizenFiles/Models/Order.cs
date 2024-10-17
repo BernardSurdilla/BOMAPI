@@ -144,12 +144,6 @@ namespace CRUDFI.Models
             PictureData = pictureData;
         }
     }
-
-    public class debugshit
-    {
-        public string pictureBase64 { get; set; } = "";
-    }
-
     public class CustomOrderUpdateRequest
     {
         public string designName { get; set; }
