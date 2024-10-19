@@ -812,6 +812,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+                //checks if suborder id list is empty
+                if (checkOutRequest.suborderIds == null || !checkOutRequest.suborderIds.Any())
+                {
+                    return BadRequest("suborder ids cannot be null");
+                }
+
+
                 // Retrieve customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
                 if (string.IsNullOrEmpty(customerUsername))
