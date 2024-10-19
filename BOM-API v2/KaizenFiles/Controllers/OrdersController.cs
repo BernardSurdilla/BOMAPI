@@ -875,6 +875,30 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        private async Task<bool> AreAllSubordersPricedAsync(string orderIdBinary)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // SQL query to check if any suborder has a price <= 0 for the given order ID
+                string sql = @"SELECT COUNT(*) FROM suborders 
+                       WHERE order_id = @orderId AND price <= 0";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderIdBinary);
+
+                    // Execute the query to count suborders with price <= 0
+                    int subordersWithZeroOrNegativePrice = Convert.ToInt32(await command.ExecuteScalarAsync());
+
+                    // If there are no suborders with price <= 0, return true; otherwise, return false
+                    return subordersWithZeroOrNegativePrice == 0;
+                }
+            }
+        }
+
+
         [HttpPost("/culo-api/v1/{orderId}/approve-order")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> ApprovingOrder(string orderId)
@@ -888,6 +912,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 string orderIdBinary = orderId.ToLower();
+
+                bool doesHavePrice = await AreAllSubordersPricedAsync(orderIdBinary);
+
+                if (!doesHavePrice)
+                {
+                    return BadRequest("All suborders must have a price greater than 0.");
+                }
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
