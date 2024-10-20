@@ -93,17 +93,17 @@ namespace CRUDFI.Models
     public class BatchRequest
     {
         public double Price { get; set; }
-        public int Quantity { get; set; }
+        public double Quantity { get; set; }
     }
     public class BatchDto
     {
         public string id { get; set; }
         public string itemId { get; set; }
         public decimal price { get; set; }
-        public int quantity { get; set; }
+        public double quantity { get; set; }
         public DateTime created { get; set; }
         public DateTime? lastModified { get; set; }
-        public string lastModifiedBy { get; set; }
+        public string? lastModifiedBy { get; set; }
         public bool isActive { get; set; }
     }
 
