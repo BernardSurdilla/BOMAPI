@@ -153,7 +153,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        private async Task InsertOrUpdateIngredientAsync(int quantity, double price, string lastUpdatedBy, string id, string itemId)
+        private async Task InsertOrUpdateIngredientAsync(double quantity, double price, string lastUpdatedBy, string id, string itemId)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
@@ -638,7 +638,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                 id = reader["id"].ToString(),
                                 itemId = reader["item_id"].ToString(),
                                 price = reader.GetDecimal("price"),
-                                quantity = reader.GetInt32("quantity"),
+                                quantity = reader.GetDouble("quantity"),
                                 created = reader.GetDateTime("created"),
                                 lastModified = reader.IsDBNull(reader.GetOrdinal("last_modified"))
                                     ? (DateTime?)null
