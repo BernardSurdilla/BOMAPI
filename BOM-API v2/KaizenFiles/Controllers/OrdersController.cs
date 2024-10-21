@@ -2871,6 +2871,115 @@ WHERE
             return addonTotal;
         }
 
+        [HttpGet("/culo-api/v1/current-user/to-receive")]
+        [ProducesResponseType(typeof(CustomerInitial), StatusCodes.Status200OK)]
+        [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
+        public async Task<IActionResult> GetToReceiveInitialOrdersByCustomerIds()
+        {
+            try
+            {
+                var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(customerUsername))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the customer's ID using the extracted username
+                string customerId = await GetUserIdByAllUsername(customerUsername);
+                if (customerId == null || customerId.Length == 0)
+                {
+                    return BadRequest("Customer not found");
+                }
+
+                // Fetch all orders (no search or filtering logic)
+                List<CustomerInitial> orders = await FetchInitialToReceiveCustomerOrdersAsync(customerId);
+
+                // If no orders are found, return an empty list
+                if (orders.Count == 0)
+                    return Ok(new List<toPayInitial>());
+
+                return Ok(orders);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}. Stack Trace: {ex.StackTrace}");
+
+            }
+        }
+
+        private async Task<List<CustomerInitial>> FetchInitialToReceiveCustomerOrdersAsync(string customerid)
+        {
+            List<CustomerInitial> orders = new List<CustomerInitial>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
+                        FROM orders WHERE status IN ('to receive', 'done') AND customer_id = @customer_id";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@customer_id", customerid);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string orderId = reader["order_id"].ToString();
+
+                            // Initialize a CustomerInitial object with order details
+                            CustomerInitial order = new CustomerInitial
+                            {
+                                orderId = orderId,
+                                type = !reader.IsDBNull(reader.GetOrdinal("type"))
+                                        ? reader.GetString(reader.GetOrdinal("type"))
+                                        : null,
+                                pickup = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
+                                         ? (DateTime?)null
+                                         : reader.GetDateTime(reader.GetOrdinal("pickup_date")),
+                                payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
+                                           ? reader.GetString(reader.GetOrdinal("payment"))
+                                           : null,
+                                price = new Prices() // Initialize the price list
+                            };
+
+                            string orderIdString = orderId.ToLower();
+
+                            // If the order ID is valid, fetch the total price and design details
+                            if (!string.IsNullOrEmpty(orderId))
+                            {
+
+                                double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
+
+                                // Calculate half price
+                                double halfPrice = totalPrice / 2;
+
+                                // Add the total price to the Prices list in the CustomerInitial object
+                                order.price = new Prices
+                                {
+                                    full = totalPrice,  // Assign the total price to the full property
+                                    half = halfPrice    // Assign the half price to the half property
+                                };
+
+                                CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
+                                order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
+
+                            }
+
+                            CustomerInitial customOrderDetails = await GetCustomOrderDetailsByCustomerAsync(order.orderId);
+                            order.customItems = customOrderDetails.customItems;
+
+                            orders.Add(order); // Add the order with design details to the list
+                        }
+                    }
+                }
+            }
+
+            return orders;
+        }
+
         [HttpGet("/culo-api/v1/current-user/for-approval")]
         [ProducesResponseType(typeof(CustomerInitial), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
@@ -3119,7 +3228,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT suborder_id, order_id, status, design_id, design_name, price, quantity, description, flavor, size, color, SUM(quantity * price) AS Total, shape
-                FROM suborders WHERE status IN ('to pay') AND suborder_id = @suborderId";
+                FROM suborders WHERE suborder_id = @suborderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3639,7 +3748,7 @@ WHERE
             }
         }
 
-        [HttpGet("/culo-api/v1/current-user/to-receive")]
+        /*[HttpGet("/culo-api/v1/current-user/to-receive")]
         [ProducesResponseType(typeof(toPayInitial), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToReceiveInitialOrdersByCustomerId()
@@ -3758,10 +3867,10 @@ WHERE
                 _logger.LogError(ex, "An error occurred while retrieving initial orders.");
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
-        }
+        }*/
 
 
-        [HttpGet("/culo-api/v1/current-user/to-receive/{suborderid}/full")]
+        /*[HttpGet("/culo-api/v1/current-user/to-receive/{suborderid}/full")]
         [ProducesResponseType(typeof(Full), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToReceiveOrdersByCustomerId(string suborderid)
@@ -3895,7 +4004,7 @@ WHERE
             {
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
-        }
+        }*/
 
         private async Task<OrderDetails?> GetOrderDetailsByOrderId(MySqlConnection connection, string orderIdBinary)
         {
