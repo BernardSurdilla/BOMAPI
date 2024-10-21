@@ -527,6 +527,29 @@ namespace BOM_API_v2.Controllers
                 }
             }
             List<DesignShapes> allShapesForDesign = await _databaseContext.DesignShapes.Where(x => x.is_active == true && x.design_id == foundEntry.design_id).ToListAsync();
+
+            if (input.designShapeNames != null && input.designShapeNames.IsNullOrEmpty() == false)
+            {
+                if (allShapesForDesign.IsNullOrEmpty() == false)
+                {
+                    DesignShapes currentShapeToBeModified = allShapesForDesign[0];
+                    _databaseContext.DesignShapes.Update(currentShapeToBeModified);
+                    currentShapeToBeModified.shape_name = input.designShapeNames[0];
+                    currentShapeToBeModified.is_active = true;
+                }
+                else
+                {
+                    DesignShapes newShapeAssociation = new DesignShapes
+                    {
+                        design_id = foundEntry.design_id,
+                        design_shape_id = Guid.NewGuid(),
+                        shape_name = input.designShapeNames[0],
+                        is_active = true
+                    };
+                    await _databaseContext.DesignShapes.AddAsync(newShapeAssociation);
+                }
+            }
+
             List<string> normalizedShapeNames = input.designShapeNames != null ? input.designShapeNames.Distinct().ToList() : new List<string>();
             foreach (string shapeName in normalizedShapeNames)
             {
