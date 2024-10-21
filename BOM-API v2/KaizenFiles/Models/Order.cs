@@ -335,23 +335,17 @@ namespace CRUDFI.Models
         public string? orderId { get; set; }
         public string designId { get; set; }
         public string customerId { get; set; }
-        public string? employeeId { get; set; }
-        public string employeeName { get; set; } = string.Empty;
         public string customerName { get; set; }
-        public DateTime createdAt { get; set; }
         public string pastryId { get; set; }
         public string status { get; set; }
         public string designName { get; set; }
         public string color { get; set; } = string.Empty;
         public string shape { get; set; } = string.Empty;
         public string tier { get; set; } = string.Empty;
-        public double price { get; set; }
         public int quantity { get; set; }
         public string description { get; set; }
         public string flavor { get; set; }
         public string size { get; set; }
-        public string lastUpdatedBy { get; set; } = "";
-        public DateTime? lastUpdatedAt { get; set; }
         public bool isActive { get; set; }
     }
     public class CheckOutDetails
