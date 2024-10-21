@@ -1720,6 +1720,17 @@ namespace BillOfMaterialsAPI.Helpers
                     response.designTags.Add(new GetDesignTag { designTagId = currentTag.DesignTags.design_tag_id, designTagName = currentTag.DesignTags.design_tag_name });
                 }
             }
+
+            if (cakeShapes.IsNullOrEmpty() == false) 
+            {
+                response.designShapes.Add(new GetDesignShape
+                {
+                    designShapeId = cakeShapes[0].design_shape_id,
+                    shapeName = cakeShapes[0].shape_name
+                });
+            }
+
+            /*
             foreach (DesignShapes currentShape in cakeShapes)
             {
                 response.designShapes.Add(new GetDesignShape
@@ -1728,6 +1739,7 @@ namespace BillOfMaterialsAPI.Helpers
                     shapeName = currentShape.shape_name
                 });
             }
+            */
 
             return response;
         }
