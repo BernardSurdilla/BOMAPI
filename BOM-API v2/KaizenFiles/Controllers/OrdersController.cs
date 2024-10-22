@@ -2208,14 +2208,17 @@ SELECT
                 string sql = @"
             SELECT order_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
             FROM orders 
-            WHERE status IN('baking', 'to review', 'for update', 'assigning artist', 'done', 'for approval')
+            WHERE status IN('baking', 'assigning artist', 'done', 'for approval', 'to pay', 'for pick up', 'cancelled')
             ORDER BY 
                 CASE 
                     WHEN status = 'for approval' THEN 1
                     WHEN status = 'assigning artist' THEN 2
                     WHEN status = 'baking' THEN 3
-                    WHEN status = 'done' THEN 4
-                    ELSE 5 -- Default for other statuses
+                    WHEN status = 'to pay' THEN 4
+                    WHEN status = 'for pick up' THEN 5
+                    WHEN status = 'done' THEN 6
+                    WHEN status = 'cancelled' THEN 7
+                    ELSE 8 -- Default for other statuses    
                 END";
 
                 using (var command = new MySqlCommand(sql, connection))
@@ -4076,12 +4079,20 @@ WHERE
             {
                 List<Artist> orders = new List<Artist>();
 
+
+
                 // Retrieve order IDs
                 List<string> orderIds = await GetOrderIdsAsync();
 
                 // If no order IDs found, return an empty list
                 if (orderIds.Count == 0)
                     return Ok(new List<Order>());
+
+                // Update order status if all suborders match for each order ID
+                foreach (var orderId in orderIds)
+                {
+                    await UpdateOrderStatusIfAllSubordersMatchAsync(orderId);
+                }
 
                 // Retrieve suborder details for each order ID
                 foreach (var orderId in orderIds)
@@ -4097,6 +4108,63 @@ WHERE
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
+        private async Task UpdateOrderStatusIfAllSubordersMatchAsync(string orderId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT status 
+            FROM suborders 
+            WHERE order_id = @orderId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        // Use a HashSet to store unique statuses
+                        HashSet<string> statuses = new HashSet<string>();
+
+                        while (await reader.ReadAsync())
+                        {
+                            statuses.Add(reader.GetString("status"));
+                        }
+
+                        // Check if all statuses are the same
+                        if (statuses.Count == 1)
+                        {
+                            // Get the common status
+                            string commonStatus = statuses.First();
+
+                            // Update the orders table with the common status
+                            // Use a new connection for the update
+                            using (var updateConnection = new MySqlConnection(connectionstring))
+                            {
+                                await updateConnection.OpenAsync();
+
+                                string updateSql = @"
+                            UPDATE orders 
+                            SET status = @commonStatus 
+                            WHERE order_id = @orderId";
+
+                                using (var updateCommand = new MySqlCommand(updateSql, updateConnection))
+                                {
+                                    updateCommand.Parameters.AddWithValue("@commonStatus", commonStatus);
+                                    updateCommand.Parameters.AddWithValue("@orderId", orderId);
+                                    await updateCommand.ExecuteNonQueryAsync();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
 
         // Private async method to retrieve order IDs
         private async Task<List<string>> GetOrderIdsAsync()
@@ -4148,11 +4216,11 @@ WHERE
             JOIN orders o ON s.order_id = o.order_id
             WHERE s.order_id = @orderId 
                 AND s.employee_id = @customerId 
-                AND s.status IN ('baking', 'for pickup', 'done') 
+                AND s.status IN ('baking', 'for pick up', 'done') 
             ORDER BY 
                 CASE 
                     WHEN s.status = 'baking' THEN 0
-                    WHEN s.status = 'for pickup' THEN 1
+                    WHEN s.status = 'for pick up' THEN 1
                     WHEN s.status = 'done' THEN 2
                     ELSE 3
                 END";
