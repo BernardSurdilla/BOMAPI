@@ -136,7 +136,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     designName = designName,
                     size = buyNowRequest.size,
                     flavor = buyNowRequest.flavor,
-                    isActive = false,
+                    isActive = true,
                     customerName = customerUsername,
                     color = buyNowRequest.color,
                     shape = shape,
@@ -329,7 +329,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     description = customOrder.description,
                     cover = customOrder.cover,
                     price = 0,
-                    isActive = false,
+                    isActive = true,
                 };
 
                 // Insert the order and related data into the database
@@ -603,7 +603,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     designName = designName,
                     size = orderDto.size,
                     flavor = orderDto.flavor,
-                    isActive = false,
+                    isActive = true,
                     customerName = customerUsername,
                     color = orderDto.color,
                     shape = shape,
