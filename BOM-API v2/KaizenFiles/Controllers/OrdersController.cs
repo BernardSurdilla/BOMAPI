@@ -4076,82 +4076,19 @@ WHERE
             {
                 List<Artist> orders = new List<Artist>();
 
-                using (var connection = new MySqlConnection(connectionstring))
-                {
-                    await connection.OpenAsync();
+                // Retrieve order IDs
+                List<string> orderIds = await GetOrderIdsAsync();
 
-                    string sql = @"
-                SELECT 
-                    suborder_id, s.order_id, customer_id, employee_id, created_at, s.status, 
-                    design_id, design_name, price, quantity, 
-                    last_updated_by, last_updated_at, is_active, description, 
-                    flavor, size, customer_name, employee_name, shape, color, pastry_id 
-                FROM suborders s
-                JOIN orders o ON s.order_id = o.order_id
-                WHERE s.employee_id = @customerId 
-                    AND s.status IN ('baking', 'for pickup', 'done')
-                ORDER BY 
-                    CASE 
-                        WHEN o.type = 'rush' THEN 0
-                        WHEN o.type = 'normal' THEN 1 
-                        ELSE 2 
-                    END,
-                    CASE 
-                        WHEN s.status = 'baking' THEN 0
-                        WHEN s.status = 'for pickup' THEN 1
-                        WHEN s.status = 'done' THEN 2
-                        ELSE 3
-                    END";
-
-
-                    using (var command = new MySqlCommand(sql, connection))
-                    {
-                        command.Parameters.AddWithValue("@customerId", customerIdHex);
-
-                        using (var reader = await command.ExecuteReaderAsync())
-                        {
-                            while (await reader.ReadAsync())
-                            {
-                                string orderIdFromDb = reader["order_id"].ToString();
-                                string suborderId = reader["suborder_id"].ToString();
-                                string designId = reader["design_id"].ToString();
-                                string customerIdFromDb = reader["customer_id"].ToString();
-
-                                string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
-                                                   ? null
-                                                   : reader.GetString(reader.GetOrdinal("employee_name"));
-
-                                string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
-                                                    ? null
-                                                    : reader.GetString(reader.GetOrdinal("last_updated_by"));
-
-                                orders.Add(new Artist
-                                {
-                                    orderId = orderIdFromDb, // Handle null values for orderId
-                                    suborderId = suborderId,
-                                    customerId = customerIdFromDb,
-                                    status = reader.GetString(reader.GetOrdinal("status")),
-                                    color = reader.GetString(reader.GetOrdinal("color")),
-                                    shape = reader.GetString(reader.GetOrdinal("shape")),
-                                    designId = designId,
-                                    designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
-             ? null
-             : reader.GetString(reader.GetOrdinal("design_name")),
-                                    quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                    isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                                    description = reader.GetString(reader.GetOrdinal("description")),
-                                    flavor = reader.GetString(reader.GetOrdinal("flavor")),
-                                    size = reader.GetString(reader.GetOrdinal("size")),
-                                    customerName = reader.GetString(reader.GetOrdinal("customer_name")),
-                                });
-                            }
-                        }
-                    }
-                }
-
-                // If no orders are found, return an empty list
-                if (orders.Count == 0)
+                // If no order IDs found, return an empty list
+                if (orderIds.Count == 0)
                     return Ok(new List<Order>());
+
+                // Retrieve suborder details for each order ID
+                foreach (var orderId in orderIds)
+                {
+                    var suborderDetails = await GetSuborderDetailsAsync(orderId, customerIdHex);
+                    orders.AddRange(suborderDetails);
+                }
 
                 return Ok(orders);
             }
@@ -4160,6 +4097,113 @@ WHERE
                 return StatusCode(500, $"An error occurred: {ex.Message}");
             }
         }
+
+        // Private async method to retrieve order IDs
+        private async Task<List<string>> GetOrderIdsAsync()
+        {
+            List<string> orderIds = new List<string>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT order_id 
+            FROM orders 
+            WHERE pickup_date > NOW() 
+            ORDER BY pickup_date ASC";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            orderIds.Add(reader["order_id"].ToString());
+                        }
+                    }
+                }
+            }
+
+            return orderIds;
+        }
+
+        // Private async method to retrieve suborder details for a given order ID
+        private async Task<List<Artist>> GetSuborderDetailsAsync(string orderId, string customerIdHex)
+        {
+            List<Artist> suborders = new List<Artist>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT 
+                suborder_id, order_id, customer_id, employee_id, created_at, status, 
+                design_id, design_name, price, quantity, 
+                last_updated_by, last_updated_at, is_active, description, 
+                flavor, size, customer_name, employee_name, shape, color, pastry_id 
+            FROM suborders 
+            WHERE order_id = @orderId 
+                AND employee_id = @customerId 
+                AND status IN ('baking', 'for pick up', 'done') 
+            ORDER BY 
+                CASE 
+                    WHEN status = 'baking' THEN 0
+                    WHEN status = 'for pickup' THEN 1
+                    WHEN status = 'done' THEN 2
+                    ELSE 3
+                END";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+                    command.Parameters.AddWithValue("@customerId", customerIdHex);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            string orderIdFromDb = reader["order_id"].ToString();
+                            string suborderId = reader["suborder_id"].ToString();
+                            string designId = reader["design_id"].ToString();
+                            string customerIdFromDb = reader["customer_id"].ToString();
+
+                            string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
+                                                    ? null
+                                                    : reader.GetString(reader.GetOrdinal("employee_name"));
+
+                            string? lastUpdatedBy = reader.IsDBNull(reader.GetOrdinal("last_updated_by"))
+                                                     ? null
+                                                     : reader.GetString(reader.GetOrdinal("last_updated_by"));
+
+                            suborders.Add(new Artist
+                            {
+                                orderId = orderIdFromDb,
+                                suborderId = suborderId,
+                                customerId = customerIdFromDb,
+                                status = reader.GetString(reader.GetOrdinal("status")),
+                                color = reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.GetString(reader.GetOrdinal("shape")),
+                                designId = designId,
+                                designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("design_name")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
+                                description = reader.GetString(reader.GetOrdinal("description")),
+                                flavor = reader.GetString(reader.GetOrdinal("flavor")),
+                                size = reader.GetString(reader.GetOrdinal("size")),
+                                customerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                            });
+                        }
+                    }
+                }
+            }
+
+            return suborders;
+        }
+
 
         private async Task<string> GetUserIdByUsername(string username)
         {
