@@ -2205,8 +2205,18 @@ SELECT
             {
                 await connection.OpenAsync();
 
-                string sql = @" SELECT order_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
-                FROM orders WHERE status IN('baking', 'to review', 'for update', 'assigning artist', 'done', 'for approval')";
+                string sql = @"
+            SELECT order_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
+            FROM orders 
+            WHERE status IN('baking', 'to review', 'for update', 'assigning artist', 'done', 'for approval')
+            ORDER BY 
+                CASE 
+                    WHEN status = 'for approval' THEN 1
+                    WHEN status = 'assigning artist' THEN 2
+                    WHEN status = 'baking' THEN 3
+                    WHEN status = 'done' THEN 4
+                    ELSE 5 -- Default for other statuses
+                END";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {

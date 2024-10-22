@@ -36,7 +36,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         [HttpGet("/culo-api/v1/current-user/transaction/history")]
         [ProducesResponseType(typeof(GetTransactions), StatusCodes.Status200OK)]
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetAllTransactions()
         {
             try
