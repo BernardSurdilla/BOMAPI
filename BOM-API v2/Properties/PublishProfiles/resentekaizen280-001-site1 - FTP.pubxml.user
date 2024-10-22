@@ -496,4 +496,27 @@ by editing this MSBuild file. In order to learn more about this please visit htt
       <publishTime>01/01/0001 00:00:00</publishTime>
     </File>
   </ItemGroup>
+  <ItemGroup>
+    <DestinationConnectionStrings Include="AUTHTESTING">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="connection">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="MySql">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="picture_db_conn">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="ProgramDB">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="SQLServer">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+    <DestinationConnectionStrings Include="SQLServerMigrationTesting">
+      <Value>Server=MYSQL6013.site4now.net%3bDatabase=db_aad9f1_bomdb%3bUid=aad9f1_bomdb%3bPwd=Fuck12345!</Value>
+    </DestinationConnectionStrings>
+  </ItemGroup>
 </Project>
