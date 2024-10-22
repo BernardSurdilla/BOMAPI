@@ -4081,13 +4081,28 @@ WHERE
                     await connection.OpenAsync();
 
                     string sql = @"
-            SELECT 
-                suborder_id, order_id, customer_id, employee_id, created_at, status, 
-                design_id, design_name, price, quantity, 
-                last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, pastry_id 
-            FROM suborders 
-            WHERE employee_id = @customerId";
+                SELECT 
+                    suborder_id, s.order_id, customer_id, employee_id, created_at, s.status, 
+                    design_id, design_name, price, quantity, 
+                    last_updated_by, last_updated_at, is_active, description, 
+                    flavor, size, customer_name, employee_name, shape, color, pastry_id 
+                FROM suborders s
+                JOIN orders o ON s.order_id = o.order_id
+                WHERE s.employee_id = @customerId 
+                    AND s.status IN ('baking', 'for pickup', 'done')
+                ORDER BY 
+                    CASE 
+                        WHEN o.type = 'rush' THEN 0
+                        WHEN o.type = 'normal' THEN 1 
+                        ELSE 2 
+                    END,
+                    CASE 
+                        WHEN s.status = 'baking' THEN 0
+                        WHEN s.status = 'for pickup' THEN 1
+                        WHEN s.status = 'done' THEN 2
+                        ELSE 3
+                    END";
+
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
