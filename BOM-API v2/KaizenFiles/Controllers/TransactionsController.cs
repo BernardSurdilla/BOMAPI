@@ -62,7 +62,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     await connection.OpenAsync();
 
-                    string sql = "SELECT Id, order_id, status, total_amount, total_paid, date FROM transactions WHERE user_id = @userId AND status != 'unpaid'";
+                    string sql = "SELECT Id, order_id, status, total_amount, total_paid, date FROM transactions WHERE user_id = @userId AND status != 'unpaid' ORDER BY date DESC";
 
                     using (var command = new MySqlCommand(sql, connection))
                     {
