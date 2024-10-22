@@ -4139,19 +4139,21 @@ WHERE
 
                 string sql = @"
             SELECT 
-                suborder_id, order_id, customer_id, employee_id, created_at, status, 
-                design_id, design_name, price, quantity, 
-                last_updated_by, last_updated_at, is_active, description, 
-                flavor, size, customer_name, employee_name, shape, color, pastry_id 
-            FROM suborders 
-            WHERE order_id = @orderId 
-                AND employee_id = @customerId 
-                AND status IN ('baking', 'for pick up', 'done') 
+                s.suborder_id, s.order_id, s.customer_id, s.employee_id, s.created_at, s.status, 
+                s.design_id, s.design_name, s.price, s.quantity, 
+                s.last_updated_by, s.last_updated_at, s.is_active, s.description, 
+                s.flavor, s.size, s.customer_name, s.employee_name, s.shape, s.color, s.pastry_id,
+                o.pickup_date
+            FROM suborders s
+            JOIN orders o ON s.order_id = o.order_id
+            WHERE s.order_id = @orderId 
+                AND s.employee_id = @customerId 
+                AND s.status IN ('baking', 'for pickup', 'done') 
             ORDER BY 
                 CASE 
-                    WHEN status = 'baking' THEN 0
-                    WHEN status = 'for pickup' THEN 1
-                    WHEN status = 'done' THEN 2
+                    WHEN s.status = 'baking' THEN 0
+                    WHEN s.status = 'for pickup' THEN 1
+                    WHEN s.status = 'done' THEN 2
                     ELSE 3
                 END";
 
@@ -4168,6 +4170,9 @@ WHERE
                             string suborderId = reader["suborder_id"].ToString();
                             string designId = reader["design_id"].ToString();
                             string customerIdFromDb = reader["customer_id"].ToString();
+                            DateTime pickupDate = reader.IsDBNull(reader.GetOrdinal("pickup_date"))
+                                ? default
+                                : reader.GetDateTime(reader.GetOrdinal("pickup_date"));
 
                             string? employeeName = reader.IsDBNull(reader.GetOrdinal("employee_name"))
                                                     ? null
@@ -4195,6 +4200,7 @@ WHERE
                                 flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                 size = reader.GetString(reader.GetOrdinal("size")),
                                 customerName = reader.GetString(reader.GetOrdinal("customer_name")),
+                                pickupDate = pickupDate // Assuming Artist has a pickupDate property
                             });
                         }
                     }
@@ -4203,6 +4209,7 @@ WHERE
 
             return suborders;
         }
+
 
 
         private async Task<string> GetUserIdByUsername(string username)
