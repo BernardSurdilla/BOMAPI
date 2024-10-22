@@ -347,6 +347,7 @@ namespace CRUDFI.Models
         public string flavor { get; set; }
         public string size { get; set; }
         public bool isActive { get; set; }
+        public DateTime pickupDate { get; set; }
     }
     public class CheckOutDetails
     {
