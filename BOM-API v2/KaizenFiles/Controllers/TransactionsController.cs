@@ -1,7 +1,6 @@
 ﻿using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
-using BOM_API_v2.KaizenFiles.Models;
 using CRUDFI.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -10,13 +9,15 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MySql.Data.MySqlClient;
+using Newtonsoft.Json;
+using RestSharp;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
-using static BOM_API_v2.KaizenFiles.Models.Transactions;
+using BOM_API_v2.KaizenFiles.Transactions;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace BOM_API_v2.KaizenFiles.Controllers
@@ -35,7 +36,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
         [HttpGet("/culo-api/v1/current-user/transaction/history")]
-        [ProducesResponseType(typeof(GetTransactions), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Transactions.Transactions.GetTransactions), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Customer)]
         public async Task<IActionResult> GetAllTransactions()
         {
@@ -56,7 +57,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return BadRequest("Customer not found.");
                 }
 
-                List<GetTransactions> transactionList = new List<GetTransactions>();
+                List<Transactions.Transactions.GetTransactions> transactionList = new List<Transactions.Transactions.GetTransactions>();
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -72,7 +73,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         {
                             while (await reader.ReadAsync())
                             {
-                                GetTransactions transact = new GetTransactions
+                                Transactions.Transactions.GetTransactions transact = new Transactions.Transactions.GetTransactions
                                 {
                                     id = reader.GetString(reader.GetOrdinal("id")),
                                     orderId = reader.GetString(reader.GetOrdinal("order_id")),
@@ -127,6 +128,87 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+
+        private async Task<string?> GetTransactionIdByOrderIdAsync(string orderId)
+        {
+            string? transactionId = null; // Nullable to handle cases where no matching transaction is found.
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string sql = @"
+            SELECT id 
+            FROM transactions 
+            WHERE order_id = @orderId"; // No need for LIMIT since id is unique.
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            // Get the id column from the result
+                            transactionId = reader["id"].ToString();
+                        }
+                    }
+                }
+            }
+
+            return transactionId;
+        }
+
+        [HttpGet("/culo-api/v1/{id}/payment-status")]
+        public async Task<IActionResult> GetPaymentStatus(string id)
+        {
+            try
+            {
+                // Call the GetPaymentStatusAsync method using the provided id
+                var paymentResponse = await GetPaymentStatusAsync(id);
+
+                // Check if the response content is null or empty
+                if (paymentResponse == null)
+                {
+                    return StatusCode(500, "Failed to retrieve payment status.");
+                }
+
+                // Deserialize the JSON response content
+                var paymentStatusData = JsonConvert.DeserializeObject<GetResponses>(paymentResponse);
+
+                // Check if deserialization was successful
+                if (paymentStatusData == null)
+                {
+                    return StatusCode(500, "Failed to parse payment status.");
+                }
+
+                // Return the deserialized JSON response
+                return Ok(paymentStatusData);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred: {ex.Message}");
+            }
+        }
+
+        private async Task<string> GetPaymentStatusAsync(string id)
+        {
+            // Use the full API URL directly as in your new code structure
+            var options = new RestClientOptions($"https://api.paymongo.com/v1/links/{id}");
+            var client = new RestClient(options);
+            var request = new RestRequest();
+
+            // Set the headers
+            request.AddHeader("accept", "application/json");
+            request.AddHeader("authorization", "Basic c2tfdGVzdF9hdE53NnFHbkRBZnpjWld5Tkp1cmt5Z2M6");
+
+            // Execute the request
+            var response = await client.GetAsync(request);
+
+            // Return the content of the response as a string
+            return response.Content;
+        }
 
     }
 }
