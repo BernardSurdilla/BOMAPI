@@ -441,6 +441,26 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
                         loopCount++;
                     }
+                        // If the loop count reaches 5 and status is still not "paid"
+                        if (status != "paid")
+                        {
+                            double unpaidIngredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
+                            double unpaidAddonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
+                            double unpaidTotalPrice = unpaidIngredientPrice + unpaidAddonPrice;
+                            double unpaidIndicator = 0;
+                            string unpaidStatus = "unpaid";
+
+                            // Call the method to get customer ID and name
+                            var (unpaidcustomerId, unpaidcustomerName) = await GetCustomerInfo(orderIdBinary);
+                            string unpaiduserId = unpaidcustomerId.ToLower();
+
+                            string transacId = payMongoResponse.data[0].id.ToLower();
+
+                            await InsertTransaction(transacId, orderIdBinary, unpaiduserId, unpaidTotalPrice, unpaidIndicator, unpaidStatus);
+
+                            return "Order not paid";
+                        }
+                    
 
                     double ingredientPrice = await GetTotalPriceForIngredientsAsync(orderIdBinary);
                     double addonPrice = await GetTotalPriceForAddonsAsync(orderIdBinary);
