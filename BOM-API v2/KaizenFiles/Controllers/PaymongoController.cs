@@ -89,6 +89,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         return BadRequest("Invalid option. Choose either 'full' or 'half'.");
                     }
 
+                    bool isRushOrder = await IsOrderRushAsync(orderIdBinary);
+
+                    if (isRushOrder)
+                    {
+                        updatedAmount += 500;
+                    }
+
                     // Convert the amount to cents (PayMongo expects amounts in cents)
                     var amountInCents = (int)(updatedAmount * 100);
 
@@ -177,6 +184,32 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     // Execute the query and check if a row exists
                     var result = await command.ExecuteScalarAsync();
                     return Convert.ToInt32(result) > 0;
+                }
+            }
+        }
+
+        private async Task<bool> IsOrderRushAsync(string orderId)
+        {
+            // Ensure orderId is not null or empty
+            if (string.IsNullOrEmpty(orderId))
+            {
+                throw new ArgumentException("Order ID cannot be null or empty.", nameof(orderId));
+            }
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Use a more efficient SQL query since order_id is a primary key
+                string sql = "SELECT EXISTS(SELECT 1 FROM orders WHERE order_id = @orderId AND type = 'rush')";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    // Execute the command and return true or false based on existence
+                    var exists = Convert.ToBoolean(await command.ExecuteScalarAsync());
+                    return exists;
                 }
             }
         }
@@ -552,6 +585,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return await client.GetAsync(request);
         }
 
+        
 
 
 
