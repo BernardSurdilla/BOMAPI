@@ -547,6 +547,11 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 // Check if the transaction is 'half paid'
                 var isHalfPaid = await IsTransactionHalfPaidAsync(id);
 
+                if (!isHalfPaid)
+                {
+                    return BadRequest("Order is not paid in half.");
+                }
+
                 var (name, email) = await GetCustomerDetailsByOrderIdAsync(id);
                 Debug.WriteLine("name: " + name + "/nemail: " + email);
                 double ingredientPrice = await GetTotalPriceForIngredientsAsync(id);
@@ -583,11 +588,6 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     });
 
 
-                }
-
-                if (!isHalfPaid)
-                {
-                    return BadRequest("Order is not paid in half.");
                 }
 
                 var username = User.FindFirst(ClaimTypes.Name)?.Value;
