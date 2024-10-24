@@ -160,7 +160,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             return transactionId;
         }
 
-        [HttpGet("/culo-api/v1/{id}/payment-status")]
+        [HttpGet("/culo-api/v1/transaction/{id}/payment-status")]
         public async Task<IActionResult> GetPaymentStatus(string id)
         {
             try
