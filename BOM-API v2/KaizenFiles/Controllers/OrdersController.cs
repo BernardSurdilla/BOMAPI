@@ -5728,10 +5728,6 @@ WHERE
 
                         var (customerId, customerName) = await GetCustomerInfoForCustomOrders(suborderIdBinary);
 
-                        string orderId = await GetOrderIdBySuborderIdAsync(suborderIdBinary);
-
-                        await UpdateOrderStatusToPayAsync(orderId);
-
                         if (!string.IsNullOrEmpty(customerId))
                         {
 
