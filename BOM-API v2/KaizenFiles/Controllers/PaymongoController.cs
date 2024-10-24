@@ -44,7 +44,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         }
 
-        [HttpPost("/culo-api/v1/{orderId}/payment")]
+        [HttpPost("/culo-api/v1/paymongo/{orderId}/payment")]
         [ProducesResponseType(typeof(PaymentRequestResponse), StatusCodes.Status200OK)]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin + "," + UserRoles.Customer)]
         public async Task<IActionResult> CreatePaymentLink(string orderId, [FromBody] PaymentRequest paymentRequest)

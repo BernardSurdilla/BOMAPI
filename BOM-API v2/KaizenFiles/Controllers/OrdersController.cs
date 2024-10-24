@@ -906,7 +906,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         }
 
 
-        [HttpPost("/culo-api/v1/{orderId}/approve-order")]
+        [HttpPost("/culo-api/v1/orders/{orderId}/approve-order")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin)]
         public async Task<IActionResult> ApprovingOrder(string orderId)
         {
@@ -6039,7 +6039,6 @@ WHERE
                 {
                     return Unauthorized("No valid customer username found.");
                 }
-
                 // Delete all suborders belonging to the current user
                 bool deleteSuccess = await DeleteAllSubordersByCustomerUsername(customerUsername);
                 if (deleteSuccess)
@@ -6087,7 +6086,7 @@ WHERE
 
                 string sql = @"
         DELETE FROM suborders 
-        WHERE status = 'cart' AND customer_id = (SELECT UserId FROM users WHERE Username = @customerUsername)";
+        WHERE status = 'cart' AND customer_id = (SELECT Id FROM aspnetusers WHERE Username = @customerUsername)";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
