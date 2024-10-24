@@ -18,6 +18,7 @@
     public class GetResponses
     {
         public GetData data { get; set; } // Change to a single object, not a list
+        public string paymentType { get; set; }
     }
 
     public class GetData

@@ -109,31 +109,31 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
             }
         }
 
-
-        private async Task<string?> GetTransactionIdByOrderIdAsync(string orderId) {
-            string? transactionId = null; // Nullable to handle cases where no matching transaction is found.
+        private async Task<string?> GetTransactionIdByOrderIdAsync(string link)
+        {
+            string? status = null; // Nullable to handle cases where no matching transaction is found
 
             using(var connection = new MySqlConnection(connectionstring)) {
                 await connection.OpenAsync();
 
                 string sql = @"
-            SELECT id 
+            SELECT status 
             FROM transactions 
-            WHERE order_id = @orderId"; // No need for LIMIT since id is unique.
-
-                using(var command = new MySqlCommand(sql,connection)) {
-                    command.Parameters.AddWithValue("@orderId",orderId);
+            WHERE id = @orderId"; // No need for LIMIT since id is unique.
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", link);
 
                     using(var reader = await command.ExecuteReaderAsync()) {
                         if(await reader.ReadAsync()) {
                             // Get the id column from the result
-                            transactionId = reader["id"].ToString();
+                            status = reader["status"].ToString();
                         }
                     }
                 }
             }
 
-            return transactionId;
+            return status;
         }
 
         [HttpGet("{id}/payment-status")]
@@ -147,8 +147,25 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                     return StatusCode(500,"Failed to retrieve payment status.");
                 }
 
+                var stats = await GetTransactionIdByOrderIdAsync(id);
+                string status;
+
+                if (stats == "paid")
+                {
+                    status = "full";
+                }
+                else if (stats == "half paid")
+                {
+                    status = "half";
+                }else
+                {
+                    status = stats;
+                }
+
                 // Deserialize the JSON response content
                 var paymentStatusData = JsonConvert.DeserializeObject<GetResponses>(paymentResponse);
+
+                paymentStatusData.paymentType = status;
 
                 // Check if deserialization was successful
                 if(paymentStatusData == null) {
