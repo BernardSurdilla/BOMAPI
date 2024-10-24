@@ -1368,7 +1368,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 }
 
                 // Calculate total price
-                double total = request.Quantity * addOnDSOS.price;
+                double total = request.Quantity * addOnDSOS.price * 2;
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -5236,7 +5236,7 @@ WHERE
                     try
                     {
                         // Calculate total price
-                        double total = manage.quantity * addonPrice;
+                        double total = manage.quantity * addonPrice * 2;
 
                         // Insert or update the order add-ons for the current add-on
                         await InsertOrUpdateOrderaddonWithSubOrderId(suborderIdBinary, manage.id, addonPrice, manage.quantity, name, total);
@@ -5411,7 +5411,7 @@ WHERE
                                 var addOnDetails = addOnDetailsDict[addOn.id];
 
                                 // Calculate total price based on the default quantity
-                                double total = addOn.quantity * addOnDetails.Price;
+                                double total = addOn.quantity * addOnDetails.Price * 2;
 
                                 // Insert the default add-on to the orderaddons table
                                 await InsertAddOn(connection, transaction, suborderIdBinary, addOn.id, addOn.quantity, total, addOnDetailsDict);
