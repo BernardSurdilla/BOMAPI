@@ -5709,7 +5709,7 @@ WHERE
             string sql = @"
             UPDATE suborders 
             SET design_name = @designName, 
-                price = @price , status = 'to pay' 
+                price = @price 
             WHERE suborder_id = @customId";
 
             try
