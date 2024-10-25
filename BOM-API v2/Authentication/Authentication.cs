@@ -475,6 +475,8 @@ namespace JWTAuthentication.Controllers
         [HttpPost("/culo-api/v1/current-user/reset-password/")]
         public async Task<IActionResult> ResetUserPassword([FromBody] ResetPassword data)
         {
+            data.resetPasswordToken = Uri.UnescapeDataString(data.resetPasswordToken);
+
             ForgotPasswordKeys? currentKey = await _auth.ForgotPasswordKeys.Where(x => x.ForgotPasswordKey == data.resetPasswordToken).FirstOrDefaultAsync();
 
             if (currentKey == null) { return Unauthorized(new { message = "Invalid Reset Token" }); }
@@ -654,7 +656,7 @@ namespace JWTAuthentication.Controllers
 
             string? userName = currentUser.UserName;
             string? email = currentUser.Email;
-            string? redirectAddress = _configuration.GetValue<string>("Email:ForgotPassword:RedirectAddress") + currentForgotPasswordKey; //Link here to verify the current user, insert key here
+            string? redirectAddress = _configuration.GetValue<string>("Email:ForgotPassword:RedirectAddress") + Uri.EscapeDataString(currentForgotPasswordKey); //Link here to verify the current user, insert key here
 
 
             int result = await _emailService.SendForgotPasswordEmail(userName, email, redirectAddress);
