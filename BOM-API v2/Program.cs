@@ -39,7 +39,7 @@ builder.Services.AddCors(options => {
     });
     options.AddPolicy(name: "FrontEndAndOriginOnly",policy => {
         policy.SetIsOriginAllowed((host) => true)
-        .WithOrigins("https://culo-t97g.vercel.app/")
+        .WithOrigins("https://culo-vite.vercel.app/")
         .AllowCredentials()
         .AllowAnyHeader()
         .AllowAnyMethod()
