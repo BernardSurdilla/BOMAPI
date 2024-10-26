@@ -519,7 +519,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
         }
-        [HttpPatch("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
+        [HttpPatch("{pastry_material_id}/add-ons/{pastry_material_add_on_id}")]
         public async Task<IActionResult> UpdatePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id, PatchPastryMaterialAddOn entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -592,7 +592,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "PATCH", "Update sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
             return Ok(new { message = "Sub variant updated" });
         }
-        [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
+        [HttpPatch("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add-ons/{pastry_material_sub_variant_add_on_id}")]
         public async Task<IActionResult> UpdatePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id, PatchPastryMaterialSubVariantAddOn entry)
         {
             PastryMaterials? currentPastryMaterial;
@@ -692,7 +692,7 @@ namespace BOM_API_v2.Controllers
             return Ok(new { message = "Pastry Material Ingredient updated." });
 
         }
-        [HttpDelete("{pastry_material_id}/add_ons/{pastry_material_add_on_id}")]
+        [HttpDelete("{pastry_material_id}/add-ons/{pastry_material_add_on_id}")]
         public async Task<IActionResult> DeletePastryMaterialAddOn(string pastry_material_id, string pastry_material_add_on_id)
         {
             PastryMaterials? currentPastryMaterial;
@@ -753,7 +753,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "DELETE", "Delete sub variant " + pastry_material_sub_variant_id + " ingredient " + pastry_material_sub_variant_ingredient_id);
             return Ok(new { message = "Sub variant deleted" });
         }
-        [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons/{pastry_material_sub_variant_add_on_id}")]
+        [HttpDelete("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add-ons/{pastry_material_sub_variant_add_on_id}")]
         public async Task<IActionResult> DeletePastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, string pastry_material_sub_variant_add_on_id)
         {
             PastryMaterials? currentPastryMaterial;
