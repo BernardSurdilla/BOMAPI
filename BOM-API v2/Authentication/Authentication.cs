@@ -26,9 +26,10 @@ namespace JWTAuthentication.Authentication
     //New Authentication
     public class AuthDB : IdentityDbContext<APIUsers>
     {
+        
         public AuthDB(DbContextOptions<AuthDB> options) : base(options)
         {
-
+            
         }
         public DbSet<EmailConfirmationKeys> EmailConfirmationKeys { get; set; } //Table for storing user confirmation keys
         public DbSet<ForgotPasswordKeys> ForgotPasswordKeys { get; set; }
@@ -36,6 +37,7 @@ namespace JWTAuthentication.Authentication
     }
     public class APIUsers : IdentityUser
     {
+        
         [Required] public DateTime JoinDate { get; set; }
     }
     public class EmailConfirmationKeys

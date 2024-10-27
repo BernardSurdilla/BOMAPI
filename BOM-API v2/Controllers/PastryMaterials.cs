@@ -397,7 +397,7 @@ namespace BOM_API_v2.Controllers
             await _actionLogger.LogAction(User, "POST", "Add Sub variant ingredient for " + pastry_material_sub_variant_id + " of " + pastry_material_id);
             return Ok(new { message = "New sub variant ingredient for " + pastry_material_sub_variant_id + " added" });
         }
-        [HttpPost("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add_ons")]
+        [HttpPost("{pastry_material_id}/sub-variants/{pastry_material_sub_variant_id}/add-ons")]
         public async Task<IActionResult> AddNewPastryMaterialSubVariantAddOn(string pastry_material_id, string pastry_material_sub_variant_id, PostPastryMaterialSubVariantAddOns entry)
         {
             PastryMaterials? currentPastryMaterial;

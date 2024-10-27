@@ -1,5 +1,6 @@
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Services;
+using BOM_API_v2.Authentication;
 using BOM_API_v2.Bridge;
 using BOM_API_v2.Data;
 using BOM_API_v2.Helpers;
@@ -85,9 +86,15 @@ builder.Services.AddDbContext<InventoryAccounts>(options => options.UseMySql(bui
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddIdentity<APIUsers,IdentityRole>()
+builder.Services.AddIdentity<APIUsers,IdentityRole>(options =>
+{
+    options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedEmail = true;
+    options.Stores.ProtectPersonalData = true;
+})
     .AddEntityFrameworkStores<AuthDB>()
-    .AddDefaultTokenProviders();
+    .AddDefaultTokenProviders()
+    .AddPersonalDataProtection<UserDataLookupProtector, UserDataLookupProtectorKeyRing>();
 builder.Services.AddAuthentication(options => {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
