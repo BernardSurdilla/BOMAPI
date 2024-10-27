@@ -293,6 +293,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         {
             try
             {
+
+                List<string> allId = await GetAllItemIdsAsync();
+
+                if (allId != null)
+                {
+                    foreach (string items in allId)
+                    {
+                        await UpdateItemStatusAsync(items);
+                    }
+                }
+
                 List<string> itemId = await GetItemIdsAsync();
 
                 if (itemId != null)
@@ -343,7 +354,97 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task<List<string>> GetItemIdAsync()
+        private async Task UpdateItemStatusAsync(string itemId)
+        {
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Step 1: Select quantity from item table
+                string sqlSelectItemQuantity = "SELECT quantity FROM item WHERE Id = @id";
+                int currentItemQuantity = 0;
+
+                using (var selectItemCommand = new MySqlCommand(sqlSelectItemQuantity, connection))
+                {
+                    selectItemCommand.Parameters.AddWithValue("@id", itemId);
+
+                    using (var reader = await selectItemCommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            currentItemQuantity = reader.GetInt32("quantity");
+                        }
+                        else
+                        {
+                            // Handle the case where the item is not found
+                            Debug.WriteLine($"No item found with ID: {itemId}");
+                            return; // Exit if no item found
+                        }
+                    }
+                }
+
+                // Step 2: Select good and critical thresholds from thresholdconfig table
+                string sqlThresholdSelect = @"
+            SELECT good_threshold, critical_threshold 
+            FROM thresholdconfig 
+            WHERE item_id = @itemId";
+
+                int goodThreshold = 0;
+                int criticalThreshold = 0;
+
+                using (var selectThresholdCommand = new MySqlCommand(sqlThresholdSelect, connection))
+                {
+                    selectThresholdCommand.Parameters.AddWithValue("@itemId", itemId);
+
+                    using (var reader = await selectThresholdCommand.ExecuteReaderAsync())
+                    {
+                        if (await reader.ReadAsync())
+                        {
+                            goodThreshold = reader.GetInt32("good_threshold");
+                            criticalThreshold = reader.GetInt32("critical_threshold");
+                        }
+                    }
+                }
+
+                // Step 3: Calculate status based on quantity thresholds
+                string status;
+                if (currentItemQuantity <= criticalThreshold)
+                {
+                    status = "critical";
+                }
+                else if (currentItemQuantity > criticalThreshold && currentItemQuantity < goodThreshold)
+                {
+                    status = "mid";
+                }
+                else if (currentItemQuantity >= goodThreshold)
+                {
+                    status = "good";
+                }
+                else
+                {
+                    status = "normal"; // Default status if none of the conditions are met
+                }
+
+                // Step 4: Update the Item table with the new status only
+                string sqlUpdateItem = @"
+            UPDATE item 
+            SET status = @status, 
+                last_updated_by = @last_updated_by, last_updated_at = @last_updated_at 
+            WHERE Id = @id";
+
+                using (var updateCommand = new MySqlCommand(sqlUpdateItem, connection))
+                {
+                    updateCommand.Parameters.AddWithValue("@status", status);
+                    updateCommand.Parameters.AddWithValue("@last_updated_by", "System Update");
+                    updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                    updateCommand.Parameters.AddWithValue("@id", itemId);
+
+                    await updateCommand.ExecuteNonQueryAsync();
+                }
+            }
+        }
+
+        private async Task<List<string>> GetAllItemIdsAsync()
         {
             var itemIds = new List<string>();
 
@@ -351,11 +452,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sqlSelectIds = @"
-            SELECT i.Id 
-            FROM item i 
-            INNER JOIN batches b ON i.Id = b.item_id 
-            WHERE i.quantity IS NULL AND i.price IS NULL";
+                // Select all Ids from the item table
+                string sqlSelectIds = "SELECT Id FROM item";
 
                 using (var command = new MySqlCommand(sqlSelectIds, connection))
                 {
@@ -405,6 +503,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
             return itemIds;
         }
+
+
 
 
         private async Task UpdateItemFromBatchesAsync(string itemId)
