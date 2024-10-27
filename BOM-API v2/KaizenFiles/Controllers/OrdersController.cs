@@ -6163,7 +6163,7 @@ WHERE
                             // Convert the order_id directly as it is assumed to be a valid Guid in binary format
                             string orderId = reader["order_id"].ToString();
 
-                            // Step 2: Convert the retrieved order_id to binary format
+                            // Convert the retrieved order_id to binary format
                             orderIdFi = orderId.ToLower();
                         }
                         else
@@ -6173,9 +6173,25 @@ WHERE
                     }
                 }
 
-                // Step 3: Update the status in the orders table
+                // Step 2: Check if all suborders with the retrieved order_id have status "baking"
                 if (!string.IsNullOrEmpty(orderIdFi))
                 {
+                    string sqlCheckStatus = "SELECT COUNT(*) FROM suborders WHERE order_id = @orderId AND status <> 'baking'";
+                    using (var command = new MySqlCommand(sqlCheckStatus, connection))
+                    {
+                        command.Parameters.AddWithValue("@orderId", orderIdFi);
+
+                        int nonBakingCount = Convert.ToInt32(await command.ExecuteScalarAsync());
+
+                        // If nonBakingCount is 0, it means all suborders are in 'baking' status
+                        if (nonBakingCount > 0)
+                        {
+                            // Skip updating if any suborder is not in 'baking' status
+                            return; // Or you can throw an exception or log as needed
+                        }
+                    }
+
+                    // Step 3: Update the status in the orders table
                     string sqlOrders = "UPDATE orders SET status = 'baking' WHERE order_id = @orderId";
                     using (var command = new MySqlCommand(sqlOrders, connection))
                     {
