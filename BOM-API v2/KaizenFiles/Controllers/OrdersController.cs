@@ -1,6 +1,7 @@
 using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
 using BillOfMaterialsAPI.Models;
 using BillOfMaterialsAPI.Schemas;
+using BOM_API_v2.Authentication;
 using BOM_API_v2.KaizenFiles.Models;
 using CRUDFI.Models;
 using JWTAuthentication.Authentication;
@@ -16,6 +17,7 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using Microsoft.AspNetCore.Identity;
 
 
 
@@ -41,19 +43,25 @@ namespace BOM_API_v2.KaizenFiles.Controllers
         private readonly DatabaseContext _context;
         private readonly KaizenTables _kaizenTables;
 
+        private readonly UserManager<APIUsers> userManager;
+        private readonly RoleManager<IdentityRole> roleManager;
+
         public static IWebHostEnvironment _webhostEnvironment;
 
 
-        public OrdersController(IConfiguration configuration, ILogger<OrdersController> logger, DatabaseContext context, KaizenTables kaizenTables)
+        public OrdersController(RoleManager<IdentityRole> roleManager, UserManager<APIUsers> userManager, IConfiguration configuration, ILogger<OrdersController> logger, DatabaseContext context, KaizenTables kaizenTables)
         {
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
 
             _context = context;
             _kaizenTables = kaizenTables;
-
+            this.userManager = userManager;
+            this.roleManager = roleManager;
 
         }
+
+
 
         [HttpPost("/culo-api/v1/current-user/buy-now")]
         [ProducesResponseType(typeof(SuborderResponse), StatusCodes.Status200OK)]
@@ -74,12 +82,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("User is not authorized");
                 }
 
-                // Retrieve customerId from username
-                string customerId = await GetUserIdByAllUsername(customerUsername);
-                if (customerId == null || customerId.Length == 0)
-                {
-                    return BadRequest("Customer not found.");
-                }
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
 
                 Debug.WriteLine("customer Id: " + customerId);
 
@@ -303,11 +308,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("User is not authorized");
                 }
 
-                string customerId = await GetUserIdByAllUsername(customerUsername);
-                if (string.IsNullOrEmpty(customerId))
-                {
-                    return BadRequest("Customer not found");
-                }
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
 
                 // Process the uploaded image from base64 string
                 byte[] pictureBinary = null;
@@ -558,13 +561,18 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("User is not authorized");
                 }
 
-                string customerId = await GetUserIdByAllUsername(customerUsername);
-                if (customerId == null || customerId.Length == 0)
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
+
+                Debug.WriteLine("customer ID: " + customerId);
+
+                if (customerId == null)
                 {
                     return BadRequest("Customer not found");
                 }
 
-                Debug.WriteLine("customer ID: " + customerId);
+                
 
                 // Convert designId from string to hex
                 string designIdHex = orderDto.designId;
@@ -820,18 +828,17 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
                 // Retrieve customer username from claims
+                // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
+
                 if (string.IsNullOrEmpty(customerUsername))
                 {
-                    return Unauthorized("User is not authorized.");
+                    return Unauthorized("User is not authorized");
                 }
 
-                // Retrieve customerId from username
-                string customerId = await GetUserIdByAllUsername(customerUsername);
-                if (customerId == null || customerId.Length == 0)
-                {
-                    return BadRequest("Customer not found.");
-                }
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
 
 
                 // Validate type
@@ -1645,7 +1652,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        
+
         [HttpGet("debug")]
         public async Task<IActionResult> GetAllOrders()
         {
@@ -2560,6 +2567,7 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetCartOrdersByCustomerId()
         {
+            // Fetch customer username from claims
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
             if (string.IsNullOrEmpty(customerUsername))
@@ -2567,8 +2575,9 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
                 return Unauthorized("User is not authorized");
             }
 
-            // Get the customer's ID using the extracted username
-            string customerId = await GetUserIdByAllUsername(customerUsername);
+            var user = await userManager.FindByNameAsync(customerUsername);
+
+            string customerId = user.Id;
             if (customerId == null || customerId.Length == 0)
             {
                 return BadRequest("Customer not found");
@@ -2713,6 +2722,7 @@ WHERE
         {
             try
             {
+                // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
                 if (string.IsNullOrEmpty(customerUsername))
@@ -2720,8 +2730,9 @@ WHERE
                     return Unauthorized("User is not authorized");
                 }
 
-                // Get the customer's ID using the extracted username
-                string customerId = await GetUserIdByAllUsername(customerUsername);
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
                 if (customerId == null || customerId.Length == 0)
                 {
                     return BadRequest("Customer not found");
@@ -2891,6 +2902,7 @@ WHERE
         {
             try
             {
+                // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
                 if (string.IsNullOrEmpty(customerUsername))
@@ -2898,8 +2910,9 @@ WHERE
                     return Unauthorized("User is not authorized");
                 }
 
-                // Get the customer's ID using the extracted username
-                string customerId = await GetUserIdByAllUsername(customerUsername);
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
                 if (customerId == null || customerId.Length == 0)
                 {
                     return BadRequest("Customer not found");
@@ -3000,6 +3013,7 @@ WHERE
         {
             try
             {
+                // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
                 if (string.IsNullOrEmpty(customerUsername))
@@ -3007,8 +3021,9 @@ WHERE
                     return Unauthorized("User is not authorized");
                 }
 
-                // Get the customer's ID using the extracted username
-                string customerId = await GetUserIdByAllUsername(customerUsername);
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
                 if (customerId == null || customerId.Length == 0)
                 {
                     return BadRequest("Customer not found");
@@ -3530,6 +3545,7 @@ WHERE
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToProcessInitialOrdersByCustomerIds()
         {
+            // Fetch customer username from claims
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
             if (string.IsNullOrEmpty(customerUsername))
@@ -3537,8 +3553,9 @@ WHERE
                 return Unauthorized("User is not authorized");
             }
 
-            // Get the customer's ID using the extracted username
-            string customerId = await GetUserIdByAllUsername(customerUsername);
+            var user = await userManager.FindByNameAsync(customerUsername);
+
+            string customerId = user.Id;
             if (customerId == null || customerId.Length == 0)
             {
                 return BadRequest("Customer not found");
@@ -3629,6 +3646,7 @@ WHERE
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetToProcessOrdersByCustomerId(string suborderid)
         {
+            // Fetch customer username from claims
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
             if (string.IsNullOrEmpty(customerUsername))
@@ -3636,8 +3654,9 @@ WHERE
                 return Unauthorized("User is not authorized");
             }
 
-            // Get the customer's ID using the extracted username
-            string customerId = await GetUserIdByAllUsername(customerUsername);
+            var user = await userManager.FindByNameAsync(customerUsername);
+
+            string customerId = user.Id;
             if (customerId == null || customerId.Length == 0)
             {
                 return BadRequest("Customer not found");
@@ -4320,6 +4339,7 @@ WHERE
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> GetFinalOrderDetailsByOrderId(string orderId)
         {
+            // Fetch customer username from claims
             var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
             if (string.IsNullOrEmpty(customerUsername))
@@ -4327,7 +4347,9 @@ WHERE
                 return Unauthorized("User is not authorized");
             }
 
-            string customerId = await GetUserIdByAllUsername(customerUsername);
+            var user = await userManager.FindByNameAsync(customerUsername);
+
+            string customerId = user.Id;
             if (customerId == null || customerId.Length == 0)
             {
                 return BadRequest("Customer not found");
