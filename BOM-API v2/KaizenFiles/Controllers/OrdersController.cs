@@ -2791,6 +2791,9 @@ WHERE
                                 payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
                                            ? reader.GetString(reader.GetOrdinal("payment"))
                                            : null,
+                                status = reader.IsDBNull(reader.GetOrdinal("status"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("status")),
                                 price = new Prices() // Initialize the price list
                             };
 
@@ -2946,7 +2949,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
-                        FROM orders WHERE status IN ('for pick up', 'done') AND customer_id = @customer_id";
+                        FROM orders WHERE status IN ('for pick up', 'done', 'baking') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -2971,6 +2974,9 @@ WHERE
                                 payment = !reader.IsDBNull(reader.GetOrdinal("payment"))
                                            ? reader.GetString(reader.GetOrdinal("payment"))
                                            : null,
+                                status = !reader.IsDBNull(reader.GetOrdinal("status"))
+                                        ? reader.GetString(reader.GetOrdinal("status"))
+                                        : null,
                                 price = new Prices() // Initialize the price list
                             };
 
@@ -2991,11 +2997,11 @@ WHERE
                                     full = totalPrice,  // Assign the total price to the full property
                                     half = halfPrice    // Assign the half price to the half property
                                 };
-
-                                CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
-                                order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
-
                             }
+
+
+                            CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
+                            order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
 
                             CustomerInitial customOrderDetails = await GetCustomOrderDetailsByCustomerAsync(order.orderId);
                             order.customItems = customOrderDetails.customItems;
@@ -3282,6 +3288,9 @@ WHERE
                                     ? reader.GetString(reader.GetOrdinal("design_name"))
                                     : null,
                                 price = reader.GetDouble(reader.GetOrdinal("price")),
+                                status = reader.IsDBNull(reader.GetOrdinal("status"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("status")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 description = reader.GetString(reader.GetOrdinal("description")),
                                 flavor = reader.GetString(reader.GetOrdinal("flavor")),
@@ -3364,7 +3373,7 @@ WHERE
                 {
                     // Retrieve suborder details, assuming this returns a List<OrderItem>
                     List<OrderItem> suborderDetails = await GetSuborderDetails(suborderId);
-
+                    
                     Debug.WriteLine(suborderDetails);
 
                     // Loop through each OrderItem in the retrieved suborderDetails
@@ -4486,6 +4495,9 @@ WHERE
                                 designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
                                     ? null
                                     : reader.GetString(reader.GetOrdinal("design_name")),
+                                status = reader.IsDBNull(reader.GetOrdinal("status"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("status")),
                                 price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
