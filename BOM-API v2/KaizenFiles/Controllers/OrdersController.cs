@@ -1155,7 +1155,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        [HttpPost("/culo-api/v1/current-user/{orderId}/confirm")]
+        /*[HttpPost("/culo-api/v1/current-user/{orderId}/confirm")]
         [Authorize(Roles = UserRoles.Customer + "," + UserRoles.Admin + "," + UserRoles.Manager)]
         public async Task<IActionResult> ConfirmOrder(string orderId)
         {
@@ -1208,7 +1208,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
 
             return Ok("Order confirmed successfully.");
-        }
+        }*/
 
        
         [HttpPost("/culo-api/v1/current-user/{orderId}/cancel")]
@@ -1234,14 +1234,19 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             // Perform the update for cancellation
             await UpdateOrderxxStatus(orderIdBinary, "cancel");
 
-            string suborderId = await UpdateOrderxxxxStatus(orderIdBinary);
+            // Retrieve the list of suborder IDs for the given order ID
+            List<string> suborderIds = await UpdateOrderxxxxStatusAsync(orderIdBinary);
 
-            if (suborderId == null)
+            if (suborderIds == null || !suborderIds.Any())
             {
-                return NotFound("No suborder ID found for the given order ID.");
+                return NotFound("No suborder IDs found for the given order ID.");
             }
 
-            await UpdateOrderxxxStatus(suborderId, "cancel");
+            // Iterate through each suborderId in the list
+            foreach (var suborderId in suborderIds)
+            {
+                await UpdateOrderxxxStatus(suborderId, "cancel");
+            }
 
             return Ok("Order canceled successfully.");
         }
@@ -1258,7 +1263,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                action.Equals("cancel", StringComparison.OrdinalIgnoreCase) ? 0 :
                                throw new ArgumentException("Invalid action. Please choose 'confirm' or 'cancel'.");
 
-                string sql = "UPDATE orders SET is_active = @isActive, status = 'for approval' WHERE order_id = @orderId";
+                string sql = "UPDATE orders SET is_active = @isActive, status = 'cancelled' WHERE order_id = @orderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1280,7 +1285,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                action.Equals("cancel", StringComparison.OrdinalIgnoreCase) ? 0 :
                                throw new ArgumentException("Invalid action. Please choose 'confirm' or 'cancel'.");
 
-                string sql = "UPDATE suborders SET is_active = @isActive, status = 'for approval' WHERE suborder_id = @orderId";
+                string sql = "UPDATE suborders SET is_active = @isActive, status = 'cancelled' WHERE suborder_id = @orderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -1291,8 +1296,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-        private async Task<string> UpdateOrderxxxxStatus(string orderIdBinary)
+        private async Task<List<string>> UpdateOrderxxxxStatusAsync(string orderIdBinary)
         {
+            var suborderIds = new List<string>();
+
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
@@ -1307,25 +1314,21 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     // Execute the query and retrieve the result
                     using (var reader = await command.ExecuteReaderAsync())
                     {
-                        if (await reader.ReadAsync())
+                        while (await reader.ReadAsync())
                         {
-                            // Retrieve the suborder_id directly as a string
+                            // Retrieve each suborder_id and add it to the list
                             string suborderId = reader["suborder_id"].ToString();
+                            suborderIds.Add(suborderId);
 
-                            // Log the retrieved suborder_id in the original GUID format
+                            // Log each retrieved suborder_id
                             Debug.WriteLine($"Suborder ID for order ID '{orderIdBinary}': {suborderId}");
-
-                            // Return the suborder_id string (should already be in GUID format)
-                            return suborderId;
-                        }
-                        else
-                        {
-                            // No suborder found for the given orderId
-                            return null;
                         }
                     }
                 }
             }
+
+            // Return the list of suborder_id strings
+            return suborderIds;
         }
 
 
@@ -2943,7 +2946,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT order_id, customer_id, type, created_at, status, payment, pickup_date, last_updated_by, last_updated_at, is_active, customer_name 
-                        FROM orders WHERE status IN ('to receive', 'done') AND customer_id = @customer_id";
+                        FROM orders WHERE status IN ('for pick up', 'done') AND customer_id = @customer_id";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -5897,13 +5900,6 @@ WHERE
                 // Convert the hex orderId to binary format
                 string orderIdBinary = orderId.ToLower();
 
-                // Check if the order belongs to the current user
-                bool isOrderOwnedByUser = await IsOrderOwnedByUser(customerUsername, orderIdBinary);
-                if (!isOrderOwnedByUser)
-                {
-                    return Unauthorized("You do not have permission to delete this order.");
-                }
-
                 // Delete the order from the database
                 bool deleteSuccess = await DeleteOrderByOrderId(orderIdBinary);
                 if (deleteSuccess)
@@ -5978,13 +5974,6 @@ WHERE
 
                 // Convert the hex orderId to binary format
                 string suborderIdBinary = suborderId.ToLower();
-
-                // Check if the order belongs to the current user
-                bool isOrderOwnedByUser = await IsSuborderOwnedByUser(customerUsername, suborderIdBinary);
-                if (!isOrderOwnedByUser)
-                {
-                    return Unauthorized("You do not have permission to delete this order.");
-                }
 
                 // Delete the order from the database
                 bool deleteSuccess = await DeleteOrderBySuborderId(suborderIdBinary);
