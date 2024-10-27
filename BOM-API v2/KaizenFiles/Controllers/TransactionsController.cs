@@ -19,6 +19,8 @@ using System.Security.Claims;
 using System.Text;
 using BOM_API_v2.KaizenFiles.Transactions;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using Microsoft.AspNetCore.Identity;
+
 
 namespace BOM_API_v2.KaizenFiles.Controllers {
     [Route("transactions")]
@@ -26,10 +28,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
     public class TransactionsController: ControllerBase {
         private readonly string connectionstring;
         private readonly ILogger<TransactionsController> _logger;
+        private readonly UserManager<APIUsers> userManager;
+        private readonly RoleManager<IdentityRole> roleManager;
 
-        public TransactionsController(IConfiguration configuration,ILogger<TransactionsController> logger,DatabaseContext context,KaizenTables kaizenTables) {
+        public TransactionsController(RoleManager<IdentityRole> roleManager, UserManager<APIUsers> userManager, IConfiguration configuration,ILogger<TransactionsController> logger,DatabaseContext context,KaizenTables kaizenTables) {
+            
             connectionstring = configuration["ConnectionStrings:connection"] ?? throw new ArgumentNullException("connectionStrings is missing in the configuration.");
             _logger = logger;
+            this.userManager = userManager;
+            this.roleManager = roleManager;
         }
 
         [HttpGet("/culo-api/v1/current-user/transactions")]
@@ -40,13 +47,15 @@ namespace BOM_API_v2.KaizenFiles.Controllers {
                 // Fetch customer username from claims
                 var customerUsername = User.FindFirst(ClaimTypes.Name)?.Value;
 
-                if(string.IsNullOrEmpty(customerUsername)) {
+                if (string.IsNullOrEmpty(customerUsername))
+                {
                     return Unauthorized("User is not authorized");
                 }
 
-                // Retrieve customerId from username
-                string customerId = await GetUserIdByAllUsername(customerUsername);
-                if(customerId == null || customerId.Length == 0) {
+                var user = await userManager.FindByNameAsync(customerUsername);
+
+                string customerId = user.Id;
+                if (customerId == null || customerId.Length == 0) {
                     return BadRequest("Customer not found.");
                 }
 
