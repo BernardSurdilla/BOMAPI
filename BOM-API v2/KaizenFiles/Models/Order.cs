@@ -1,4 +1,6 @@
 ﻿
+using System.Security.Policy;
+
 namespace CRUDFI.Models
 {
     public class Order
@@ -233,6 +235,7 @@ namespace CRUDFI.Models
         public string type { get; set; }
         public Prices price { get; set; }
         public DateTime? pickup { get; set; }
+        public string status { get; set; }
 
         public List<OrderItem> orderItems { get; set; } = new List<OrderItem>();
         public List<CustomItem> customItems { get; set; } = new List<CustomItem>();
@@ -379,6 +382,7 @@ namespace CRUDFI.Models
         public double customTotal { get; set; }
         public string cover { get; set; }
         public int? tier { get; set; }
+        public string status { get; set; }
         public byte[] pictureDate { get; set; }
         public List<OrderAddon1> orderAddons { get; set; } = new List<OrderAddon1>();
     }
@@ -398,6 +402,7 @@ namespace CRUDFI.Models
         public string flavor { get; set; }
         public string size { get; set; }
         public double subOrderTotal { get; set; }
+        public string status { get; set; }
 
         // List to hold all add-ons for the order item
         public List<OrderAddon1> orderAddons { get; set; } = new List<OrderAddon1>();
