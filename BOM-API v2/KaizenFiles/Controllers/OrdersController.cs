@@ -3024,6 +3024,8 @@ WHERE
                     return Unauthorized("User is not authorized");
                 }
 
+                Debug.WriteLine(customerUsername);
+
                 var user = await userManager.FindByNameAsync(customerUsername);
 
                 string customerId = user.Id;
@@ -3114,7 +3116,6 @@ WHERE
                             // If the order ID is valid, fetch the total price and design details
                             if (!string.IsNullOrEmpty(orderId))
                             {
-                                
                                 double totalPrice = await CalculateTotalPriceForOrderAsync(orderIdString);
 
                                 // Calculate half price
@@ -3126,11 +3127,10 @@ WHERE
                                     full = totalPrice,  // Assign the total price to the full property
                                     half = halfPrice    // Assign the half price to the half property
                                 };
-
-                                CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
-                                order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
-
                             }
+
+                            CustomerInitial fullOrderDetails = await GetFullOrderDetailsByCustomerAsync(order.orderId);
+                            order.orderItems = fullOrderDetails.orderItems;  // Capture orderItems
 
                             CustomerInitial customOrderDetails = await GetApprovalCustomOrderDetailsByCustomerAsync(order.orderId);
                             order.customItems = customOrderDetails.customItems;
@@ -3193,7 +3193,7 @@ WHERE
                 await connection.OpenAsync();
 
                 string sql = @" SELECT suborder_id, order_id, status, design_id, design_name, price, quantity, description, flavor, size, color, SUM(quantity * price) AS Total, shape
-                FROM suborders WHERE status IN ('for approval') AND suborder_id = @suborderId";
+                FROM suborders WHERE suborder_id = @suborderId";
 
                 using (var command = new MySqlCommand(sql, connection))
                 {
@@ -3363,7 +3363,7 @@ WHERE
                 foreach (var suborderId in suborderIds)
                 {
                     // Retrieve suborder details, assuming this returns a List<OrderItem>
-                    List<OrderItem> suborderDetails = await GetSuborderDetails(orderIdBinary);
+                    List<OrderItem> suborderDetails = await GetSuborderDetails(suborderId);
 
                     Debug.WriteLine(suborderDetails);
 
@@ -3396,6 +3396,8 @@ WHERE
             {
                 // Retrieve the list of suborder IDs associated with the given orderId
                 List<string> suborderIds = await GetCustomSuborderIdsByOrderIdAsync(orderIdBinary);
+
+                Debug.WriteLine("Retrieved Suborder IDs: " + string.Join(", ", suborderIds));
 
                 foreach (var suborderID in suborderIds)
                 {
@@ -4454,7 +4456,7 @@ WHERE
         last_updated_by, last_updated_at, is_active, description, 
         flavor, size, customer_name, employee_name, shape, color, pastry_id 
     FROM suborders 
-    WHERE order_id = @orderIdBinary";
+    WHERE suborder_id = @orderIdBinary";
 
                 using (var command = new MySqlCommand(suborderSql, connection))
                 {
