@@ -5077,6 +5077,127 @@ WHERE
             return quantities;
         }
 
+        [HttpPost("current-user/{orderId}/order-received")]
+        public async Task<IActionResult> MarkOrderAsReceived(string orderId)
+        {
+            try
+            {
+                await UpdateOrderStatusAsync(orderId, "done", false);
+                // Retrieve the list of suborder IDs for the given order ID
+                List<string> suborderIds = await GetSuborderIdByOrderIdAsync(orderId);
+
+                if (suborderIds == null || !suborderIds.Any())
+                {
+                    return NotFound($"No suborders found for the given order ID: {orderId}");
+                }
+
+                // Loop through each suborder and update its status to "done" and set is_active to false
+                foreach (var suborderId in suborderIds)
+                {
+                    await UpdateDoneStatus(suborderId, "done", false);
+                    // Process the order completion by inserting relevant details into the sales table
+                    await ProcessOrderCompletion(suborderId);
+                }
+                _logger.LogInformation($"Order '{orderId}' marked as received and processed successfully.");
+                return Ok($"Order '{orderId}' has been marked as received and processed.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while marking order '{orderId}' as received.");
+                return StatusCode(500, "An error occurred while processing the order. Please try again.");
+            }
+        }
+
+        private async Task<List<string>> GetSuborderIdByOrderIdAsync(string orderId)
+        {
+            var suborderIds = new List<string>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                // Query to select suborder_id based on order_id
+                string sql = "SELECT suborder_id FROM suborders WHERE order_id = @orderId";
+
+                using (var command = new MySqlCommand(sql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderId", orderId);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+                            // Retrieve suborder_id and add it to the list
+                            suborderIds.Add(reader.GetString("suborder_id"));
+                        }
+                    }
+                }
+            }
+
+            return suborderIds;
+        }
+
+
+        private async Task UpdateDoneStatus(string orderIdBinary, string status,bool isActive)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // Update the status of the suborders
+                    string subOrderSql = "UPDATE suborders SET status = @subOrderStatus, is_active = @isActive, last_updated_at = NOW() WHERE suborder_id = @orderId";
+                    using (var subOrderCommand = new MySqlCommand(subOrderSql, connection))
+                    {
+                        subOrderCommand.Parameters.AddWithValue("@subOrderStatus", status);
+                        subOrderCommand.Parameters.AddWithValue("@orderId", orderIdBinary);
+                        subOrderCommand.Parameters.AddWithValue("@isActive", isActive);
+
+                        await subOrderCommand.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while updating status for order with ID '{orderIdBinary}'.");
+                throw;
+            }
+        }
+
+        private async Task UpdateOrderStatusAsync(string orderId, string status, bool isActive)
+        {
+            try
+            {
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    await connection.OpenAsync();
+
+                    // SQL command to update the status and is_active fields in the orders table
+                    string sqlUpdateOrder = @"
+                UPDATE orders 
+                SET status = @subOrderStatus, 
+                    is_active = @isActive, 
+                    last_updated_at = NOW() 
+                WHERE order_id = @orderId";
+
+                    using (var command = new MySqlCommand(sqlUpdateOrder, connection))
+                    {
+                        command.Parameters.AddWithValue("@subOrderStatus", status);
+                        command.Parameters.AddWithValue("@isActive", isActive);
+                        command.Parameters.AddWithValue("@orderId", orderId);
+
+                        await command.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"An error occurred while updating order status for order ID '{orderId}'.");
+                throw;
+            }
+        }
+
 
         [HttpPatch("suborders/{suborderId}/update-status")] //done
         [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist + "," + UserRoles.Customer)]
