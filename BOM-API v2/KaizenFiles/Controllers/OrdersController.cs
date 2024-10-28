@@ -1,23 +1,17 @@
 using BillOfMaterialsAPI.Helpers;// Adjust the namespace according to your project structure
 using BillOfMaterialsAPI.Models;
-using BillOfMaterialsAPI.Schemas;
-using BOM_API_v2.Authentication;
-using BOM_API_v2.KaizenFiles.Models;
 using CRUDFI.Models;
 using JWTAuthentication.Authentication;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using MySql.Data.MySqlClient;
 using System.Data;
 using System.Diagnostics;
 using System.Globalization;
-using System.Net;
 using System.Security.Claims;
 using System.Text;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using Microsoft.AspNetCore.Identity;
+using BOM_API_v2.KaizenFiles.Models;
 
 
 
@@ -2499,36 +2493,49 @@ WHERE s.status = @status AND o.status IN('baking', 'to review', 'for update', 'a
 
             try
             {
-
                     // Standard order flow
                     var orderDetails = await GetOrderDetailx(orderIdBinary);
 
-                    if (orderDetails != null)
+                if (orderDetails != null)
+                {
+                    // Initialize total sum for both sections
+                    double totalSum = 0;
+
+                    // Section 1: Calculate totals for orderItems
+                    orderDetails.orderItems = await GetSubordersDetails(orderIdBinary);
+                    foreach (var suborder in orderDetails.orderItems)
                     {
-                        // Retrieve suborders
-                        orderDetails.orderItems = await GetSuborderDetails(orderIdBinary);
+                        // Retrieve add-ons for each suborder
+                        suborder.orderAddons = await GetOrderAddonsDetails(suborder.suborderId);
 
-                        // Initialize total sum
-                        double totalSum = 0;
-
-                        foreach (var suborder in orderDetails.orderItems)
-                        {
-                            // Retrieve add-ons for each suborder
-                            suborder.orderAddons = await GetOrderAddonsDetails(suborder.suborderId);
-
-                            // Calculate the total for this suborder
-                            double addOnsTotal = suborder.orderAddons.Sum(addon => addon.addOnTotal);
-                            suborder.subOrderTotal = (suborder.price ?? 0) * suborder.quantity + addOnsTotal;
+                        // Calculate the total for this suborder
+                        double addOnsTotal = suborder.orderAddons.Sum(addon => addon.addOnTotal);
+                        suborder.subOrderTotal = (suborder.price ?? 0) * suborder.quantity + addOnsTotal;
 
                         // Add to the overall total
                         totalSum += suborder.subOrderTotal;
-                        }
-
-                        // Set the total in CheckOutDetails
-                        orderDetails.orderTotal = totalSum;
                     }
 
-                    return Ok(orderDetails);
+                    // Section 2: Calculate totals for customItems
+                    orderDetails.customItems = await GetSuborderDetail(orderIdBinary);
+                    foreach (var suborders in orderDetails.customItems)
+                    {
+                        // Retrieve add-ons for each suborder
+                        suborders.orderAddons = await GetOrderAddonsDetails(suborders.suborderId);
+
+                        // Calculate the total for this suborder
+                        double addOnsTotal = suborders.orderAddons.Sum(addon => addon.addOnTotal);
+                        suborders.subOrderTotal = (suborders.price ?? 0) * suborders.quantity + addOnsTotal;
+
+                        // Add to the overall total
+                        totalSum += suborders.subOrderTotal;
+                    }
+
+                    // Assign the combined total to orderTotal
+                    orderDetails.orderTotal = totalSum;
+                }
+
+                return Ok(orderDetails);
             }
             catch (Exception ex)
             {
@@ -4448,6 +4455,150 @@ WHERE
                 }
             }
             return null;
+        }
+
+        private async Task<List<CustomItem>> GetSuborderDetail(string orderIdBinary)
+        {
+            var suborders = new List<CustomItem>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string suborderSql = @"
+    SELECT 
+        suborder_id, order_id, customer_id, employee_id, created_at, status, 
+        design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, description, 
+        flavor, size, customer_name, employee_name, shape, color, pastry_id 
+    FROM suborders 
+    WHERE order_id = @orderIdBinary AND custom_id IS NOT NULL";
+
+                using (var command = new MySqlCommand(suborderSql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+
+                            string? orderIdFromDb = reader.IsDBNull(reader.GetOrdinal("order_id")) ? null : reader["order_id"].ToString();
+                            string? suborderId = reader.IsDBNull(reader.GetOrdinal("suborder_id")) ? null : reader["suborder_id"].ToString();
+                            string? designId = reader.IsDBNull(reader.GetOrdinal("design_id")) ? null : reader["design_id"].ToString();
+                            string? customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id")) ? null : reader["customer_id"].ToString();
+                            string? employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id")) ? null : reader["employee_id"].ToString();
+
+                            var suborder = new CustomItem
+                            {
+                                suborderId = suborderId,
+                                orderId = orderIdFromDb,
+                                color = reader.IsDBNull(reader.GetOrdinal("color")) ? null : reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? null : reader.GetString(reader.GetOrdinal("shape")),
+                                designId = designId,
+                                designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("design_name")),
+                                status = reader.IsDBNull(reader.GetOrdinal("status"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("status")),
+                                price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                                flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? null : reader.GetString(reader.GetOrdinal("flavor")),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? null : reader.GetString(reader.GetOrdinal("size")),
+                                subOrderTotal = (reader.IsDBNull(reader.GetOrdinal("price")) ? 0 : reader.GetDouble(reader.GetOrdinal("price"))) *
+                                                (reader.IsDBNull(reader.GetOrdinal("quantity")) ? 0 : reader.GetInt32(reader.GetOrdinal("quantity"))) // Calculate Total
+                            };
+
+                            var (tier, cover) = await FetchTierAndCoverBySuborderIdAsync(suborder.suborderId);
+                            suborder.tier = tier;
+                            suborder.cover = cover;
+
+                            if (!string.IsNullOrEmpty(suborder.designId))
+                            {
+                                byte[]? pictureData = await GetPictureDataByDesignId(suborder.designId);
+                                if (pictureData != null)
+                                {
+                                    // Convert the picture data to a base64 string
+                                    suborder.pictureDate = Convert.FromBase64String(Convert.ToBase64String(pictureData));
+                                }
+                            }
+
+                            suborders.Add(suborder);
+                        }
+                    }
+                }
+            }
+
+            return suborders;
+        }
+
+        private async Task<List<OrderItem>> GetSubordersDetails(string orderIdBinary)
+        {
+            var suborders = new List<OrderItem>();
+
+            using (var connection = new MySqlConnection(connectionstring))
+            {
+                await connection.OpenAsync();
+
+                string suborderSql = @"
+    SELECT 
+        suborder_id, order_id, customer_id, employee_id, created_at, status, 
+        design_id, design_name, price, quantity, 
+        last_updated_by, last_updated_at, is_active, description, 
+        flavor, size, customer_name, employee_name, shape, color, pastry_id 
+    FROM suborders 
+    WHERE order_id = @orderIdBinary AND custom_id IS NULL";
+
+                using (var command = new MySqlCommand(suborderSql, connection))
+                {
+                    command.Parameters.AddWithValue("@orderIdBinary", orderIdBinary);
+
+                    using (var reader = await command.ExecuteReaderAsync())
+                    {
+                        while (await reader.ReadAsync())
+                        {
+
+                            string? orderIdFromDb = reader.IsDBNull(reader.GetOrdinal("order_id")) ? null : reader["order_id"].ToString();
+                            string? suborderId = reader.IsDBNull(reader.GetOrdinal("suborder_id")) ? null : reader["suborder_id"].ToString();
+                            string? designId = reader.IsDBNull(reader.GetOrdinal("design_id")) ? null : reader["design_id"].ToString();
+                            string? customerIdFromDb = reader.IsDBNull(reader.GetOrdinal("customer_id")) ? null : reader["customer_id"].ToString();
+                            string? employeeId = reader.IsDBNull(reader.GetOrdinal("employee_id")) ? null : reader["employee_id"].ToString();
+
+                            var suborder = new OrderItem
+                            {
+                                suborderId = suborderId,
+                                orderId = orderIdFromDb,
+                                pastryId = reader.IsDBNull(reader.GetOrdinal("pastry_id"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("pastry_id")),
+                                color = reader.IsDBNull(reader.GetOrdinal("color")) ? null : reader.GetString(reader.GetOrdinal("color")),
+                                shape = reader.IsDBNull(reader.GetOrdinal("shape")) ? null : reader.GetString(reader.GetOrdinal("shape")),
+                                designId = designId,
+                                designName = reader.IsDBNull(reader.GetOrdinal("design_name"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("design_name")),
+                                status = reader.IsDBNull(reader.GetOrdinal("status"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("status")),
+                                price = reader.IsDBNull(reader.GetOrdinal("price")) ? (double?)null : reader.GetDouble(reader.GetOrdinal("price")),
+                                quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
+                                description = reader.IsDBNull(reader.GetOrdinal("description")) ? null : reader.GetString(reader.GetOrdinal("description")),
+                                flavor = reader.IsDBNull(reader.GetOrdinal("flavor")) ? null : reader.GetString(reader.GetOrdinal("flavor")),
+                                size = reader.IsDBNull(reader.GetOrdinal("size")) ? null : reader.GetString(reader.GetOrdinal("size")),
+                                subOrderTotal = (reader.IsDBNull(reader.GetOrdinal("price")) ? 0 : reader.GetDouble(reader.GetOrdinal("price"))) *
+                                                (reader.IsDBNull(reader.GetOrdinal("quantity")) ? 0 : reader.GetInt32(reader.GetOrdinal("quantity"))) // Calculate Total
+                            };
+
+
+                            suborders.Add(suborder);
+                        }
+                    }
+                }
+            }
+
+            return suborders;
         }
 
         private async Task<List<OrderItem>> GetSuborderDetails(string orderIdBinary)

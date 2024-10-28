@@ -374,7 +374,7 @@ namespace CRUDFI.Models
         public string shape { get; set; }
         public string designId { get; set; }
         public string? designName { get; set; }
-        public double price { get; set; }
+        public double? price { get; set; }
         public int quantity { get; set; }
         public string description { get; set; }
         public string flavor { get; set; }
@@ -383,6 +383,7 @@ namespace CRUDFI.Models
         public string cover { get; set; }
         public int? tier { get; set; }
         public string status { get; set; }
+        public double subOrderTotal { get; set; }
         public byte[] pictureDate { get; set; }
         public List<OrderAddon1> orderAddons { get; set; } = new List<OrderAddon1>();
     }
