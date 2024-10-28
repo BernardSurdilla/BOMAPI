@@ -3230,7 +3230,7 @@ WHERE
                                     : null,
                                 price = reader.GetDouble(reader.GetOrdinal("price")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                description = reader.GetString(reader.GetOrdinal("description")),
+                                description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
                                 flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                 size = reader.GetString(reader.GetOrdinal("size")),
                                 color = reader.GetString(reader.GetOrdinal("color")),
@@ -3299,7 +3299,7 @@ WHERE
                                     ? null
                                     : reader.GetString(reader.GetOrdinal("status")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
-                                description = reader.GetString(reader.GetOrdinal("description")),
+                                description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
                                 flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                 size = reader.GetString(reader.GetOrdinal("size")),
                                 color = reader.GetString(reader.GetOrdinal("color")),
@@ -3759,7 +3759,7 @@ WHERE
                                                     ? (DateTime?)null
                                                     : reader.GetDateTime(reader.GetOrdinal("last_updated_at")),
                                     isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                                    description = reader.GetString(reader.GetOrdinal("description")),
+                                    description = reader.IsDBNull(reader.GetOrdinal("description")) ? string.Empty : reader.GetString(reader.GetOrdinal("description")),
                                     flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                     size = reader.GetString(reader.GetOrdinal("size")),
                                     customerName = reader.GetString(reader.GetOrdinal("customer_name")),
@@ -4304,7 +4304,9 @@ WHERE
                                     : reader.GetString(reader.GetOrdinal("design_name")),
                                 quantity = reader.GetInt32(reader.GetOrdinal("quantity")),
                                 isActive = reader.GetBoolean(reader.GetOrdinal("is_active")),
-                                description = reader.GetString(reader.GetOrdinal("description")),
+                                description = reader.IsDBNull(reader.GetOrdinal("description"))
+                                    ? null
+                                    : reader.GetString(reader.GetOrdinal("description")),
                                 flavor = reader.GetString(reader.GetOrdinal("flavor")),
                                 size = reader.GetString(reader.GetOrdinal("size")),
                                 customerName = reader.GetString(reader.GetOrdinal("customer_name")),
