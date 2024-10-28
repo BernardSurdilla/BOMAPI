@@ -5079,7 +5079,7 @@ WHERE
 
 
         [HttpPatch("suborders/{suborderId}/update-status")] //done
-        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist)]
+        [Authorize(Roles = UserRoles.Admin + "," + UserRoles.Manager + "," + UserRoles.Artist + "," + UserRoles.Customer)]
         public async Task<IActionResult> PatchOrderStatus(string suborderId, [FromQuery] string action)
         {
             try
