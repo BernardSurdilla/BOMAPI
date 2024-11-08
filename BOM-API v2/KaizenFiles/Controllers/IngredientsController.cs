@@ -751,7 +751,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     ? null
                                     : reader["last_modified_by"].ToString(),
                                 isActive = reader.GetBoolean("is_active"),
-                                expiration = reader.GetDateTime("expiration"),
+                                expiration = reader.IsDBNull(reader.GetOrdinal("expiration"))
+                                    ? (DateTime?)null
+                                    : reader.GetDateTime("expiration"),
                                 lotNumber = reader.IsDBNull(reader.GetOrdinal("lot_number"))
                                     ? null
                                     : reader["lot_number"].ToString(),
