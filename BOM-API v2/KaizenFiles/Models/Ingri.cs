@@ -94,7 +94,7 @@ namespace CRUDFI.Models
     {
         public double price { get; set; }
         public double quantity { get; set; }
-        public DateTime expiration { get; set; }
+        public string expiration { get; set; }
         public string lotNumber {  get; set; }
     }
     public class BatchDto
