@@ -140,7 +140,8 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     lastUpdatedBy,
                     id,
                     itemId,
-                    batchRequest.expiration
+                    batchRequest.expiration,
+                    batchRequest.lotNumber
                 );
 
                 return Ok("Batch created successfully.");
@@ -154,14 +155,14 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
 
 
-        private async Task InsertOrUpdateIngredientAsync(double quantity, double price, string lastUpdatedBy, string id, string itemId, DateTime expiration)
+        private async Task InsertOrUpdateIngredientAsync(double quantity, double price, string lastUpdatedBy, string id, string itemId, DateTime expiration, string lotNumber)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
                    
                         // If the ingredient does not exist, insert a new record
-                        string sqlInsert = "INSERT INTO batches(id, item_id, quantity, price,  created, last_modified_by, last_modified, expiration) VALUES(@id, @item_id, @quantity, @price, @createdAt, @last_updated_by, @last_updated_at, @expiration)";
+                        string sqlInsert = "INSERT INTO batches(id, item_id, quantity, price,  created, last_modified_by, last_modified, expiration, lot_number) VALUES(@id, @item_id, @quantity, @price, @createdAt, @last_updated_by, @last_updated_at, @expiration, @lot)";
                         using (var insertCommand = new MySqlCommand(sqlInsert, connection))
                         {
                             insertCommand.Parameters.AddWithValue("@id", id);
@@ -172,6 +173,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                             insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
                             insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
                             insertCommand.Parameters.AddWithValue("@expiration", expiration);
+                            insertCommand.Parameters.AddWithValue("@lot", lotNumber);
 
                     await insertCommand.ExecuteNonQueryAsync();
                         }
@@ -727,7 +729,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             {
                 await connection.OpenAsync();
 
-                string sqlQuery = "SELECT id, item_id, price, quantity, expiration, created, last_modified, last_modified_by, is_active FROM batches";
+                string sqlQuery = "SELECT id, item_id, price, quantity, expiration, created, last_modified, last_modified_by, lot_number, is_active FROM batches";
 
                 using (var command = new MySqlCommand(sqlQuery, connection))
                 {
@@ -749,7 +751,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                                     ? null
                                     : reader["last_modified_by"].ToString(),
                                 isActive = reader.GetBoolean("is_active"),
-                                expiration = reader.GetDateTime("expiration")
+                                expiration = reader.GetDateTime("expiration"),
+                                lotNumber = reader.IsDBNull(reader.GetOrdinal("lot_number"))
+                                    ? null
+                                    : reader["lot_number"].ToString(),
                             };
 
                             batchesList.Add(batch);
