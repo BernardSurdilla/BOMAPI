@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 using MySql.Data.MySqlClient;
 using System.Data;
 using System.Diagnostics;
+using System.Globalization;
 using System.Security.Claims;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
@@ -132,16 +133,23 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             string lastUpdatedBy = await GetLastupdater(username);
             string id = Guid.NewGuid().ToString();
 
+            // Step 1: Parse and validate the expiration date
+            if (!DateTime.TryParseExact(batchRequest.expiration, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedExpirationDate))
+            {
+                return BadRequest("Invalid expiration date format. Use 'yyyy-MM-dd' for date.");
+            }
+
             try
             {
+                // Step 2: Pass parsed DateTime and nullable lotNumber to InsertOrUpdateIngredientAsync
                 await InsertOrUpdateIngredientAsync(
                     batchRequest.quantity,
                     batchRequest.price,
                     lastUpdatedBy,
                     id,
                     itemId,
-                    batchRequest.expiration,
-                    batchRequest.lotNumber
+                    parsedExpirationDate,
+                    batchRequest.lotNumber // This will be nullable
                 );
 
                 return Ok("Batch created successfully.");
@@ -153,33 +161,41 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
-
-
-        private async Task InsertOrUpdateIngredientAsync(double quantity, double price, string lastUpdatedBy, string id, string itemId, DateTime expiration, string lotNumber)
+        private async Task InsertOrUpdateIngredientAsync(double quantity, double price, string lastUpdatedBy, string id, string itemId, DateTime expirationDate, string lotNumber)
         {
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
-                   
-                        // If the ingredient does not exist, insert a new record
-                        string sqlInsert = "INSERT INTO batches(id, item_id, quantity, price,  created, last_modified_by, last_modified, expiration, lot_number) VALUES(@id, @item_id, @quantity, @price, @createdAt, @last_updated_by, @last_updated_at, @expiration, @lot)";
-                        using (var insertCommand = new MySqlCommand(sqlInsert, connection))
-                        {
-                            insertCommand.Parameters.AddWithValue("@id", id);
-                            insertCommand.Parameters.AddWithValue("@item_id", itemId);
-                            insertCommand.Parameters.AddWithValue("@quantity", quantity);
-                            insertCommand.Parameters.AddWithValue("@price", price);
-                            insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow);
-                            insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
-                            insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
-                            insertCommand.Parameters.AddWithValue("@expiration", expiration);
-                            insertCommand.Parameters.AddWithValue("@lot", lotNumber);
+
+                string sqlInsert = "INSERT INTO batches(id, item_id, quantity, price, created, last_modified_by, last_modified, expiration, lot_number) " +
+                                   "VALUES(@id, @item_id, @quantity, @price, @createdAt, @last_updated_by, @last_updated_at, @expiration, @lot)";
+                using (var insertCommand = new MySqlCommand(sqlInsert, connection))
+                {
+                    insertCommand.Parameters.AddWithValue("@id", id);
+                    insertCommand.Parameters.AddWithValue("@item_id", itemId);
+                    insertCommand.Parameters.AddWithValue("@quantity", quantity);
+                    insertCommand.Parameters.AddWithValue("@price", price);
+                    insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow);
+                    insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
+                    insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                    insertCommand.Parameters.AddWithValue("@expiration", expirationDate); // Use parsed DateTime for expiration
+
+                    // Add the lotNumber, allowing it to be nullable
+                    if (string.IsNullOrEmpty(lotNumber))
+                    {
+                        insertCommand.Parameters.AddWithValue("@lot", "none");
+                    }
+                    else
+                    {
+                        insertCommand.Parameters.AddWithValue("@lot", lotNumber);
+                    }
 
                     await insertCommand.ExecuteNonQueryAsync();
-                        }
-                    }
                 }
-           
+            }
+        }
+
+
 
 
         private async Task InsertOrUpdateThresholdConfigAsync(string name, int good, int bad, string itemId)
