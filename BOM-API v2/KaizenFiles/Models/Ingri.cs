@@ -92,8 +92,9 @@ namespace CRUDFI.Models
     }
     public class BatchRequest
     {
-        public double Price { get; set; }
-        public double Quantity { get; set; }
+        public double price { get; set; }
+        public double quantity { get; set; }
+        public DateTime expiration { get; set; }
     }
     public class BatchDto
     {
@@ -105,6 +106,7 @@ namespace CRUDFI.Models
         public DateTime? lastModified { get; set; }
         public string? lastModifiedBy { get; set; }
         public bool isActive { get; set; }
+        public DateTime expiration { get; set; }
     }
 
 }
