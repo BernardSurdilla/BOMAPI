@@ -107,8 +107,8 @@ namespace CRUDFI.Models
         public DateTime? lastModified { get; set; }
         public string? lastModifiedBy { get; set; }
         public bool isActive { get; set; }
-        public DateTime expiration { get; set; }
-        public string lotNumber { get; set; }
+        public DateTime? expiration { get; set; }
+        public string? lotNumber { get; set; }
     }
 
 }
