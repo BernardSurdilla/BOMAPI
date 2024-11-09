@@ -1090,6 +1090,61 @@ namespace BOM_API_v2.KaizenFiles.Controllers
             }
         }
 
+        [HttpDelete("{batchId}/batch")]
+        [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
+        public async Task<IActionResult> DeleteBatch(string batchId)
+        {
+            try
+            {
+                // Extract the username from the token
+                var username = User.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(username))
+                {
+                    return Unauthorized("User is not authorized");
+                }
+
+                // Get the last updated by user
+                string lastUpdatedBy = await GetLastupdater(username);
+                if (lastUpdatedBy == null)
+                {
+                    return Unauthorized("Username not found");
+                }
+
+                TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+                DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
+                DateTime lastUpdatedAt = cstNow;
+
+                using (var connection = new MySqlConnection(connectionstring))
+                {
+                    connection.Open();
+
+                    string sqlUpdate = "UPDATE batches SET is_active = @isActive, last_modified = @last, last_modified_by = @by WHERE id = @batchId";
+                    using (var updateCommand = new MySqlCommand(sqlUpdate, connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@isActive", false);
+                        updateCommand.Parameters.AddWithValue("@batchId", batchId);
+                        updateCommand.Parameters.AddWithValue("@by", lastUpdatedBy);
+                        updateCommand.Parameters.AddWithValue("@last", lastUpdatedAt);
+                        int rowsAffected = updateCommand.ExecuteNonQuery();
+
+                        if (rowsAffected == 0)
+                        {
+                            return NotFound("Batch not found");
+                        }
+                    }
+                }
+
+                return Ok("Batch marked as inactive successfully");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while marking the batch as inactive");
+                return StatusCode(500, "An error occurred while processing the request");
+            }
+        }
+
         [HttpPost("restore")]
         [Authorize(Roles = UserRoles.Manager + "," + UserRoles.Admin)]
         public async Task<IActionResult> ReactivateIngredient(string restore)
