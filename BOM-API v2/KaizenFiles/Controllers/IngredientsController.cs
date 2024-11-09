@@ -92,6 +92,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task InsertIngredientAsync(IngriDTO ingredientDto, string lastUpdatedBy, string id)
         {
+
+            TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+            DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync(); // Open the connection asynchronously
@@ -107,9 +111,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     insertCommand.Parameters.AddWithValue("@id", id);
                     insertCommand.Parameters.AddWithValue("@item_name", ingredientDto.name);
                     insertCommand.Parameters.AddWithValue("@type", ingredientDto.type);
-                    insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow); // Set created_at to the current date/time
+                    insertCommand.Parameters.AddWithValue("@createdAt", cstNow); // Set created_at to the current date/time
                     insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
-                    insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                    insertCommand.Parameters.AddWithValue("@last_updated_at", cstNow);
                     insertCommand.Parameters.AddWithValue("@measurements", ingredientDto.measurements);
 
                     await insertCommand.ExecuteNonQueryAsync(); // Execute the insert command
@@ -163,6 +167,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task InsertOrUpdateIngredientAsync(double quantity, double price, string lastUpdatedBy, string id, string itemId, DateTime expirationDate, string lotNumber)
         {
+            TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+            DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
@@ -175,9 +182,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     insertCommand.Parameters.AddWithValue("@item_id", itemId);
                     insertCommand.Parameters.AddWithValue("@quantity", quantity);
                     insertCommand.Parameters.AddWithValue("@price", price);
-                    insertCommand.Parameters.AddWithValue("@createdAt", DateTime.UtcNow);
+                    insertCommand.Parameters.AddWithValue("@createdAt", cstNow);
                     insertCommand.Parameters.AddWithValue("@last_updated_by", lastUpdatedBy);
-                    insertCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                    insertCommand.Parameters.AddWithValue("@last_updated_at", cstNow);
                     insertCommand.Parameters.AddWithValue("@expiration", expirationDate); // Use parsed DateTime for expiration
 
                     // Add the lotNumber, allowing it to be nullable
@@ -376,6 +383,9 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task UpdateItemStatusAsync(string itemId)
         {
+            TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+            DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
@@ -456,7 +466,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                 {
                     updateCommand.Parameters.AddWithValue("@status", status);
                     updateCommand.Parameters.AddWithValue("@last_updated_by", "System Update");
-                    updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                    updateCommand.Parameters.AddWithValue("@last_updated_at", cstNow);
                     updateCommand.Parameters.AddWithValue("@id", itemId);
 
                     await updateCommand.ExecuteNonQueryAsync();
@@ -529,6 +539,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
 
         private async Task UpdateItemFromBatchesAsync(string itemId)
         {
+
+            TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+            DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
             using (var connection = new MySqlConnection(connectionstring))
             {
                 await connection.OpenAsync();
@@ -629,7 +643,7 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     updateCommand.Parameters.AddWithValue("@quantity", updatedQuantity);
                     updateCommand.Parameters.AddWithValue("@status", status); // Set the calculated status
                     updateCommand.Parameters.AddWithValue("@last_updated_by", "System Update");
-                    updateCommand.Parameters.AddWithValue("@last_updated_at", DateTime.UtcNow);
+                    updateCommand.Parameters.AddWithValue("@last_updated_at", cstNow);
                     updateCommand.Parameters.AddWithValue("@id", itemId);
 
                     await updateCommand.ExecuteNonQueryAsync();
@@ -945,10 +959,13 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                         existingIngredient.measurements = updatedIngredient.measurements;
                     }
                 }
+                
+                TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+                DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
 
                 // Set the last updated fields
                 existingIngredient.lastUpdatedBy = lastUpdatedBy;
-                existingIngredient.lastUpdatedAt = DateTime.UtcNow;
+                existingIngredient.lastUpdatedAt = cstNow;
 
                 // Update the ingredient in the database
                 UpdateIngredientInDatabase(existingIngredient);
@@ -1030,7 +1047,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("Username not found");
                 }
 
-                DateTime lastUpdatedAt = DateTime.UtcNow;
+                TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+                DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
+                DateTime lastUpdatedAt = cstNow;
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
@@ -1091,7 +1111,10 @@ namespace BOM_API_v2.KaizenFiles.Controllers
                     return Unauthorized("Username not found");
                 }
 
-                DateTime lastUpdatedAt = DateTime.UtcNow;
+                TimeZoneInfo cstTimeZone = TimeZoneInfo.FindSystemTimeZoneById("China Standard Time");
+                DateTime cstNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, cstTimeZone);
+
+                DateTime lastUpdatedAt = cstNow;
 
                 using (var connection = new MySqlConnection(connectionstring))
                 {
